@@ -81,16 +81,18 @@ vi.mock('@babylonjs/core', () => {
       CreatePlane: vi.fn(() => mockMesh),
     },
     TransformNode: vi.fn(() => mockTransformNode),
-    ActionManager: vi.fn(() => ({ registerAction: vi.fn() })),
+    ActionManager: Object.assign(
+      vi.fn(() => ({ registerAction: vi.fn() })),
+      {
+        OnPointerOverTrigger: 0,
+        OnPointerOutTrigger: 1,
+        OnPickTrigger: 4,
+      }
+    ),
     ExecuteCodeAction: vi.fn(() => {}),
     Animation: {
       CreateAndStartAnimation: vi.fn(),
       ANIMATIONLOOPMODE_CONSTANT: 0,
-    },
-    ActionManager: {
-      OnPointerOverTrigger: 0,
-      OnPointerOutTrigger: 1,
-      OnPickTrigger: 4,
     },
     Mesh: {
       BILLBOARDMODE_ALL: 7,
