@@ -17,6 +17,7 @@ export class VRSceneManager {
   private isAnimating: boolean = false;
   private fileColorMap: Map<string, BABYLON.Color3> = new Map();
   private currentFunctionId: string | null = null;
+  private currentFaceNormal: BABYLON.Vector3 | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.engine = new BABYLON.Engine(canvas, true);
@@ -62,20 +63,136 @@ export class VRSceneManager {
         if (pickResult && pickResult.hit && pickResult.pickedMesh) {
           const clickedNode = (pickResult.pickedMesh as any).nodeData as GraphNode;
           if (clickedNode) {
+            let faceNormal = (pickResult as any).normal || new BABYLON.Vector3(0, 0, 1);
+            const pickedPoint = (pickResult as any).pickedPoint as BABYLON.Vector3;
+            const cubePosition = pickResult.pickedMesh.position;
+            
+            // Check if click is near an edge (within 10% of cube size) and get adjacent face if so
+            const adjacentFaceNormal = this.getAdjacentFaceIfNearEdge(pickedPoint, cubePosition, faceNormal);
+            if (adjacentFaceNormal) {
+              faceNormal = adjacentFaceNormal;
+            }
+            
+            const isSameFunction = clickedNode.id === this.currentFunctionId;
+            const isSameFace = isSameFunction && this.isFaceNormalEqual(faceNormal, this.currentFaceNormal);
+            
             this.isAnimating = true;
-            if (clickedNode.id === this.currentFunctionId) {
-              // Same function clicked - slide to show that face
-              const normal = (pickResult as any).normal || new BABYLON.Vector3(0, 0, 1);
-              this.slideFaceView(pickResult.pickedMesh.position, normal);
+            
+            if (isSameFace) {
+              // Same face clicked again - slide to show that face
+              this.slideFaceView(pickResult.pickedMesh.position, faceNormal);
+            } else if (isSameFunction) {
+              // Different face of same function - slide to new face
+              this.currentFaceNormal = faceNormal.clone();
+              this.slideFaceView(pickResult.pickedMesh.position, faceNormal);
             } else {
               // Different function - jump to it
               this.currentFunctionId = clickedNode.id;
+              this.currentFaceNormal = null;  // Reset face normal on function change
               this.sceneRootFlyTo(pickResult.pickedMesh.position);
             }
           }
         }
       }
     });
+  }
+
+  /**
+   * Check if click is within 10% of a cube edge and return adjacent face normal if so
+   */
+  private getAdjacentFaceIfNearEdge(pickedPoint: BABYLON.Vector3, cubePosition: BABYLON.Vector3, faceNormal: BABYLON.Vector3): BABYLON.Vector3 | null {
+    if (!pickedPoint) return null;
+    
+    const cubeHalfSize = SceneConfig.FUNCTION_BOX_SIZE / 2;  // 2.0
+    const edgeThreshold = cubeHalfSize * 0.1;  // 10% of half-size = 0.2
+    
+    // Convert picked point to local coordinates relative to cube center
+    const localPoint = pickedPoint.subtract(cubePosition);
+    
+    // Determine which face was clicked based on normal and find edge
+    // The normal should point to one of 6 cardinal directions
+    const absNormal = new BABYLON.Vector3(Math.abs(faceNormal.x), Math.abs(faceNormal.y), Math.abs(faceNormal.z));
+    
+    // Determine which face (X, Y, or Z aligned) and get the 2D coordinates on that face
+    if (absNormal.x > 0.9) {
+      // Face is X-aligned (left or right)
+      const y = localPoint.y;
+      const z = localPoint.z;
+      
+      // Check if near top edge (positive Z)
+      if (z > cubeHalfSize - edgeThreshold) {
+        return new BABYLON.Vector3(0, 0, 1);  // Top face
+      }
+      // Check if near bottom edge (negative Z)
+      if (z < -cubeHalfSize + edgeThreshold) {
+        return new BABYLON.Vector3(0, 0, -1);  // Bottom face
+      }
+      // Check if near back edge (positive Y)
+      if (y > cubeHalfSize - edgeThreshold) {
+        return new BABYLON.Vector3(0, 1, 0);  // Back face
+      }
+      // Check if near front edge (negative Y)
+      if (y < -cubeHalfSize + edgeThreshold) {
+        return new BABYLON.Vector3(0, -1, 0);  // Front face
+      }
+    } else if (absNormal.y > 0.9) {
+      // Face is Y-aligned (front or back)
+      const x = localPoint.x;
+      const z = localPoint.z;
+      
+      // Check if near top edge (positive Z)
+      if (z > cubeHalfSize - edgeThreshold) {
+        return new BABYLON.Vector3(0, 0, 1);  // Top face
+      }
+      // Check if near bottom edge (negative Z)
+      if (z < -cubeHalfSize + edgeThreshold) {
+        return new BABYLON.Vector3(0, 0, -1);  // Bottom face
+      }
+      // Check if near right edge (positive X)
+      if (x > cubeHalfSize - edgeThreshold) {
+        return new BABYLON.Vector3(1, 0, 0);  // Right face
+      }
+      // Check if near left edge (negative X)
+      if (x < -cubeHalfSize + edgeThreshold) {
+        return new BABYLON.Vector3(-1, 0, 0);  // Left face
+      }
+    } else if (absNormal.z > 0.9) {
+      // Face is Z-aligned (top or bottom)
+      const x = localPoint.x;
+      const y = localPoint.y;
+      
+      // Check if near right edge (positive X)
+      if (x > cubeHalfSize - edgeThreshold) {
+        return new BABYLON.Vector3(1, 0, 0);  // Right face
+      }
+      // Check if near left edge (negative X)
+      if (x < -cubeHalfSize + edgeThreshold) {
+        return new BABYLON.Vector3(-1, 0, 0);  // Left face
+      }
+      // Check if near back edge (positive Y)
+      if (y > cubeHalfSize - edgeThreshold) {
+        return new BABYLON.Vector3(0, 1, 0);  // Back face
+      }
+      // Check if near front edge (negative Y)
+      if (y < -cubeHalfSize + edgeThreshold) {
+        return new BABYLON.Vector3(0, -1, 0);  // Front face
+      }
+    }
+    
+    return null;  // Not near any edge
+  }
+
+  /**
+   * Compare two face normals with floating-point tolerance
+   */
+  private isFaceNormalEqual(a: BABYLON.Vector3 | null, b: BABYLON.Vector3 | null): boolean {
+    if (!a || !b) return false;
+    const tolerance = 0.1;  // Allow small floating-point differences
+    return (
+      Math.abs(a.x - b.x) < tolerance &&
+      Math.abs(a.y - b.y) < tolerance &&
+      Math.abs(a.z - b.z) < tolerance
+    );
   }
 
   /**
@@ -507,6 +624,9 @@ export class VRSceneManager {
   private slideFaceView(cubePosition: BABYLON.Vector3, faceNormal: BABYLON.Vector3): void {
     // Stop any existing animation
     this.scene.stopAnimation(this.sceneRoot);
+
+    // Track the current face being viewed
+    this.currentFaceNormal = faceNormal.clone();
 
     const cameraPosition = SceneConfig.CAMERA_POSITION;
     
