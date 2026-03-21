@@ -94,37 +94,37 @@
       "id": "createLabel@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "createLabel",
       "file": "VRSceneManager.ts",
-      "line": 198
+      "line": 208
     },
     {
       "id": "showTooltip@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "showTooltip",
       "file": "VRSceneManager.ts",
-      "line": 225
+      "line": 235
     },
     {
       "id": "hideTooltip@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "hideTooltip",
       "file": "VRSceneManager.ts",
-      "line": 248
+      "line": 258
     },
     {
       "id": "setupWebXR@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "setupWebXR",
       "file": "VRSceneManager.ts",
-      "line": 253
+      "line": 263
     },
     {
       "id": "run@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "run",
       "file": "VRSceneManager.ts",
-      "line": 263
+      "line": 273
     },
     {
       "id": "dispose@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "dispose",
       "file": "VRSceneManager.ts",
-      "line": 269
+      "line": 279
     }
   ],
   "edges": [
@@ -137,5 +137,5 @@
       "to": "simulate@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts"
     }
   ],
-  "lastUpdated": "2026-03-21T14:09:01.760Z"
+  "lastUpdated": "2026-03-21T14:13:34.852Z"
 }
