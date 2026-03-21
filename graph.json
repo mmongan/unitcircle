@@ -49,6 +49,12 @@
       "line": 155
     },
     {
+      "id": "logBuildVersion@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
+      "name": "logBuildVersion",
+      "file": "main.ts",
+      "line": 5
+    },
+    {
       "id": "createGround@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "createGround",
       "file": "VRSceneManager.ts",
@@ -131,5 +137,5 @@
       "to": "simulate@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts"
     }
   ],
-  "lastUpdated": "2026-03-21T14:05:30.423Z"
+  "lastUpdated": "2026-03-21T14:09:01.760Z"
 }
