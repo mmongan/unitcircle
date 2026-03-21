@@ -313,22 +313,26 @@ export class VRSceneManager {
     // Stop any existing animation on the scene root
     this.scene.stopAnimation(this.sceneRoot);
 
+    const cameraPosition = SceneConfig.CAMERA_POSITION;
+    const viewOffset = SceneConfig.FLY_TO_OFFSET;
+
+    // Calculate where sceneRoot should be positioned
+    // We want the target mesh (at local position targetPosition) to appear at:
+    // world position = cameraPosition + viewOffset
+    // Since: meshWorldPosition = sceneRoot.position + targetPosition
+    // We solve: cameraPosition + viewOffset = sceneRoot.position + targetPosition
+    // Therefore: sceneRoot.position = cameraPosition + viewOffset - targetPosition
+    const targetSceneRootPosition = cameraPosition.add(viewOffset).subtract(targetPosition);
+
     // Calculate rotation to face the clicked face toward camera
     let rotationQuaternion = BABYLON.Quaternion.Identity();
     if (faceNormal) {
-      // Create a rotation that orients the face normal to point toward camera (along -Z axis)
-      const cameraPosition = SceneConfig.CAMERA_POSITION;
+      // Create a rotation that orients the face normal to point toward camera
       const targetDirection = BABYLON.Vector3.Zero().subtract(cameraPosition).normalize();
       
       // Create rotation to align faceNormal with targetDirection
       rotationQuaternion = BABYLON.Quaternion.FromUnitVectorsToRef(faceNormal, targetDirection, rotationQuaternion);
     }
-
-    // Position cube in front of camera using world coordinates
-    // The sceneRoot position determines where all meshes appear relative to the camera
-    // To have the target mesh appear at viewOffset from camera: sceneRoot = targetPosition - viewOffset
-    const viewOffset = SceneConfig.FLY_TO_OFFSET;
-    const targetSceneRootPosition = targetPosition.subtract(viewOffset);
 
     // Create animations
     const positionAnimation = new BABYLON.Animation(
