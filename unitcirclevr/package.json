@@ -7,7 +7,7 @@
   "scripts": {
     "graph:build": "tsx scripts/build-graph.ts",
     "graph:watch": "tsx scripts/FileWatcher.ts",
-    "dev": "npm run graph:build && vite",
+    "dev": "vite",
     "dev:watch": "concurrently \"npm run graph:watch\" \"npm run dev\"",
     "build": "npm run graph:build && tsc && vite build",
     "preview": "vite preview",

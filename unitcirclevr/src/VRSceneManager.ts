@@ -95,12 +95,17 @@ export class VRSceneManager {
 
   private async loadGraph(): Promise<GraphData | null> {
     try {
-      const response = await fetch('/unitcircle/graph.json');
+      // In development, use live API endpoint
+      // In production, use prebuilt graph.json
+      const isDev = import.meta.env.DEV;
+      const url = isDev ? '/api/graph.json' : '/unitcircle/graph.json';
+      
+      const response = await fetch(url);
       if (response.ok) {
         return await response.json();
       }
     } catch (error) {
-      console.warn('Could not load graph.json:', error);
+      console.warn('Could not load graph:', error);
     }
     return null;
   }

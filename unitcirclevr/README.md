@@ -84,19 +84,29 @@ npm install
 npm run dev
 ```
 
-The application will be available at `http://localhost:5173/`
+The application will be available at `http://localhost:5173/` with **live file parsing**.
+
+**Key Feature**: The dev server uses live project files instead of a prebuilt graph. When you modify code in `src/`, the visualization will reflect those changes when you refresh the page (no rebuild needed).
 
 #### Watch for Code Changes
 
-Watch source code and regenerate visualization:
+To automatically regenerate the graph and refresh as you make changes:
 
 ```bash
 npm run dev:watch
 ```
 
-This runs file watcher and dev server concurrently.
+This runs the FileWatcher in the background while the dev server is active, providing the fastest feedback loop.
 
-#### Generate Code Graph
+#### Local Development vs Production
+
+| Context | Graph Source | Update Method | Best For |
+| --- | --- | --- | --- |
+| `npm run dev` | Live from `src/` files | Manual refresh | Quick iteration |
+| `npm run dev:watch` | Live with auto-polling | Auto-refresh via FileWatcher | Active development |
+| `npm run build` → deployed | Prebuilt `graph.json` | At build time | Production, fast static serving |
+
+#### Generate Code Graph (For Preview)
 
 Manually regenerate the function dependency graph:
 
@@ -173,20 +183,35 @@ npm run preview
 
 ## Build Pipeline & Static Assets
 
-### Graph Generation
+### Development vs Production
 
-The code visualization uses a **prebuilt graph.json** file generated at build time:
+**Local Development** (`npm run dev` or `npm run dev:watch`):
+- Graph is **parsed live** from source files in `src/`
+- No prebuilt graph needed
+- Changes visible immediately on refresh
+- Vite plugin intercepts `/api/graph.json` requests
+
+**Production** (GitHub Pages):
+- Graph is **prebuilt** at build time via `npm run graph:build`
+- Static `public/graph.json` copied to `dist/`
+- Fast load times, no server processing required
+- Optimized for static hosting
+
+### Production Build Pipeline
+
+The code visualization for production uses a **prebuilt graph.json** file:
 
 ```
 npm run build
 ├─ graph:build
-│  ├─ Parse src/VRSceneManager.ts
-│  └─ Generate public/graph.json
+│  ├─ Parse src/VRSceneManager.ts for live code
+│  └─ Generate public/graph.json (snapshot)
 ├─ tsc (TypeScript compilation)
 └─ vite build
    ├─ Copy public/ → dist/
-   ├─ Transpile TypeScript sources
+   ├─ Transpile TypeScript sources to JavaScript
    └─ Bundle and minify assets
+      └─ dist/graph.json (static file)
 ```
 
 **Key Points**:
@@ -194,6 +219,7 @@ npm run build
 - Graph is generated **once at build time** (not at runtime)
 - Graph.json is a **static asset** served by GitHub Pages
 - Benefits: Fast load times, no server-side processing, simple deployment
+- Production snapshot captures code structure at build time
 
 ### Deployed Assets
 
