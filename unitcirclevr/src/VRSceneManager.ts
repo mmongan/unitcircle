@@ -60,7 +60,7 @@ export class VRSceneManager {
   }
 
   private setupCamera(canvas: HTMLCanvasElement): void {
-    this.camera = new BABYLON.UniversalCamera('camera', new BABYLON.Vector3(0, 0, -30), this.scene);
+    this.camera = new BABYLON.UniversalCamera('camera', new BABYLON.Vector3(0, 0, -70), this.scene);
     this.camera.attachControl(canvas, true);
     this.camera.inertia = 0.5;
     this.camera.angularSensibility = 1000;
@@ -189,7 +189,7 @@ export class VRSceneManager {
 
   private createExternalModuleMesh(node: GraphData['nodes'][0], position: BABYLON.Vector3): void {
     const externalModuleColor = new BABYLON.Color3(0.4, 0.8, 1);
-    const cylinder = BABYLON.MeshBuilder.CreateCylinder(`ext_${node.id}`, { height: 0.8, diameterTop: 0.5, diameterBottom: 0.5 }, this.scene);
+    const cylinder = BABYLON.MeshBuilder.CreateCylinder(`ext_${node.id}`, { height: 2.0, diameterTop: 1.2, diameterBottom: 1.2 }, this.scene);
     cylinder.position = position;
 
     const material = new BABYLON.StandardMaterial(`extMat_${node.id}`, this.scene);
@@ -205,7 +205,7 @@ export class VRSceneManager {
     const exportedVarColor = new BABYLON.Color3(1, 0.8, 0.2);
     const unexportedVarColor = new BABYLON.Color3(0.6, 0.6, 0.6);
     
-    const sphere = BABYLON.MeshBuilder.CreateSphere(`var_${node.id}`, { diameter: 0.6 }, this.scene);
+    const sphere = BABYLON.MeshBuilder.CreateSphere(`var_${node.id}`, { diameter: 1.5 }, this.scene);
     sphere.position = position;
 
     const material = new BABYLON.StandardMaterial(`varMat_${node.id}`, this.scene);
@@ -228,7 +228,7 @@ export class VRSceneManager {
       new BABYLON.Color3(1, 0.2, 1),
     ];
 
-    const box = BABYLON.MeshBuilder.CreateBox(`func_${node.id}`, { size: 0.8 }, this.scene);
+    const box = BABYLON.MeshBuilder.CreateBox(`func_${node.id}`, { size: 2.0 }, this.scene);
     box.position = position;
 
     const material = new BABYLON.StandardMaterial(`mat_${node.id}`, this.scene);
@@ -288,7 +288,7 @@ export class VRSceneManager {
 
       const tube = BABYLON.MeshBuilder.CreateTube(`edge_${index}`, {
         path: points,
-        radius: 0.08
+        radius: 0.2
       });
       tube.material = material;
     }
