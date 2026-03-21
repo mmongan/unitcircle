@@ -109,12 +109,12 @@ export class MeshFactory {
     signatureTexture.uOffset = 0;
     signatureTexture.vOffset = 0;
     
-    // Use texture as emissive only (no additional color)
+    // Use texture as emissive with primary blue tint
     material.emissiveTexture = signatureTexture;
-    material.emissiveColor = new BABYLON.Color3(0, 0, 0);  // No additional emissive
-    // Add diffuse and reduce specular for less glare
-    material.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);  // Very low specularity
-    material.specularPower = 4;  // Low power for matte finish
+    material.emissiveColor = new BABYLON.Color3(0.2, 0.6, 1.0);  // Vibrant primary blue
+    // Add specular for subtle shine
+    material.specularColor = new BABYLON.Color3(0.3, 0.3, 0.3);
+    material.specularPower = 12;  // Moderate to sharp shine
     material.wireframe = false;
 
     box.material = material;
@@ -139,8 +139,8 @@ export class MeshFactory {
     ctx.fillStyle = 'rgba(0, 0, 0, 0)';
     ctx.fillRect(0, 0, textureSize, textureSize);
 
-    // Draw border frame in dimmed gray
-    ctx.strokeStyle = '#888888';
+    // Draw border frame in white
+    ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 3;
     ctx.strokeRect(
       SceneConfig.SIGNATURE_TEXTURE_BORDER_SIZE,
@@ -166,7 +166,7 @@ export class MeshFactory {
       node.type === 'function' ? 'Function' : node.type === 'variable' ? 'Variable' : 'External';
     lines.push(typeLabel);
 
-    ctx.fillStyle = '#cccccc';  // Dimmed gray instead of white
+    ctx.fillStyle = '#ffffff';  // Clear white text
     ctx.font = `bold ${SceneConfig.SIGNATURE_FONT_SIZE_PX}px ${SceneConfig.SIGNATURE_FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';

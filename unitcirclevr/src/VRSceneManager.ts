@@ -294,41 +294,98 @@ export class VRSceneManager {
         this.hideTooltip();
       })
     );
-    mesh.actionManager.registerAction(
-      new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPickTrigger, () => {
-        this.sceneRootFlyTo(mesh.position);
-      })
-    );
+    
+    // Use scene-level pick trigger to capture the exact hit point
+    const originalFlyTo = this.sceneRootFlyTo.bind(this);
+    this.scene.onPointerObservable.add((pointerEvent) => {
+      if (pointerEvent.type === BABYLON.PointerEventTypes.POINTERDOWN && mesh.isPickable) {
+        const pickResult = this.scene.pick(this.scene.pointerX, this.scene.pointerY);
+        if (pickResult && pickResult.hit && pickResult.pickedMesh === mesh) {
+          // Get the normal at the clicked point to determine which face was clicked
+          const normal = pickResult.getNormal(true);
+          originalFlyTo(mesh.position, normal ?? undefined);
+        }
+      }
+    });
   }
 
-  private sceneRootFlyTo(targetPosition: BABYLON.Vector3): void {
+  private sceneRootFlyTo(targetPosition: BABYLON.Vector3, faceNormal?: BABYLON.Vector3): void {
     // Stop any existing animation on the scene root
     this.scene.stopAnimation(this.sceneRoot);
 
-    // Animate scene root position to place object directly below camera (top-down view)
-    // Camera is fixed at CAMERA_POSITION; position object directly below
     const cameraPosition = SceneConfig.CAMERA_POSITION;
 
-    // Top-down viewing position: object centered below camera
+    // Calculate rotation to face the clicked face toward camera
+    let rotationQuaternion = BABYLON.Quaternion.Identity();
+    if (faceNormal) {
+      // Create a rotation that orients the face normal to point toward camera (along -Z axis)
+      // The target direction for the normal is from the cube toward the camera
+      const targetDirection = BABYLON.Vector3.Zero().subtract(cameraPosition).normalize();
+      
+      // Create rotation to align faceNormal with targetDirection
+      rotationQuaternion = BABYLON.Quaternion.FromUnitVectorsToRef(faceNormal, targetDirection, rotationQuaternion);
+    }
+
+    // Position cube in front of camera
     const viewOffset = SceneConfig.FLY_TO_OFFSET;
-
-    // Calculate where the target should appear in world space
     const desiredWorldPosition = cameraPosition.add(viewOffset);
-
-    // Calculate scene root offset to position target at desired world position
     const sceneOffset = desiredWorldPosition.subtract(targetPosition);
 
-    // Animate scene root movement
-    BABYLON.Animation.CreateAndStartAnimation(
-      'sceneRootFly',
-      this.sceneRoot,
+    // Create animations
+    const positionAnimation = new BABYLON.Animation(
+      'sceneRootFlyPosition',
       'position',
       SceneConfig.FLY_TO_ANIMATION_FPS,
-      (SceneConfig.FLY_TO_ANIMATION_TIME_MS / 1000) * SceneConfig.FLY_TO_ANIMATION_FPS,
-      this.sceneRoot.position.clone(),
-      sceneOffset,
-      BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+      BABYLON.Animation.ANIMATIONTYPE_VECTOR3
     );
+    
+    const keys = [];
+    keys.push({
+      frame: 0,
+      value: this.sceneRoot.position.clone(),
+    });
+    keys.push({
+      frame: (SceneConfig.FLY_TO_ANIMATION_TIME_MS / 1000) * SceneConfig.FLY_TO_ANIMATION_FPS,
+      value: this.sceneRoot.position.clone().add(sceneOffset),
+    });
+    positionAnimation.setKeys(keys);
+    
+    this.scene.beginDirectAnimation(
+      this.sceneRoot,
+      [positionAnimation],
+      0,
+      (SceneConfig.FLY_TO_ANIMATION_TIME_MS / 1000) * SceneConfig.FLY_TO_ANIMATION_FPS,
+      false
+    );
+
+    // If a face normal was provided, also animate rotation
+    if (faceNormal && !rotationQuaternion.equals(BABYLON.Quaternion.Identity())) {
+      const rotationAnimation = new BABYLON.Animation(
+        'sceneRootFlyRotation',
+        'rotationQuaternion',
+        SceneConfig.FLY_TO_ANIMATION_FPS,
+        BABYLON.Animation.ANIMATIONTYPE_QUATERNION
+      );
+      
+      const rotKeys = [];
+      rotKeys.push({
+        frame: 0,
+        value: this.sceneRoot.rotationQuaternion || BABYLON.Quaternion.Identity(),
+      });
+      rotKeys.push({
+        frame: (SceneConfig.FLY_TO_ANIMATION_TIME_MS / 1000) * SceneConfig.FLY_TO_ANIMATION_FPS,
+        value: rotationQuaternion,
+      });
+      rotationAnimation.setKeys(rotKeys);
+
+      this.scene.beginDirectAnimation(
+        this.sceneRoot,
+        [rotationAnimation],
+        0,
+        (SceneConfig.FLY_TO_ANIMATION_TIME_MS / 1000) * SceneConfig.FLY_TO_ANIMATION_FPS,
+        false
+      );
+    }
   }
 
   private renderEdges(edges: Array<{ from: string; to: string }>, layoutNodes: Map<string, any>): void {
