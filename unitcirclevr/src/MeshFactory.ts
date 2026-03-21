@@ -266,14 +266,29 @@ export class MeshFactory {
    */
   createEdges(
     edges: Array<{ from: string; to: string }>,
+    nodes: Array<any>,
     layoutNodes: Map<string, any>
   ): void {
+    // Create material for normal edges
     const edgeMaterial = new BABYLON.StandardMaterial('edgeMaterial', this.scene);
     edgeMaterial.emissiveColor = new BABYLON.Color3(0.3, 0.3, 0.3);  // Dark gray
 
+    // Create material for golden edges (calls to exported functions)
+    const goldenEdgeMaterial = new BABYLON.StandardMaterial('goldenEdgeMaterial', this.scene);
+    goldenEdgeMaterial.emissiveColor = new BABYLON.Color3(1.0, 0.84, 0.0);  // Golden yellow
+
+    // Build a map of exported functions for quick lookup
+    const exportedFunctions = new Set(
+      nodes
+        .filter((n: any) => n.isExported && n.type === 'function')
+        .map((n: any) => n.id)
+    );
+
     let edgeIndex = 0;
     for (const edge of edges) {
-      this.createEdge(edge, layoutNodes, edgeMaterial, edgeIndex++);
+      const isCallToExported = exportedFunctions.has(edge.to);
+      const material = isCallToExported ? goldenEdgeMaterial : edgeMaterial;
+      this.createEdge(edge, layoutNodes, material, edgeIndex++);
     }
   }
 
@@ -301,6 +316,7 @@ export class MeshFactory {
       });
       tube.parent = this.sceneRoot;
       tube.material = material;
+      tube.isPickable = false;  // Edges should not be clickable
     }
   }
 
