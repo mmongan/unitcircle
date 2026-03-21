@@ -61,7 +61,8 @@ export class VRSceneManager {
           const clickedNode = (pickResult.pickedMesh as any).nodeData as GraphNode;
           if (clickedNode) {
             this.isAnimating = true;
-            this.sceneRootFlyTo(pickResult.pickedMesh.getAbsolutePosition());
+            // Use local position (relative to sceneRoot) so clicks on same node land consistently
+            this.sceneRootFlyTo(pickResult.pickedMesh.position);
             // Allow next click after animation completes
             setTimeout(() => {
               this.isAnimating = false;
