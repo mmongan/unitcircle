@@ -17,19 +17,27 @@ export class GraphLoader {
    */
   async loadGraph(): Promise<GraphData | null> {
     try {
-      const isDev = import.meta.env.DEV;
-      const url = isDev ? '/graph.json' : '/unitcircle/graph.json';
+      // Use BASE_URL which respects Vite's base configuration
+      // In dev: /unitcircle/ 
+      // In prod: /unitcircle/
+      const baseUrl = import.meta.env.BASE_URL;
+      const url = `${baseUrl}graph.json`;
       
+      console.log(`📊 Loading graph from: ${url}`);
       const response = await fetch(url);
+      
       if (response.ok) {
         const data = await response.json();
         this.cache = data;
         this.lastLoadTime = Date.now();
+        console.log(`✓ Loaded graph with ${data.nodes?.length || 0} functions and ${data.edges?.length || 0} calls`);
         return data;
       }
       
+      console.warn(`Failed to load graph: ${response.status} ${response.statusText}`);
       // If fetch fails, try returning cached version
       if (this.cache) {
+        console.warn('Using cached graph data');
         return this.cache;
       }
       return null;
@@ -37,6 +45,7 @@ export class GraphLoader {
       console.error('Error loading graph:', error);
       // Return cached version if available
       if (this.cache) {
+        console.warn('Using cached graph data due to error');
         return this.cache;
       }
       return null;

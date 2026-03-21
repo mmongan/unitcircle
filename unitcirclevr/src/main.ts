@@ -44,7 +44,9 @@ function createVRScene(canvas: HTMLCanvasElement): void {
   runVRScene(vrScene);
 }
 
-function runVRScene(vrScene: VRSceneManager): void {
+async function runVRScene(vrScene: VRSceneManager): Promise<void> {
+  // Initialize the scene visualization before starting render loop
+  await vrScene.initialize();
   vrScene.run();
 }
 

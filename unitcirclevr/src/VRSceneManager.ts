@@ -35,16 +35,23 @@ export class VRSceneManager {
     // Create a simple ground
     this.createGround();
 
-    // Initialize code visualization
-    this.initializeCodeVisualization();
-
-    // Setup WebXR
+    // Setup WebXR (non-blocking)
     this.setupWebXR();
 
     // Handle window resize
     window.addEventListener('resize', () => this.engine.resize());
+  }
 
-    // Poll for graph updates
+  /**
+   * Initialize the scene visualization - must be called after construction
+   */
+  async initialize(): Promise<void> {
+    console.log('📦 Initializing code visualization...');
+    
+    // Load and render the code graph
+    await this.initializeCodeVisualization();
+    
+    // Start polling for graph updates
     this.setupGraphPolling();
   }
 
@@ -83,14 +90,25 @@ export class VRSceneManager {
 
   private async initializeCodeVisualization(): Promise<void> {
     try {
+      console.log('📦 Initializing code visualization...');
       const graph = await this.graphLoader.loadGraph();
-      if (graph && graph.nodes.length > 0) {
-        this.validateGraphData(graph);
-        this.lastGraphUpdate = graph.lastUpdated;
-        this.renderCodeGraph(graph);
+      
+      if (!graph) {
+        console.error('❌ Failed to load graph: graph is null or undefined');
+        return;
       }
+      
+      if (!graph.nodes || graph.nodes.length === 0) {
+        console.error('❌ Failed to load graph: no nodes found');
+        return;
+      }
+      
+      console.log(`✓ Graph loaded: ${graph.nodes.length} nodes, ${graph.edges?.length || 0} edges`);
+      this.validateGraphData(graph);
+      this.lastGraphUpdate = graph.lastUpdated || '';
+      this.renderCodeGraph(graph);
     } catch (error) {
-      console.error('Error initializing code visualization:', error);
+      console.error('❌ Error initializing code visualization:', error);
     }
   }
 
