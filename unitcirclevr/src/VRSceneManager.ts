@@ -317,20 +317,18 @@ export class VRSceneManager {
       if (pointerEvent.type === BABYLON.PointerEventTypes.POINTERDOWN && mesh.isPickable) {
         const pickResult = this.scene.pick(this.scene.pointerX, this.scene.pointerY);
         if (pickResult && pickResult.hit && pickResult.pickedMesh === mesh) {
-          // Get the normal at the clicked point to determine which face was clicked
-          const normal = pickResult.getNormal(true);
           // Verify the mesh corresponds to the correct node and fly to it
           const clickedNode = (mesh as any).nodeData as GraphNode;
           if (clickedNode) {
             // Use world position, not local position, since scene root moves
-            originalFlyTo(mesh.getAbsolutePosition(), normal ?? undefined);
+            originalFlyTo(mesh.getAbsolutePosition());
           }
         }
       }
     });
   }
 
-  private sceneRootFlyTo(targetPosition: BABYLON.Vector3, faceNormal?: BABYLON.Vector3): void {
+  private sceneRootFlyTo(targetPosition: BABYLON.Vector3): void {
     // Stop any existing animation on the scene root
     this.scene.stopAnimation(this.sceneRoot);
 
@@ -343,16 +341,6 @@ export class VRSceneManager {
       .add(viewOffset)
       .subtract(targetPosition)
       .add(new BABYLON.Vector3(0, landingHeight, 0));
-
-    // Calculate rotation to face the clicked face toward camera
-    let rotationQuaternion = BABYLON.Quaternion.Identity();
-    if (faceNormal) {
-      // Create a rotation that orients the face normal to point toward camera
-      const targetDirection = BABYLON.Vector3.Zero().subtract(cameraPosition).normalize();
-      
-      // Create rotation to align faceNormal with targetDirection
-      rotationQuaternion = BABYLON.Quaternion.FromUnitVectorsToRef(faceNormal, targetDirection, rotationQuaternion);
-    }
 
     // Create parabolic position animation
     const positionAnimation = new BABYLON.Animation(
@@ -395,40 +383,6 @@ export class VRSceneManager {
       totalFrames,
       false
     );
-
-    // If a face normal was provided, also animate rotation
-    if (faceNormal && !rotationQuaternion.equals(BABYLON.Quaternion.Identity())) {
-      const rotationAnimation = new BABYLON.Animation(
-        'sceneRootFlyRotation',
-        'rotationQuaternion',
-        SceneConfig.FLY_TO_ANIMATION_FPS,
-        BABYLON.Animation.ANIMATIONTYPE_QUATERNION
-      );
-      
-      const rotKeys = [];
-      rotKeys.push({
-        frame: 0,
-        value: this.sceneRoot.rotationQuaternion || BABYLON.Quaternion.Identity(),
-      });
-      rotKeys.push({
-        frame: totalFrames,
-        value: rotationQuaternion,
-      });
-      rotationAnimation.setKeys(rotKeys);
-      
-      // Add easing to rotation as well for consistency
-      const rotationEasing = new BABYLON.QuadraticEase();
-      rotationEasing.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
-      rotationAnimation.setEasingFunction(rotationEasing);
-
-      this.scene.beginDirectAnimation(
-        this.sceneRoot,
-        [rotationAnimation],
-        0,
-        totalFrames,
-        false
-      );
-    }
   }
 
   private renderEdges(edges: Array<{ from: string; to: string }>, layoutNodes: Map<string, any>): void {
