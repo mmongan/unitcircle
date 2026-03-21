@@ -8,6 +8,7 @@ import { SceneConfig } from './SceneConfig';
 export class MeshFactory {
   private scene: BABYLON.Scene;
   private sceneRoot: BABYLON.TransformNode;
+  private nodeMeshes: Map<string, BABYLON.Mesh> = new Map();  // Track meshes for raycasting
 
   constructor(scene: BABYLON.Scene, sceneRoot: BABYLON.TransformNode) {
     this.scene = scene;
@@ -145,6 +146,9 @@ export class MeshFactory {
     material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
 
     box.material = material;
+
+    // Store reference to this mesh for raycasting during edge creation
+    this.nodeMeshes.set(node.id, box);
 
     onNodeInteraction(box as BABYLON.Mesh, material, node);
   }
@@ -318,8 +322,36 @@ export class MeshFactory {
     const targetNode = layoutNodes.get(edge.to);
 
     if (sourceNode && targetNode) {
-      const sourcePos = new BABYLON.Vector3(sourceNode.position.x, sourceNode.position.y, sourceNode.position.z);
-      const targetPos = new BABYLON.Vector3(targetNode.position.x, targetNode.position.y, targetNode.position.z);
+      const sourceCenterPos = new BABYLON.Vector3(sourceNode.position.x, sourceNode.position.y, sourceNode.position.z);
+      const targetCenterPos = new BABYLON.Vector3(targetNode.position.x, targetNode.position.y, targetNode.position.z);
+      
+      let sourcePos = sourceCenterPos.clone();
+      let targetPos = targetCenterPos.clone();
+      
+      // Calculate direction from source to target
+      const direction = targetCenterPos.subtract(sourceCenterPos).normalize();
+      const distance = BABYLON.Vector3.Distance(sourceCenterPos, targetCenterPos);
+      
+      // Find source surface intersection point via raycast
+      const sourceMesh = this.nodeMeshes.get(edge.from);
+      if (sourceMesh) {
+        const sourceRay = new BABYLON.Ray(sourceCenterPos, direction, distance);
+        const sourceHit = this.scene.pickWithRay(sourceRay, (mesh) => mesh === sourceMesh);
+        if (sourceHit && sourceHit.hit && sourceHit.pickedPoint) {
+          sourcePos = sourceHit.pickedPoint.clone();
+        }
+      }
+      
+      // Find target surface intersection point via raycast
+      const targetMesh = this.nodeMeshes.get(edge.to);
+      if (targetMesh) {
+        const reverseDirection = direction.scale(-1);
+        const targetRay = new BABYLON.Ray(targetCenterPos, reverseDirection, distance);
+        const targetHit = this.scene.pickWithRay(targetRay, (mesh) => mesh === targetMesh);
+        if (targetHit && targetHit.hit && targetHit.pickedPoint) {
+          targetPos = targetHit.pickedPoint.clone();
+        }
+      }
       
       const points = [sourcePos, targetPos];
 
@@ -368,6 +400,13 @@ export class MeshFactory {
     arrowhead.parent = this.sceneRoot;
     arrowhead.material = material;
     arrowhead.isPickable = false;
+  }
+
+  /**
+   * Remove a node mesh reference from the tracking map
+   */
+  removeMeshReference(nodeId: string): void {
+    this.nodeMeshes.delete(nodeId);
   }
 
   /**

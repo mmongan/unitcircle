@@ -480,6 +480,9 @@ export class VRSceneManager {
     if (sigTexture) {
       sigTexture.dispose();
     }
+    
+    // Remove mesh reference from factory
+    this.meshFactory.removeMeshReference(nodeId);
   }
 
   /**
