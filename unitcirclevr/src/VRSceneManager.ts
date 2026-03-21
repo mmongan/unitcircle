@@ -88,7 +88,7 @@ export class VRSceneManager {
             } else {
               // Different function - jump to it
               this.currentFunctionId = clickedNode.id;
-              this.currentFaceNormal = null;  // Reset face normal on function change
+              this.currentFaceNormal = faceNormal.clone();  // Preserve the face we're landing on
               this.sceneRootFlyTo(pickResult.pickedMesh.position);
             }
           }
