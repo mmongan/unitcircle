@@ -51,12 +51,12 @@ export class SceneConfig {
   static readonly LABEL_TEXTURE_SIZE = 512;
 
   // Texture
-  static readonly SIGNATURE_TEXTURE_SIZE = 512;
-  static readonly SIGNATURE_TEXTURE_BORDER_SIZE = 10;
-  static readonly SIGNATURE_FONT_SIZE_PX = 32;
+  static readonly SIGNATURE_TEXTURE_SIZE = 1024;
+  static readonly SIGNATURE_TEXTURE_BORDER_SIZE = 20;
+  static readonly SIGNATURE_FONT_SIZE_PX = 64;
   static readonly SIGNATURE_FONT_FAMILY = 'monospace';
-  static readonly SIGNATURE_TEXT_COLOR = '#00ff00';
-  static readonly SIGNATURE_BORDER_COLOR = '#00ff00';
+  static readonly SIGNATURE_TEXT_COLOR = '#ffffff';
+  static readonly SIGNATURE_BORDER_COLOR = '#ffffff';
 
   // Edge Rendering
   static readonly EDGE_RADIUS = 0.2;

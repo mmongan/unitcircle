@@ -98,44 +98,28 @@ export class MeshFactory {
     box.position = position;
     box.parent = this.sceneRoot;
 
-    // Create signature texture for each face
-    const signatureTexture = this.createSignatureTexture(node);
+    const material = new BABYLON.StandardMaterial(`mat_${node.id}`, this.scene);
 
     // Determine base color
-    let baseColor: BABYLON.Color3;
     if (node.isExported) {
-      baseColor = SceneConfig.EXPORTED_FUNCTION_COLOR;
+      material.emissiveColor = SceneConfig.EXPORTED_FUNCTION_COLOR;
     } else {
-      baseColor = SceneConfig.LEAF_FUNCTION_COLOR;
+      material.emissiveColor = SceneConfig.LEAF_FUNCTION_COLOR;
     }
 
-    // Create multi-material with 6 identical signature materials (one per face)
-    const multiMaterial = new BABYLON.MultiMaterial(`multiMat_${node.id}`, this.scene);
-    
-    for (let i = 0; i < 6; i++) {
-      const material = new BABYLON.StandardMaterial(`faceMat_${node.id}_${i}`, this.scene);
-      material.emissiveColor = baseColor;
-      material.emissiveTexture = signatureTexture;
-      material.wireframe = false;
-      multiMaterial.subMaterials.push(material);
-    }
+    // Apply signature texture to all faces
+    const signatureTexture = this.createSignatureTexture(node);
+    signatureTexture.uScale = 1.0;
+    signatureTexture.vScale = 1.0;
+    signatureTexture.uOffset = 0;
+    signatureTexture.vOffset = 0;
+    material.emissiveTexture = signatureTexture;
+    material.wireframe = false;
 
-    // Clear existing submeshes and create proper submeshes for each face
-    box.subMeshes.length = 0;
-    const vertexCount = box.getTotalVertices();
-    const facets = 6;
-    const indicesPerFace = box.getIndices()!.length / facets;
-
-    for (let i = 0; i < facets; i++) {
-      box.subMeshes.push(
-        new BABYLON.SubMesh(i, 0, vertexCount, i * indicesPerFace, indicesPerFace, box)
-      );
-    }
-
-    box.material = multiMaterial;
+    box.material = material;
 
     this.createLabel(node.name, box.position);
-    onNodeInteraction(box as BABYLON.Mesh, multiMaterial.subMaterials[0] as BABYLON.StandardMaterial, node);
+    onNodeInteraction(box as BABYLON.Mesh, material, node);
   }
 
   /**
@@ -153,6 +137,16 @@ export class MeshFactory {
     // Draw transparent background
     ctx.fillStyle = 'rgba(0, 0, 0, 0)';
     ctx.fillRect(0, 0, textureSize, textureSize);
+
+    // Draw border frame
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(
+      SceneConfig.SIGNATURE_TEXTURE_BORDER_SIZE,
+      SceneConfig.SIGNATURE_TEXTURE_BORDER_SIZE,
+      textureSize - 2 * SceneConfig.SIGNATURE_TEXTURE_BORDER_SIZE,
+      textureSize - 2 * SceneConfig.SIGNATURE_TEXTURE_BORDER_SIZE
+    );
 
     // Draw text in white for visibility on any color
     const lines: string[] = [node.name];
@@ -176,10 +170,11 @@ export class MeshFactory {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
 
-    let yOffset = 60;
+    const lineHeight = SceneConfig.SIGNATURE_FONT_SIZE_PX * 1.5;
+    let yOffset = lineHeight + 20;
     for (const line of lines) {
       ctx.fillText(line, textureSize / 2, yOffset);
-      yOffset += 60;
+      yOffset += lineHeight;
     }
 
     dynamicTexture.update();
