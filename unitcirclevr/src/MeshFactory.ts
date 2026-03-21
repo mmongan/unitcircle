@@ -108,7 +108,7 @@ export class MeshFactory {
     
     // Use texture without emissive glow
     material.emissiveTexture = signatureTexture;
-    material.emissiveColor = new BABYLON.Color3(0.5, 0.5, 0.5);  // Subtle gray instead of bright color
+    material.emissiveColor = new BABYLON.Color3(0.3, 0.3, 0.3);  // Dark gray for visibility
     material.wireframe = false;
 
     box.material = material;
