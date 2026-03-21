@@ -1,1 +1,0 @@
-import{b as o,c as n}from"./index-9ENobgzm.js";class f{constructor(){this.supportCascades=!1}loadCubeData(){throw".env not supported in Cube."}loadData(e,t,r){const a=new Uint8Array(e.buffer,e.byteOffset,e.byteLength),s=o(a);r(s.width,s.height,t.generateMipMaps,!1,()=>{n(t,a)})}}export{f as _TGATextureLoader};
