@@ -228,7 +228,7 @@
       "id": "hasGraphUpdated@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphLoader.ts",
       "name": "hasGraphUpdated",
       "file": "GraphLoader.ts",
-      "line": 67,
+      "line": 49,
       "isExported": false,
       "type": "function"
     },
@@ -236,7 +236,7 @@
       "id": "getCachedGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphLoader.ts",
       "name": "getCachedGraph",
       "file": "GraphLoader.ts",
-      "line": 75,
+      "line": 57,
       "isExported": false,
       "type": "function"
     },
@@ -244,7 +244,7 @@
       "id": "getTimeSinceLastLoad@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphLoader.ts",
       "name": "getTimeSinceLastLoad",
       "file": "GraphLoader.ts",
-      "line": 82,
+      "line": 64,
       "isExported": false,
       "type": "function"
     },
@@ -252,7 +252,7 @@
       "id": "shouldPoll@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphLoader.ts",
       "name": "shouldPoll",
       "file": "GraphLoader.ts",
-      "line": 89,
+      "line": 71,
       "isExported": false,
       "type": "function"
     },
@@ -260,7 +260,7 @@
       "id": "clearCache@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphLoader.ts",
       "name": "clearCache",
       "file": "GraphLoader.ts",
-      "line": 96,
+      "line": 78,
       "isExported": false,
       "type": "function"
     },
@@ -268,7 +268,7 @@
       "id": "setPollInterval@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphLoader.ts",
       "name": "setPollInterval",
       "file": "GraphLoader.ts",
-      "line": 104,
+      "line": 86,
       "isExported": false,
       "type": "function"
     },
@@ -932,5 +932,5 @@
       "to": "render@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-21T17:49:02.145Z"
+  "lastUpdated": "2026-03-21T17:56:24.831Z"
 }
