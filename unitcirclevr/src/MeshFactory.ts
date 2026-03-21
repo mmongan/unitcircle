@@ -89,7 +89,7 @@ export class MeshFactory {
   }
 
   /**
-   * Create a function cube mesh from 6 planes with correctly oriented texture
+   * Create a function box mesh with signature texture
    */
   private createFunctionMesh(
     node: GraphNode,
@@ -97,17 +97,26 @@ export class MeshFactory {
     fileColor: BABYLON.Color3 | null,
     onNodeInteraction: (mesh: BABYLON.Mesh, material: BABYLON.StandardMaterial, node: GraphNode) => void
   ): void {
-    const size = SceneConfig.FUNCTION_BOX_SIZE;
-    const half = size / 2;
+    const box = BABYLON.MeshBuilder.CreateBox(`func_${node.id}`, { size: SceneConfig.FUNCTION_BOX_SIZE }, this.scene);
+    box.position = position;
+    box.parent = this.sceneRoot;
+    box.isPickable = true;
 
-    // Create signature texture with file color background
-    const signatureTexture = this.createSignatureTexture(node, fileColor);
-    
-    // Create material for the texture
     const material = new BABYLON.StandardMaterial(`mat_${node.id}`, this.scene);
+
+    // Apply signature texture with file color background
+    const signatureTexture = this.createSignatureTexture(node, fileColor);
+    signatureTexture.uScale = 1.0;
+    signatureTexture.vScale = 1.0;
+    signatureTexture.uOffset = 0;
+    signatureTexture.vOffset = 0;
+    
+    // Use texture as diffuse (primary visual) for proper lighting response
     material.diffuseTexture = signatureTexture;
+    // Keep diffuse color neutral so file color from texture shows through
     material.diffuseColor = new BABYLON.Color3(1, 1, 1);
     
+    // Subtle emissive glow based on file color
     if (fileColor) {
       material.emissiveColor = new BABYLON.Color3(
         fileColor.r * 0.1,
@@ -121,71 +130,10 @@ export class MeshFactory {
     material.specularColor = new BABYLON.Color3(0.2, 0.2, 0.2);
     material.specularPower = 16;
     material.wireframe = false;
-    material.backFaceCulling = false;
 
-    // Create parent transform to hold all faces
-    const cubeParent = new BABYLON.TransformNode(`cube_${node.id}`, this.scene);
-    cubeParent.position = position;
-    cubeParent.parent = this.sceneRoot;
+    box.material = material;
 
-    // Define the 6 faces of the cube with correct rotations
-    const faces = [
-      { name: 'front', rotation: new BABYLON.Vector3(0, 0, 0), position: new BABYLON.Vector3(0, 0, half) },
-      { name: 'back', rotation: new BABYLON.Vector3(0, Math.PI, 0), position: new BABYLON.Vector3(0, 0, -half) },
-      { name: 'right', rotation: new BABYLON.Vector3(0, Math.PI / 2, 0), position: new BABYLON.Vector3(half, 0, 0) },
-      { name: 'left', rotation: new BABYLON.Vector3(0, -Math.PI / 2, 0), position: new BABYLON.Vector3(-half, 0, 0) },
-      { name: 'top', rotation: new BABYLON.Vector3(Math.PI / 2, 0, 0), position: new BABYLON.Vector3(0, half, 0) },
-      { name: 'bottom', rotation: new BABYLON.Vector3(-Math.PI / 2, 0, 0), position: new BABYLON.Vector3(0, -half, 0) },
-    ];
-
-    let firstMesh: BABYLON.Mesh | null = null;
-    for (const face of faces) {
-      const plane = BABYLON.MeshBuilder.CreatePlane(
-        `${node.id}_${face.name}`,
-        { size: size },
-        this.scene
-      );
-      
-      plane.rotation = face.rotation;
-      plane.position = face.position;
-      plane.parent = cubeParent;
-      plane.isPickable = true;
-      plane.material = material;
-      
-      // Store node data on the plane for clicking
-      (plane as any).nodeData = node;
-      
-      // Merge all planes into a single mesh for performance
-      if (!firstMesh) {
-        firstMesh = plane;
-      }
-    }
-
-    // Merge all planes into a compound mesh
-    const mergedMesh = BABYLON.Mesh.MergeMeshes(
-      faces.map(() => Array.from(cubeParent.getChildren())).flat() as BABYLON.Mesh[],
-      true,
-      true,
-      undefined,
-      false,
-      true
-    ) as BABYLON.Mesh;
-    
-    if (mergedMesh) {
-      mergedMesh.name = `func_${node.id}`;
-      mergedMesh.parent = this.sceneRoot;
-      mergedMesh.position = position;
-      (mergedMesh as any).nodeData = node;
-      
-      this.createLabel(node.name, mergedMesh.position, node.id);
-      onNodeInteraction(mergedMesh, material, node);
-    } else if (firstMesh) {
-      // If merge failed, use the first mesh
-      firstMesh.parent = this.sceneRoot;
-      firstMesh.position = position;
-      this.createLabel(node.name, firstMesh.position, node.id);
-      onNodeInteraction(firstMesh, material, node);
-    }
+    onNodeInteraction(box as BABYLON.Mesh, material, node);
   }
 
   /**
@@ -359,30 +307,5 @@ export class MeshFactory {
   /**
    * Create a transparent sphere container for functions in a specific file
    */
-  createFileSphere(fileName: string, position: BABYLON.Vector3, radius: number): BABYLON.Mesh {
-    const sphere = BABYLON.MeshBuilder.CreateSphere(
-      `file_sphere_${fileName}`,
-      {
-        segments: 32,
-        diameter: radius * 2,
-      },
-      this.scene
-    );
-    
-    sphere.position = position;
-    sphere.parent = this.sceneRoot;
 
-    // Create transparent material for the sphere
-    const material = new BABYLON.StandardMaterial(`fileMat_${fileName}`, this.scene);
-    material.diffuseColor = new BABYLON.Color3(0.4, 0.6, 1.0);  // Light blue
-    material.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
-    material.alpha = 0.15;  // Transparent
-    material.wireframe = false;
-    material.backFaceCulling = false;
-
-    sphere.material = material;
-    sphere.isPickable = false;  // Don't allow clicking on sphere itself
-
-    return sphere;
-  }
 }

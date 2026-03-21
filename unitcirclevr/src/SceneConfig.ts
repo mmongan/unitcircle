@@ -62,7 +62,7 @@ export class SceneConfig {
   static readonly EDGE_RADIUS = 0.2;
 
   // Physics Layout
-  static readonly LAYOUT_ITERATIONS = 100;
+  static readonly LAYOUT_ITERATIONS = 200;
 
   // Animation
   static readonly FLY_TO_ANIMATION_TIME_MS = 600;

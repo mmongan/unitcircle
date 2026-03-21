@@ -18,9 +18,10 @@ export class ForceDirectedLayout {
   private nodes: Map<string, Node>;
   private edges: Edge[];
   private k: number = 1; // Optimal distance
-  private repulsiveForce: number = 0.5; // Repulsive force strength
+  private repulsiveForce: number = 0.2; // Repulsive force strength (lower = stronger repulsion)
   private attractiveForce: number = 0.1; // Attractive force strength
   private damping: number = 0.95; // Velocity damping
+  private minSeparation: number = 5; // Minimum distance between node centers (cube size 4.0 + buffer)
 
   constructor(nodeIds: string[], edges: Edge[]) {
     this.nodes = new Map();
@@ -104,23 +105,45 @@ export class ForceDirectedLayout {
         const dz = n2.position.z - n1.position.z;
         const distance = Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.01;
 
-        const force = (this.k * this.k) / (distance * this.repulsiveForce);
-        const fx = (dx / distance) * force;
-        const fy = (dy / distance) * force;
-        const fz = (dz / distance) * force;
+        // Enforce minimum separation - push nodes apart if too close
+        if (distance < this.minSeparation) {
+          const pushForce = (this.minSeparation - distance) * 2; // Exponential push force
+          const fx = (dx / distance) * pushForce;
+          const fy = (dy / distance) * pushForce;
+          const fz = (dz / distance) * pushForce;
 
-        const f1 = forces.get(n1.id) || { x: 0, y: 0, z: 0 };
-        const f2 = forces.get(n2.id) || { x: 0, y: 0, z: 0 };
+          const f1 = forces.get(n1.id) || { x: 0, y: 0, z: 0 };
+          const f2 = forces.get(n2.id) || { x: 0, y: 0, z: 0 };
 
-        f1.x -= fx;
-        f1.y -= fy;
-        f1.z -= fz;
-        f2.x += fx;
-        f2.y += fy;
-        f2.z += fz;
+          f1.x -= fx;
+          f1.y -= fy;
+          f1.z -= fz;
+          f2.x += fx;
+          f2.y += fy;
+          f2.z += fz;
 
-        forces.set(n1.id, f1);
-        forces.set(n2.id, f2);
+          forces.set(n1.id, f1);
+          forces.set(n2.id, f2);
+        } else {
+          // Standard repulsive force for nodes at normal distance
+          const force = (this.k * this.k) / (distance * this.repulsiveForce);
+          const fx = (dx / distance) * force;
+          const fy = (dy / distance) * force;
+          const fz = (dz / distance) * force;
+
+          const f1 = forces.get(n1.id) || { x: 0, y: 0, z: 0 };
+          const f2 = forces.get(n2.id) || { x: 0, y: 0, z: 0 };
+
+          f1.x -= fx;
+          f1.y -= fy;
+          f1.z -= fz;
+          f2.x += fx;
+          f2.y += fy;
+          f2.z += fz;
+
+          forces.set(n1.id, f1);
+          forces.set(n2.id, f2);
+        }
       }
     }
   }
