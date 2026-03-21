@@ -63,10 +63,6 @@ export class VRSceneManager {
             this.isAnimating = true;
             // Use local position (relative to sceneRoot) so clicks on same node land consistently
             this.sceneRootFlyTo(pickResult.pickedMesh.position);
-            // Allow next click after animation completes
-            setTimeout(() => {
-              this.isAnimating = false;
-            }, SceneConfig.FLY_TO_ANIMATION_TIME_MS);
           }
         }
       }
@@ -392,7 +388,12 @@ export class VRSceneManager {
       [positionAnimation],
       0,
       totalFrames,
-      false
+      false,
+      1,
+      () => {
+        // Animation completed - allow next click
+        this.isAnimating = false;
+      }
     );
   }
 
