@@ -253,64 +253,13 @@ export class VRSceneManager {
     material.wireframe = false;
     box.material = material;
 
-    this.createLabel(node.name, box.position);
-    this.setupNodeInteraction(box, material, node);
+    // Apply signature texture immediately to all faces
+    const signatureTexture = this.createSignatureTexture(node);
+    material.emissiveTexture = signatureTexture;
   }
 
-  private setupNodeInteraction(mesh: BABYLON.Mesh, material: BABYLON.StandardMaterial, node: GraphData['nodes'][0]): void {
-    const originalColor = material.emissiveColor.clone();
-    mesh.actionManager = new BABYLON.ActionManager(this.scene);
-    mesh.actionManager.registerAction(
-      new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPointerOverTrigger, () => {
-        material.emissiveColor = new BABYLON.Color3(1, 1, 1);
-        this.showTooltip(node);
-      })
-    );
-    mesh.actionManager.registerAction(
-      new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPointerOutTrigger, () => {
-        material.emissiveColor = originalColor.clone();
-        this.hideTooltip();
-      })
-    );
-    mesh.actionManager.registerAction(
-      new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPickTrigger, () => {
-        this.sceneRootFlyTo(mesh.position, node, material);
-      })
-    );
-  }
-
-  private sceneRootFlyTo(targetPosition: BABYLON.Vector3, node: GraphData['nodes'][0], material: BABYLON.StandardMaterial): void {
-    // Animate scene root position to place object directly below camera (top-down view)
-    // Camera is fixed at (0, 0, -70); position object directly below
-    const cameraPosition = new BABYLON.Vector3(0, 0, -70);
-    
-    // Top-down viewing position: object centered below camera
-    const viewOffset = new BABYLON.Vector3(0, 0, -5);
-    
-    // Calculate where the target should appear in world space
-    const desiredWorldPosition = cameraPosition.add(viewOffset);
-    
-    // Calculate scene root offset to position target at desired world position
-    const sceneOffset = desiredWorldPosition.subtract(targetPosition);
-
-    // Animate scene root movement over 800ms
-    BABYLON.Animation.CreateAndStartAnimation(
-      'sceneRootFly',
-      this.sceneRoot,
-      'position',
-      60,
-      48, // 800ms at 60fps
-      this.sceneRoot.position.clone(),
-      sceneOffset,
-      BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
-    );
-
-    // Apply function signature texture after animation completes (800ms)
-    setTimeout(() => this.applySignatureTexture(material, node), 800);
-  }
-
-  private applySignatureTexture(material: BABYLON.StandardMaterial, node: GraphData['nodes'][0]): void {
-    // Create dynamic texture for signature text
+  private createSignatureTexture(node: GraphData['nodes'][0]): BABYLON.DynamicTexture {
+    // Create dynamic texture for signature
     const textureSize = 512;
     const dynamicTexture = new BABYLON.DynamicTexture(`signatureTexture_${node.id}`, textureSize, this.scene);
     const ctx = dynamicTexture.getContext() as any;
@@ -350,9 +299,56 @@ export class VRSceneManager {
     }
 
     dynamicTexture.update();
+    return dynamicTexture;
+  }
 
-    // Apply signature texture to cube's material
-    material.emissiveTexture = dynamicTexture;
+  private setupNodeInteraction(mesh: BABYLON.Mesh, material: BABYLON.StandardMaterial, node: GraphData['nodes'][0]): void {
+    const originalColor = material.emissiveColor.clone();
+    mesh.actionManager = new BABYLON.ActionManager(this.scene);
+    mesh.actionManager.registerAction(
+      new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPointerOverTrigger, () => {
+        material.emissiveColor = new BABYLON.Color3(1, 1, 1);
+        this.showTooltip(node);
+      })
+    );
+    mesh.actionManager.registerAction(
+      new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPointerOutTrigger, () => {
+        material.emissiveColor = originalColor.clone();
+        this.hideTooltip();
+      })
+    );
+    mesh.actionManager.registerAction(
+      new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPickTrigger, () => {
+        this.sceneRootFlyTo(mesh.position);
+      })
+    );
+  }
+
+  private sceneRootFlyTo(targetPosition: BABYLON.Vector3): void {
+    // Animate scene root position to place object directly below camera (top-down view)
+    // Camera is fixed at (0, 0, -70); position object directly below
+    const cameraPosition = new BABYLON.Vector3(0, 0, -70);
+    
+    // Top-down viewing position: object centered below camera
+    const viewOffset = new BABYLON.Vector3(0, 0, -5);
+    
+    // Calculate where the target should appear in world space
+    const desiredWorldPosition = cameraPosition.add(viewOffset);
+    
+    // Calculate scene root offset to position target at desired world position
+    const sceneOffset = desiredWorldPosition.subtract(targetPosition);
+
+    // Animate scene root movement over 800ms for top-down view
+    BABYLON.Animation.CreateAndStartAnimation(
+      'sceneRootFly',
+      this.sceneRoot,
+      'position',
+      60,
+      48, // 800ms at 60fps
+      this.sceneRoot.position.clone(),
+      sceneOffset,
+      BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+    );
   }
 
   private renderEdges(edges: Array<{ from: string; to: string }>, layoutNodes: Map<string, any>): void {
