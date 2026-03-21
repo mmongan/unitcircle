@@ -305,10 +305,9 @@ export class MeshFactory {
     const targetNode = layoutNodes.get(edge.to);
 
     if (sourceNode && targetNode) {
-      const points = [
-        new BABYLON.Vector3(sourceNode.position.x, sourceNode.position.y, sourceNode.position.z),
-        new BABYLON.Vector3(targetNode.position.x, targetNode.position.y, targetNode.position.z),
-      ];
+      const sourcePos = new BABYLON.Vector3(sourceNode.position.x, sourceNode.position.y, sourceNode.position.z);
+      const targetPos = new BABYLON.Vector3(targetNode.position.x, targetNode.position.y, targetNode.position.z);
+      const points = [sourcePos, targetPos];
 
       const tube = BABYLON.MeshBuilder.CreateTube(`edge_${index}`, {
         path: points,
@@ -317,7 +316,44 @@ export class MeshFactory {
       tube.parent = this.sceneRoot;
       tube.material = material;
       tube.isPickable = false;  // Edges should not be clickable
+
+      // Create arrowhead at the end of the edge
+      this.createArrowhead(sourcePos, targetPos, material, index);
     }
+  }
+
+  /**
+   * Create an arrowhead cone at the end of an edge pointing toward the target
+   */
+  private createArrowhead(
+    sourcePos: BABYLON.Vector3,
+    targetPos: BABYLON.Vector3,
+    material: BABYLON.StandardMaterial,
+    index: number
+  ): void {
+    const arrowheadSize = 0.4;
+    // Create a cone-like shape using a cylinder with small top
+    const arrowhead = BABYLON.MeshBuilder.CreateCylinder(`arrowhead_${index}`, {
+      diameterTop: 0.05,
+      diameterBottom: arrowheadSize,
+      height: arrowheadSize * 1.5,
+    }, this.scene);
+
+    // Position at target node
+    arrowhead.position = targetPos.clone();
+
+    // Calculate direction from source to target
+    const direction = targetPos.subtract(sourcePos).normalize();
+
+    // Create a rotation that points the cylinder along the direction vector
+    // Default cylinder points up (0, 1, 0). We need to rotate it to point along direction
+    const rotationQuaternion = BABYLON.Quaternion.Identity();
+    BABYLON.Quaternion.FromUnitVectorsToRef(BABYLON.Axis.Y, direction, rotationQuaternion);
+    arrowhead.rotationQuaternion = rotationQuaternion;
+
+    arrowhead.parent = this.sceneRoot;
+    arrowhead.material = material;
+    arrowhead.isPickable = false;
   }
 
   /**
