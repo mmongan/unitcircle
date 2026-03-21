@@ -21,6 +21,7 @@ export class MeshFactory {
     node: GraphNode,
     position: BABYLON.Vector3,
     fileColor: BABYLON.Color3 | null,
+    indegree: number = 0,
     onNodeInteraction: (mesh: BABYLON.Mesh, material: BABYLON.StandardMaterial, node: GraphNode) => void
   ): void {
     if (node.type === 'external') {
@@ -28,7 +29,7 @@ export class MeshFactory {
     } else if (node.type === 'variable') {
       this.createVariableMesh(node, position, onNodeInteraction);
     } else {
-      this.createFunctionMesh(node, position, fileColor, onNodeInteraction);
+      this.createFunctionMesh(node, position, fileColor, indegree, onNodeInteraction);
     }
   }
 
@@ -95,9 +96,17 @@ export class MeshFactory {
     node: GraphNode,
     position: BABYLON.Vector3,
     fileColor: BABYLON.Color3 | null,
+    indegree: number = 0,
     onNodeInteraction: (mesh: BABYLON.Mesh, material: BABYLON.StandardMaterial, node: GraphNode) => void
   ): void {
-    const box = BABYLON.MeshBuilder.CreateBox(`func_${node.id}`, { size: SceneConfig.FUNCTION_BOX_SIZE }, this.scene);
+    // Scale box size based on number of incoming connections (indegree)
+    // Uses logarithmic scaling to keep size differences visible but not extreme
+    // Formula: base + log(indegree + 1) * scale_factor
+    const baseSize = SceneConfig.FUNCTION_BOX_SIZE;
+    const scaleFactor = 1.0;  // 1.0 unit increase per log step
+    const boxSize = baseSize + Math.log(Math.max(1, indegree + 1)) * scaleFactor;
+
+    const box = BABYLON.MeshBuilder.CreateBox(`func_${node.id}`, { size: boxSize }, this.scene);
     box.position = position;
     box.parent = this.sceneRoot;
     box.isPickable = true;

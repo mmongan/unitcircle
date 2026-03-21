@@ -387,7 +387,10 @@ export class VRSceneManager {
     );
     const layoutNodes = this.computeLayout(layout);
 
-    this.renderNodes(graph.nodes, layoutNodes);
+    // Calculate indegree (incoming connections) for each node
+    const indegreeMap = this.calculateIndegree(graph.edges);
+
+    this.renderNodes(graph.nodes, layoutNodes, indegreeMap);
     this.renderEdges(graph.edges, layoutNodes);
 
     console.log(`✓ Rendered code graph with ${graph.nodes.length} functions and ${graph.edges.length} calls`);
@@ -405,6 +408,9 @@ export class VRSceneManager {
       graph.nodes.map(n => n.id),
       edges
     );
+
+    // Calculate indegree (incoming connections) for each node
+    const indegreeMap = this.calculateIndegree(graph.edges);
     const layoutNodes = this.computeLayout(layout);
 
     // Track new node IDs and edge pairs
@@ -429,7 +435,7 @@ export class VRSceneManager {
 
     // Create only new nodes
     const newNodes = graph.nodes.filter(n => !this.currentNodeIds.has(n.id));
-    this.renderNodes(newNodes, layoutNodes);
+    this.renderNodes(newNodes, layoutNodes, indegreeMap);
     newNodes.forEach(n => this.currentNodeIds.add(n.id));
 
     // Create only new edges
@@ -497,7 +503,8 @@ export class VRSceneManager {
 
   private renderNodes(
     nodes: GraphNode[],
-    layoutNodes: Map<string, any>
+    layoutNodes: Map<string, any>,
+    indegreeMap: Map<string, number> = new Map()
   ): void {
     for (const node of nodes) {
       const layoutNode = layoutNodes.get(node.id);
@@ -511,8 +518,9 @@ export class VRSceneManager {
 
       // Get or generate color for this file
       const fileColor = node.file ? this.getFileColor(node.file) : null;
+      const indegree = indegreeMap.get(node.id) || 0;
 
-      this.meshFactory.createNodeMesh(node, position, fileColor, (mesh, material, n) =>
+      this.meshFactory.createNodeMesh(node, position, fileColor, indegree, (mesh, material, n) =>
         this.setupNodeInteraction(mesh, material, n)
       );
     }
@@ -710,6 +718,14 @@ export class VRSceneManager {
     setTimeout(() => {
       this.isAnimating = false;
     }, Math.max(300 + 100, 2000));
+  }
+
+  private calculateIndegree(edges: Array<{ from: string; to: string }>): Map<string, number> {
+    const indegreeMap = new Map<string, number>();
+    for (const edge of edges) {
+      indegreeMap.set(edge.to, (indegreeMap.get(edge.to) || 0) + 1);
+    }
+    return indegreeMap;
   }
 
   private renderEdges(
