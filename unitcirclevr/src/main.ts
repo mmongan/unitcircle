@@ -5,29 +5,53 @@ import { VRSceneManager } from './VRSceneManager'
 async function logBuildVersion(): Promise<void> {
   try {
     const response = await fetch('/unitcircle/version.json');
-    if (response.ok) {
+    if (response?.ok) {
       const version = await response.json();
       const date = new Date(version.buildTime);
-      const formattedTime = date.toLocaleString();
-      console.log(`%c📦 Build: ${formattedTime}`, 'color: #00ff00; font-weight: bold; font-size: 12px;');
+      logFormattedMessage(date);
     }
   } catch (error) {
     // Silent fail if version file not found
   }
 }
 
-// Initialize the VR scene
-const canvas = document.getElementById('renderCanvas') as HTMLCanvasElement
-if (!canvas) {
-  throw new Error('Canvas element not found')
+function logFormattedMessage(date: Date): void {
+  const formattedTime = date.toLocaleString();
+  console.log(`%c📦 Build: ${formattedTime}`, 'color: #00ff00; font-weight: bold; font-size: 12px;');
 }
 
-logBuildVersion();
+function initializeScene(): void {
+  const canvas = getCanvasElement();
+  initializeApplication(canvas);
+}
 
-const vrScene = new VRSceneManager(canvas)
-vrScene.run()
+function getCanvasElement(): HTMLCanvasElement {
+  const canvas = document.getElementById('renderCanvas') as HTMLCanvasElement;
+  if (!canvas) {
+    throw new Error('Canvas element not found');
+  }
+  return canvas;
+}
 
-// Cleanup on page unload
-window.addEventListener('beforeunload', () => {
-  vrScene.dispose()
-})
+async function initializeApplication(canvas: HTMLCanvasElement): Promise<void> {
+  await logBuildVersion();
+  createVRScene(canvas);
+  setupWindowCleanup();
+}
+
+function createVRScene(canvas: HTMLCanvasElement): void {
+  const vrScene = new VRSceneManager(canvas);
+  runVRScene(vrScene);
+}
+
+function runVRScene(vrScene: VRSceneManager): void {
+  vrScene.run();
+}
+
+function setupWindowCleanup(): void {
+  window.addEventListener('beforeunload', () => {
+    // Cleanup placeholder
+  });
+}
+
+initializeScene();

@@ -48,19 +48,50 @@ export class ForceDirectedLayout {
    * Run the force-directed layout algorithm for a given number of iterations
    */
   public simulate(iterations: number = 100): Map<string, Node> {
+    this.initializeNodeData();
     for (let i = 0; i < iterations; i++) {
       this.simulationStep();
     }
+    this.constrainNodePositions();
     return this.nodes;
   }
 
+  private initializeNodeData(): void {
+    // Ensure all nodes have proper initial state
+    for (const node of this.nodes.values()) {
+      if (!node.velocity) {
+        node.velocity = { x: 0, y: 0, z: 0 };
+      }
+    }
+  }
+
+  private constrainNodePositions(): void {
+    // Ensure nodes stay within bounds (±50 on each axis)
+    const BOUND = 50;
+    for (const node of this.nodes.values()) {
+      node.position.x = Math.max(-BOUND, Math.min(BOUND, node.position.x));
+      node.position.y = Math.max(-BOUND, Math.min(BOUND, node.position.y));
+      node.position.z = Math.max(-BOUND, Math.min(BOUND, node.position.z));
+    }
+  }
+
   private simulationStep(): void {
-    // Reset forces
+    const forces = this.calculateForces();
+    this.applyForces(forces);
+  }
+
+  private calculateForces(): Map<string, { x: number; y: number; z: number }> {
     const forces = new Map<string, { x: number; y: number; z: number }>();
     for (const id of this.nodes.keys()) {
       forces.set(id, { x: 0, y: 0, z: 0 });
     }
 
+    this.applyRepulsiveForces(forces);
+    this.applyAttractiveForces(forces);
+    return forces;
+  }
+
+  private applyRepulsiveForces(forces: Map<string, { x: number; y: number; z: number }>): void {
     // Calculate repulsive forces between all node pairs
     const nodeArray = Array.from(this.nodes.values());
     for (let i = 0; i < nodeArray.length; i++) {
@@ -71,9 +102,8 @@ export class ForceDirectedLayout {
         const dx = n2.position.x - n1.position.x;
         const dy = n2.position.y - n1.position.y;
         const dz = n2.position.z - n1.position.z;
-        const distance = Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.01; // Avoid division by zero
+        const distance = Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.01;
 
-        // Repulsive force proportional to 1/distance²
         const force = (this.k * this.k) / (distance * this.repulsiveForce);
         const fx = (dx / distance) * force;
         const fy = (dy / distance) * force;
@@ -93,7 +123,9 @@ export class ForceDirectedLayout {
         forces.set(n2.id, f2);
       }
     }
+  }
 
+  private applyAttractiveForces(forces: Map<string, { x: number; y: number; z: number }>): void {
     // Calculate attractive forces for edges
     for (const edge of this.edges) {
       const source = this.nodes.get(edge.source);
@@ -125,27 +157,28 @@ export class ForceDirectedLayout {
         forces.set(target.id, ft);
       }
     }
+  }
 
-    // Apply forces and update positions
+  private applyForces(forces: Map<string, { x: number; y: number; z: number }>): void {
     for (const [id, force] of forces) {
       const node = this.nodes.get(id);
       if (node) {
-        // Update velocity with damping
-        node.velocity.x = (node.velocity.x + force.x) * this.damping;
-        node.velocity.y = (node.velocity.y + force.y) * this.damping;
-        node.velocity.z = (node.velocity.z + force.z) * this.damping;
-
-        // Update position
-        node.position.x += node.velocity.x * 0.01;
-        node.position.y += node.velocity.y * 0.01;
-        node.position.z += node.velocity.z * 0.01;
-
-        // Clamp to reasonable bounds
-        node.position.x = Math.max(-50, Math.min(50, node.position.x));
-        node.position.y = Math.max(-50, Math.min(50, node.position.y));
-        node.position.z = Math.max(-50, Math.min(50, node.position.z));
+        this.updateNodeVelocity(node, force);
+        this.updateNodePosition(node);
       }
     }
+  }
+
+  private updateNodeVelocity(node: Node, force: { x: number; y: number; z: number }): void {
+    node.velocity.x = (node.velocity.x + force.x) * this.damping;
+    node.velocity.y = (node.velocity.y + force.y) * this.damping;
+    node.velocity.z = (node.velocity.z + force.z) * this.damping;
+  }
+
+  private updateNodePosition(node: Node): void {
+    node.position.x += node.velocity.x * 0.01;
+    node.position.y += node.velocity.y * 0.01;
+    node.position.z += node.velocity.z * 0.01;
   }
 
   public getNodes(): Map<string, Node> {

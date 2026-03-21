@@ -21,51 +21,76 @@ export class CodeParser {
     const functions = new Map<string, CodeFunction>();
     const calls = new Map<string, Set<string>>();
 
-    // Extract function definitions and calls from each file
-    for (const [filePath, content] of fileContents) {
-      // Find function declarations
-      const functionMatches = content.matchAll(/(?:(?:private|public|static|async)\s+)*(?:function\s+(\w+)|(\w+)\s*\([^)]*\)\s*(?::|=))/g);
-
-      for (const match of functionMatches) {
-        const functionName = match[1] || match[2];
-        if (functionName && !this.isKeyword(functionName)) {
-          const lineNumber = content.substring(0, match.index).split('\n').length;
-          const uniqueName = `${functionName}@${filePath}`;
-          functions.set(uniqueName, { name: functionName, filePath, lineNumber });
-          calls.set(uniqueName, new Set());
-        }
-      }
-    }
-
+    // Extract function definitions from files
+    this.extractFunctionDefinitions(fileContents, functions, calls);
+    
     // Extract function calls
-    for (const [filePath, content] of fileContents) {
-      const callMatches = content.matchAll(/(\w+)\s*\(/g);
-      for (const match of callMatches) {
-        const calledFunctionName = match[1];
-        if (calledFunctionName && !this.isKeyword(calledFunctionName)) {
-          // Find which function this call belongs to
-          const lineNumber = content.substring(0, match.index).split('\n').length;
-          const caller = this.findFunctionAtLine(filePath, lineNumber, functions);
-
-          if (caller && functions.has(caller)) {
-            // Find the called function
-            const calledFunctions = Array.from(functions.entries()).filter(
-              ([_, func]) => func.name === calledFunctionName
-            );
-
-            for (const [calledName] of calledFunctions) {
-              if (caller !== calledName) {
-                const callSet = calls.get(caller) || new Set();
-                callSet.add(calledName);
-                calls.set(caller, callSet);
-              }
-            }
-          }
-        }
-      }
-    }
+    this.extractFunctionCalls(fileContents, functions, calls);
 
     return { functions, calls };
+  }
+
+  private static extractFunctionDefinitions(fileContents: Map<string, string>, functions: Map<string, CodeFunction>, calls: Map<string, Set<string>>): void {
+    for (const [filePath, content] of fileContents) {
+      this.processFunctionDeclarations(filePath, content, functions, calls);
+    }
+  }
+
+  private static processFunctionDeclarations(filePath: string, content: string, functions: Map<string, CodeFunction>, calls: Map<string, Set<string>>): void {
+    const functionMatches = content.matchAll(/(?:(?:private|public|static|async)\s+)*(?:function\s+(\w+)|(\w+)\s*\([^)]*\)\s*(?::|=))/g);
+
+    for (const match of functionMatches) {
+      const functionName = match[1] || match[2];
+      if (functionName && !this.isKeyword(functionName)) {
+        const lineNumber = this.calculateLineNumber(content, match.index!);
+        const uniqueName = `${functionName}@${filePath}`;
+        functions.set(uniqueName, { name: functionName, filePath, lineNumber });
+        calls.set(uniqueName, new Set());
+      }
+    }
+  }
+
+  private static calculateLineNumber(content: string, index: number): number {
+    return content.substring(0, index).split('\n').length;
+  }
+
+  private static extractFunctionCalls(fileContents: Map<string, string>, functions: Map<string, CodeFunction>, calls: Map<string, Set<string>>): void {
+    for (const [filePath, content] of fileContents) {
+      this.processFunctionCalls(filePath, content, functions, calls);
+    }
+  }
+
+  private static processFunctionCalls(filePath: string, content: string, functions: Map<string, CodeFunction>, calls: Map<string, Set<string>>): void {
+    const callMatches = content.matchAll(/(\w+)\s*\(/g);
+    for (const match of callMatches) {
+      const calledFunctionName = match[1];
+      if (calledFunctionName && !this.isKeyword(calledFunctionName)) {
+        const lineNumber = this.calculateLineNumber(content, match.index!);
+        this.registerFunctionCall(filePath, lineNumber, calledFunctionName, functions, calls);
+      }
+    }
+  }
+
+  private static registerFunctionCall(filePath: string, lineNumber: number, calledFunctionName: string, functions: Map<string, CodeFunction>, calls: Map<string, Set<string>>): void {
+    const caller = this.findFunctionAtLine(filePath, lineNumber, functions);
+
+    if (caller && functions.has(caller)) {
+      const calledFunctions = this.findFunctionsByName(calledFunctionName, functions);
+
+      for (const calledName of calledFunctions) {
+        if (caller !== calledName) {
+          const callSet = calls.get(caller) || new Set();
+          callSet.add(calledName);
+          calls.set(caller, callSet);
+        }
+      }
+    }
+  }
+
+  private static findFunctionsByName(name: string, functions: Map<string, CodeFunction>): string[] {
+    return Array.from(functions.entries())
+      .filter(([_, func]) => func.name === name)
+      .map(([funcId]) => funcId);
   }
 
   private static isKeyword(word: string): boolean {

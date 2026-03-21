@@ -17,7 +17,7 @@ interface GraphData {
 export class VRSceneManager {
   private engine: BABYLON.Engine;
   private scene: BABYLON.Scene;
-  private camera: BABYLON.UniversalCamera;
+  private camera!: BABYLON.UniversalCamera;
   private lastGraphUpdate: string = '';
 
   constructor(canvas: HTMLCanvasElement) {
@@ -26,18 +26,10 @@ export class VRSceneManager {
     this.scene.collisionsEnabled = true;
 
     // Setup lighting
-    const light = new BABYLON.HemisphericLight('light', new BABYLON.Vector3(0, 1, 0), this.scene);
-    light.intensity = 0.7;
-
-    // Add a point light for dynamic shadows
-    const pointLight = new BABYLON.PointLight('pointLight', new BABYLON.Vector3(5, 10, 5), this.scene);
-    pointLight.intensity = 0.5;
+    this.setupLighting();
 
     // Create a camera with wider view
-    this.camera = new BABYLON.UniversalCamera('camera', new BABYLON.Vector3(0, 0, -30), this.scene);
-    this.camera.attachControl(canvas, true);
-    this.camera.inertia = 0.5;
-    this.camera.angularSensibility = 1000;
+    this.setupCamera(canvas);
 
     // Create a simple ground
     this.createGround();
@@ -55,6 +47,25 @@ export class VRSceneManager {
     this.setupGraphPolling();
   }
 
+  private setupLighting(): void {
+    const light = new BABYLON.HemisphericLight('light', new BABYLON.Vector3(0, 1, 0), this.scene);
+    light.intensity = 0.7;
+
+    this.createPointLight();
+  }
+
+  private createPointLight(): void {
+    const pointLight = new BABYLON.PointLight('pointLight', new BABYLON.Vector3(5, 10, 5), this.scene);
+    pointLight.intensity = 0.5;
+  }
+
+  private setupCamera(canvas: HTMLCanvasElement): void {
+    this.camera = new BABYLON.UniversalCamera('camera', new BABYLON.Vector3(0, 0, -30), this.scene);
+    this.camera.attachControl(canvas, true);
+    this.camera.inertia = 0.5;
+    this.camera.angularSensibility = 1000;
+  }
+
   private createGround(): void {
     const ground = BABYLON.MeshBuilder.CreateGround('ground', { width: 150, height: 150 }, this.scene);
     ground.material = new BABYLON.StandardMaterial('groundMat', this.scene);
@@ -65,11 +76,16 @@ export class VRSceneManager {
     try {
       const graph = await this.loadGraph();
       if (graph && graph.nodes.length > 0) {
+        this.validateGraphData(graph);
         this.renderCodeGraph(graph);
       }
     } catch (error) {
       console.error('Error initializing code visualization:', error);
     }
+  }
+
+  private validateGraphData(graph: GraphData): boolean {
+    return graph.nodes && graph.nodes.length > 0 && graph.edges && Array.isArray(graph.edges);
   }
 
   private async loadGraph(): Promise<GraphData | null> {
@@ -92,6 +108,7 @@ export class VRSceneManager {
           console.log('📊 Graph updated, refreshing visualization...');
           this.lastGraphUpdate = graph.lastUpdated;
           this.clearGraph();
+          this.validateGraphData(graph);
           this.renderCodeGraph(graph);
         }
       } catch (error) {
@@ -117,37 +134,36 @@ export class VRSceneManager {
 
   private renderCodeGraph(graph: GraphData): void {
     // Create positions using force-directed layout
-    const edges = graph.edges.map(e => ({ source: e.from, target: e.to }));
+    const edges = this.buildEdgeList(graph.edges);
     const layout = new ForceDirectedLayout(
       graph.nodes.map(n => n.id),
       edges
     );
-    const layoutNodes = layout.simulate(100);
+    const layoutNodes = this.computeLayout(layout);
 
     // Find functions that call other functions (have outgoing edges)
-    const functionsWithCalls = new Set(graph.edges.map(e => e.from));
+    const functionsWithCalls = this.extractCallingFunctions(graph.edges);
 
-    const colors = [
-      new BABYLON.Color3(0.2, 1, 0.8), // Bright cyan for exported functions
-    ];
+    this.renderNodes(graph.nodes, layoutNodes, functionsWithCalls);
+    this.renderEdges(graph.edges, layoutNodes);
 
-    const nonExportedColors = [
-      new BABYLON.Color3(1, 0.2, 0.2), // Red
-      new BABYLON.Color3(0.2, 1, 0.2), // Green
-      new BABYLON.Color3(0.2, 0.2, 1), // Blue
-      new BABYLON.Color3(1, 1, 0.2), // Yellow
-      new BABYLON.Color3(1, 0.2, 1), // Magenta
-    ];
+    console.log(`✓ Rendered code graph with ${graph.nodes.length} functions and ${graph.edges.length} calls`);
+  }
 
-    const leafColor = new BABYLON.Color3(0.8, 0.8, 0.8); // Gray for leaf functions
-    const exportedVarColor = new BABYLON.Color3(1, 0.8, 0.2); // Orange/gold for exported variables
-    const unexportedVarColor = new BABYLON.Color3(0.6, 0.6, 0.6); // Dark gray for non-exported variables
-    const externalModuleColor = new BABYLON.Color3(0.4, 0.8, 1); // Light blue for external modules
-    const exportedColor = colors[0];
-    let colorIndex = 0;
+  private buildEdgeList(edges: Array<{ from: string; to: string }>): ForceDirectedLayout['edges'] {
+    return edges.map(e => ({ source: e.from, target: e.to }));
+  }
 
-    // Create boxes for functions, spheres for variables, and cylinders for external modules
-    for (const node of graph.nodes) {
+  private computeLayout(layout: ForceDirectedLayout): Map<string, any> {
+    return layout.simulate(100);
+  }
+
+  private extractCallingFunctions(edges: Array<{ from: string; to: string }>): Set<string> {
+    return new Set(edges.map(e => e.from));
+  }
+
+  private renderNodes(nodes: GraphData['nodes'], layoutNodes: Map<string, any>, functionsWithCalls: Set<string>): void {
+    for (const node of nodes) {
       const layoutNode = layoutNodes.get(node.id);
       if (!layoutNode) continue;
 
@@ -157,129 +173,125 @@ export class VRSceneManager {
         layoutNode.position.z
       );
 
-      if (node.type === 'external') {
-        // Render as cylinder for external modules
-        const cylinder = BABYLON.MeshBuilder.CreateCylinder(`ext_${node.id}`, { height: 0.8, diameterTop: 0.5, diameterBottom: 0.5 }, this.scene);
-        cylinder.position = position;
-
-        const material = new BABYLON.StandardMaterial(`extMat_${node.id}`, this.scene);
-        material.emissiveColor = externalModuleColor;
-        material.wireframe = false;
-        cylinder.material = material;
-
-        // Add label
-        this.createLabel(node.name, cylinder.position);
-
-        // Add hover effect with tooltip
-        const originalColor = material.emissiveColor.clone();
-        cylinder.actionManager = new BABYLON.ActionManager(this.scene);
-        cylinder.actionManager.registerAction(
-          new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPointerOverTrigger, () => {
-            material.emissiveColor = new BABYLON.Color3(1, 1, 1);
-            this.showTooltip(node);
-          })
-        );
-        cylinder.actionManager.registerAction(
-          new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPointerOutTrigger, () => {
-            material.emissiveColor = originalColor.clone();
-            this.hideTooltip();
-          })
-        );
-      } else if (node.type === 'variable') {
-        // Render as sphere for global variables
-        const sphere = BABYLON.MeshBuilder.CreateSphere(`var_${node.id}`, { diameter: 0.6 }, this.scene);
-        sphere.position = position;
-
-        const material = new BABYLON.StandardMaterial(`varMat_${node.id}`, this.scene);
-        material.emissiveColor = node.isExported ? exportedVarColor : unexportedVarColor;
-        material.wireframe = false;
-        sphere.material = material;
-
-        // Add label
-        this.createLabel(node.name, sphere.position);
-
-        // Add hover effect with tooltip
-        const originalColor = material.emissiveColor.clone();
-        sphere.actionManager = new BABYLON.ActionManager(this.scene);
-        sphere.actionManager.registerAction(
-          new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPointerOverTrigger, () => {
-            material.emissiveColor = new BABYLON.Color3(1, 1, 1);
-            this.showTooltip(node);
-          })
-        );
-        sphere.actionManager.registerAction(
-          new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPointerOutTrigger, () => {
-            material.emissiveColor = originalColor.clone();
-            this.hideTooltip();
-          })
-        );
-      } else {
-        // Render as box for functions
-        const box = BABYLON.MeshBuilder.CreateBox(`func_${node.id}`, { size: 0.8 }, this.scene);
-        box.position = position;
-
-        const material = new BABYLON.StandardMaterial(`mat_${node.id}`, this.scene);
-        
-        // Determine color: exported > calls others > leaf
-        if (node.isExported) {
-          material.emissiveColor = exportedColor;
-        } else if (functionsWithCalls.has(node.id)) {
-          material.emissiveColor = nonExportedColors[colorIndex % nonExportedColors.length];
-          colorIndex++;
-        } else {
-          material.emissiveColor = leafColor;
-        }
-        
-        material.wireframe = false;
-        box.material = material;
-
-        // Add label text above the box
-        this.createLabel(node.name, box.position);
-
-        // Add hover effect with tooltip
-        const originalColor = material.emissiveColor.clone();
-        box.actionManager = new BABYLON.ActionManager(this.scene);
-        box.actionManager.registerAction(
-          new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPointerOverTrigger, () => {
-            material.emissiveColor = new BABYLON.Color3(1, 1, 1);
-            this.showTooltip(node);
-          })
-        );
-        box.actionManager.registerAction(
-          new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPointerOutTrigger, () => {
-            material.emissiveColor = originalColor.clone();
-            this.hideTooltip();
-          })
-        );
-      }
+      this.createNodeMesh(node, position, functionsWithCalls);
     }
+  }
 
-    // Draw edges (function calls)
+  private createNodeMesh(node: GraphData['nodes'][0], position: BABYLON.Vector3, functionsWithCalls: Set<string>): void {
+    if (node.type === 'external') {
+      this.createExternalModuleMesh(node, position);
+    } else if (node.type === 'variable') {
+      this.createVariableMesh(node, position);
+    } else {
+      this.createFunctionMesh(node, position, functionsWithCalls);
+    }
+  }
+
+  private createExternalModuleMesh(node: GraphData['nodes'][0], position: BABYLON.Vector3): void {
+    const externalModuleColor = new BABYLON.Color3(0.4, 0.8, 1);
+    const cylinder = BABYLON.MeshBuilder.CreateCylinder(`ext_${node.id}`, { height: 0.8, diameterTop: 0.5, diameterBottom: 0.5 }, this.scene);
+    cylinder.position = position;
+
+    const material = new BABYLON.StandardMaterial(`extMat_${node.id}`, this.scene);
+    material.emissiveColor = externalModuleColor;
+    material.wireframe = false;
+    cylinder.material = material;
+
+    this.createLabel(node.name, cylinder.position);
+    this.setupNodeInteraction(cylinder, material, node);
+  }
+
+  private createVariableMesh(node: GraphData['nodes'][0], position: BABYLON.Vector3): void {
+    const exportedVarColor = new BABYLON.Color3(1, 0.8, 0.2);
+    const unexportedVarColor = new BABYLON.Color3(0.6, 0.6, 0.6);
+    
+    const sphere = BABYLON.MeshBuilder.CreateSphere(`var_${node.id}`, { diameter: 0.6 }, this.scene);
+    sphere.position = position;
+
+    const material = new BABYLON.StandardMaterial(`varMat_${node.id}`, this.scene);
+    material.emissiveColor = node.isExported ? exportedVarColor : unexportedVarColor;
+    material.wireframe = false;
+    sphere.material = material;
+
+    this.createLabel(node.name, sphere.position);
+    this.setupNodeInteraction(sphere, material, node);
+  }
+
+  private createFunctionMesh(node: GraphData['nodes'][0], position: BABYLON.Vector3, functionsWithCalls: Set<string>): void {
+    const exportedColor = new BABYLON.Color3(0.2, 1, 0.8);
+    const leafColor = new BABYLON.Color3(0.8, 0.8, 0.8);
+    const nonExportedColors = [
+      new BABYLON.Color3(1, 0.2, 0.2),
+      new BABYLON.Color3(0.2, 1, 0.2),
+      new BABYLON.Color3(0.2, 0.2, 1),
+      new BABYLON.Color3(1, 1, 0.2),
+      new BABYLON.Color3(1, 0.2, 1),
+    ];
+
+    const box = BABYLON.MeshBuilder.CreateBox(`func_${node.id}`, { size: 0.8 }, this.scene);
+    box.position = position;
+
+    const material = new BABYLON.StandardMaterial(`mat_${node.id}`, this.scene);
+    
+    if (node.isExported) {
+      material.emissiveColor = exportedColor;
+    } else if (functionsWithCalls.has(node.id)) {
+      const colorIndex = Math.floor(Math.random() * nonExportedColors.length);
+      material.emissiveColor = nonExportedColors[colorIndex];
+    } else {
+      material.emissiveColor = leafColor;
+    }
+    
+    material.wireframe = false;
+    box.material = material;
+
+    this.createLabel(node.name, box.position);
+    this.setupNodeInteraction(box, material, node);
+  }
+
+  private setupNodeInteraction(mesh: BABYLON.Mesh, material: BABYLON.StandardMaterial, node: GraphData['nodes'][0]): void {
+    const originalColor = material.emissiveColor.clone();
+    mesh.actionManager = new BABYLON.ActionManager(this.scene);
+    mesh.actionManager.registerAction(
+      new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPointerOverTrigger, () => {
+        material.emissiveColor = new BABYLON.Color3(1, 1, 1);
+        this.showTooltip(node);
+      })
+    );
+    mesh.actionManager.registerAction(
+      new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPointerOutTrigger, () => {
+        material.emissiveColor = originalColor.clone();
+        this.hideTooltip();
+      })
+    );
+  }
+
+  private renderEdges(edges: Array<{ from: string; to: string }>, layoutNodes: Map<string, any>): void {
     const edgeMaterial = new BABYLON.StandardMaterial('edgeMaterial', this.scene);
     edgeMaterial.emissiveColor = new BABYLON.Color3(0.5, 0.5, 0.5);
 
     let edgeIndex = 0;
-    for (const edge of graph.edges) {
-      const sourceNode = layoutNodes.get(edge.from);
-      const targetNode = layoutNodes.get(edge.to);
-
-      if (sourceNode && targetNode) {
-        const points = [
-          new BABYLON.Vector3(sourceNode.position.x, sourceNode.position.y, sourceNode.position.z),
-          new BABYLON.Vector3(targetNode.position.x, targetNode.position.y, targetNode.position.z)
-        ];
-
-        // Create tube for edge visualization
-        const tube = BABYLON.MeshBuilder.CreateTube(`edge_${edgeIndex}`, {
-          path: points,
-          radius: 0.08
-        });
-        tube.material = edgeMaterial;
-        edgeIndex++;
-      }
+    for (const edge of edges) {
+      this.renderEdge(edge, layoutNodes, edgeMaterial, edgeIndex++);
     }
+  }
 
-    console.log(`✓ Rendered code graph with ${graph.nodes.length} functions and ${graph.edges.length} calls`);
+  private renderEdge(edge: { from: string; to: string }, layoutNodes: Map<string, any>, material: BABYLON.StandardMaterial, index: number): void {
+    const sourceNode = layoutNodes.get(edge.from);
+    const targetNode = layoutNodes.get(edge.to);
+
+    if (sourceNode && targetNode) {
+      const points = [
+        new BABYLON.Vector3(sourceNode.position.x, sourceNode.position.y, sourceNode.position.z),
+        new BABYLON.Vector3(targetNode.position.x, targetNode.position.y, targetNode.position.z)
+      ];
+
+      const tube = BABYLON.MeshBuilder.CreateTube(`edge_${index}`, {
+        path: points,
+        radius: 0.08
+      });
+      tube.material = material;
+    }
   }
 
   private createLabel(text: string, position: BABYLON.Vector3): void {
