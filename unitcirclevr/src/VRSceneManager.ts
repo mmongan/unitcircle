@@ -221,18 +221,30 @@ export class VRSceneManager {
    * Remove all meshes associated with a node
    */
   private removeMeshesForNode(nodeId: string): void {
-    const prefix = `func_${nodeId}`;
-    const meshes = this.scene.meshes.filter(m => m.name.startsWith(prefix));
-    for (const mesh of meshes) {
+    // Remove all meshes with this node's prefix (handles func_, var_, ext_ prefixes)
+    const nodeMeshes = this.scene.meshes.filter(m => 
+      m.name.includes(nodeId) && m.name.includes('_')
+    );
+    for (const mesh of nodeMeshes) {
       mesh.dispose();
     }
     
-    // Remove label texture if exists
-    const labelTexture = this.scene.textures.find(
-      t => t.name === `labelTexture_${nodeId}`
-    );
+    // Remove label mesh
+    const labelMesh = this.scene.meshes.find(m => m.name === `label_${nodeId}`);
+    if (labelMesh) {
+      labelMesh.dispose();
+    }
+    
+    // Remove label textures
+    const labelTexture = this.scene.textures.find(t => t.name === `labelTexture_${nodeId}`);
     if (labelTexture) {
       labelTexture.dispose();
+    }
+    
+    // Remove signature texture
+    const sigTexture = this.scene.textures.find(t => t.name === `signatureTexture_${nodeId}`);
+    if (sigTexture) {
+      sigTexture.dispose();
     }
   }
 
@@ -281,6 +293,10 @@ export class VRSceneManager {
     node: GraphNode
   ): void {
     const originalColor = material.emissiveColor.clone();
+    
+    // Store node reference on the mesh for later retrieval
+    (mesh as any).nodeData = node;
+    
     mesh.actionManager = new BABYLON.ActionManager(this.scene);
     mesh.actionManager.registerAction(
       new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPointerOverTrigger, () => {
@@ -303,7 +319,11 @@ export class VRSceneManager {
         if (pickResult && pickResult.hit && pickResult.pickedMesh === mesh) {
           // Get the normal at the clicked point to determine which face was clicked
           const normal = pickResult.getNormal(true);
-          originalFlyTo(mesh.position, normal ?? undefined);
+          // Verify the mesh corresponds to the correct node and fly to it
+          const clickedNode = (mesh as any).nodeData as GraphNode;
+          if (clickedNode) {
+            originalFlyTo(mesh.position, normal ?? undefined);
+          }
         }
       }
     });
@@ -353,6 +373,11 @@ export class VRSceneManager {
     });
     positionAnimation.setKeys(keys);
     
+    // Add smooth easing for natural acceleration/deceleration
+    const positionEasing = new BABYLON.QuadraticEase();
+    positionEasing.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
+    positionAnimation.setEasingFunction(positionEasing);
+    
     this.scene.beginDirectAnimation(
       this.sceneRoot,
       [positionAnimation],
@@ -380,6 +405,11 @@ export class VRSceneManager {
         value: rotationQuaternion,
       });
       rotationAnimation.setKeys(rotKeys);
+      
+      // Add easing to rotation as well for consistency
+      const rotationEasing = new BABYLON.QuadraticEase();
+      rotationEasing.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
+      rotationAnimation.setEasingFunction(rotationEasing);
 
       this.scene.beginDirectAnimation(
         this.sceneRoot,

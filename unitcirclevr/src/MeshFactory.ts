@@ -57,7 +57,7 @@ export class MeshFactory {
     material.wireframe = false;
     cylinder.material = material;
 
-    this.createLabel(node.name, cylinder.position);
+    this.createLabel(node.name, cylinder.position, node.id);
     onNodeInteraction(cylinder as BABYLON.Mesh, material, node);
   }
 
@@ -83,7 +83,7 @@ export class MeshFactory {
     material.wireframe = false;
     sphere.material = material;
 
-    this.createLabel(node.name, sphere.position);
+    this.createLabel(node.name, sphere.position, node.id);
     onNodeInteraction(sphere as BABYLON.Mesh, material, node);
   }
 
@@ -119,7 +119,7 @@ export class MeshFactory {
 
     box.material = material;
 
-    this.createLabel(node.name, box.position);
+    this.createLabel(node.name, box.position, node.id);
     onNodeInteraction(box as BABYLON.Mesh, material, node);
   }
 
@@ -185,9 +185,9 @@ export class MeshFactory {
   /**
    * Create a billboard label above a mesh
    */
-  private createLabel(text: string, position: BABYLON.Vector3): void {
+  private createLabel(text: string, position: BABYLON.Vector3, nodeId: string): void {
     const dynamicTexture = new BABYLON.DynamicTexture(
-      'labelTexture_' + text,
+      `labelTexture_${nodeId}`,
       SceneConfig.LABEL_TEXTURE_SIZE,
       this.scene
     );
@@ -206,7 +206,7 @@ export class MeshFactory {
 
     // Create plane for label
     const labelPlane = BABYLON.MeshBuilder.CreatePlane(
-      `label_${text}`,
+      `label_${nodeId}`,
       { width: SceneConfig.LABEL_WIDTH, height: SceneConfig.LABEL_HEIGHT },
       this.scene
     );
@@ -214,7 +214,7 @@ export class MeshFactory {
     labelPlane.parent = this.sceneRoot;
     labelPlane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
 
-    const labelMaterial = new BABYLON.StandardMaterial(`labelMat_${text}`, this.scene);
+    const labelMaterial = new BABYLON.StandardMaterial(`labelMat_${nodeId}`, this.scene);
     labelMaterial.emissiveTexture = dynamicTexture;
     labelMaterial.backFaceCulling = false;
     labelPlane.material = labelMaterial;
