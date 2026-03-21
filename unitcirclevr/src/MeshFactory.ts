@@ -104,8 +104,8 @@ export class MeshFactory {
 
     const material = new BABYLON.StandardMaterial(`mat_${node.id}`, this.scene);
 
-    // Apply signature texture 
-    const signatureTexture = this.createSignatureTexture(node);
+    // Apply signature texture with file color background
+    const signatureTexture = this.createSignatureTexture(node, fileColor);
     signatureTexture.uScale = 1.0;
     signatureTexture.vScale = 1.0;
     signatureTexture.uOffset = 0;
@@ -113,24 +113,18 @@ export class MeshFactory {
     
     // Use texture as diffuse (primary visual) for proper lighting response
     material.diffuseTexture = signatureTexture;
+    // Keep diffuse color neutral so file color from texture shows through
+    material.diffuseColor = new BABYLON.Color3(1, 1, 1);
     
-    // Use file color as the primary cube color
+    // Subtle emissive glow based on file color
     if (fileColor) {
-      // Use file color directly with enhanced brightness
-      material.diffuseColor = new BABYLON.Color3(
-        Math.min(1, fileColor.r * 1.2),
-        Math.min(1, fileColor.g * 1.2),
-        Math.min(1, fileColor.b * 1.2)
-      );
       material.emissiveColor = new BABYLON.Color3(
-        fileColor.r * 0.15,
-        fileColor.g * 0.15,
-        fileColor.b * 0.15
+        fileColor.r * 0.1,
+        fileColor.g * 0.1,
+        fileColor.b * 0.1
       );
     } else {
-      // Fallback to blue if no file color
-      material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 1.0);
-      material.emissiveColor = new BABYLON.Color3(0.05, 0.15, 0.3);
+      material.emissiveColor = new BABYLON.Color3(0.05, 0.05, 0.05);
     }
     
     material.specularColor = new BABYLON.Color3(0.2, 0.2, 0.2);
@@ -146,7 +140,7 @@ export class MeshFactory {
   /**
    * Create a dynamic texture with function signature information
    */
-  private createSignatureTexture(node: GraphNode): BABYLON.DynamicTexture {
+  private createSignatureTexture(node: GraphNode, backgroundColor: BABYLON.Color3 | null = null): BABYLON.DynamicTexture {
     const textureSize = SceneConfig.SIGNATURE_TEXTURE_SIZE;
     const dynamicTexture = new BABYLON.DynamicTexture(
       `signatureTexture_${node.id}`,
@@ -155,9 +149,19 @@ export class MeshFactory {
     );
     const ctx = dynamicTexture.getContext() as any;
 
-    // Draw transparent background
-    ctx.fillStyle = 'rgba(0, 0, 0, 0)';
-    ctx.fillRect(0, 0, textureSize, textureSize);
+    // Draw background with file color or transparent
+    if (backgroundColor) {
+      // Convert color to RGB hex and fill background
+      const r = Math.floor(backgroundColor.r * 255);
+      const g = Math.floor(backgroundColor.g * 255);
+      const b = Math.floor(backgroundColor.b * 255);
+      ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+      ctx.fillRect(0, 0, textureSize, textureSize);
+    } else {
+      // Transparent background if no color provided
+      ctx.fillStyle = 'rgba(0, 0, 0, 0)';
+      ctx.fillRect(0, 0, textureSize, textureSize);
+    }
 
     // Draw border frame in white for contrast
     ctx.strokeStyle = '#ffffff';
