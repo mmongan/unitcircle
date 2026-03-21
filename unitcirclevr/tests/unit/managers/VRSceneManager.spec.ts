@@ -152,16 +152,22 @@ describe('VRSceneManager', () => {
       expect(addEventListenerSpy).toHaveBeenCalledWith('resize', expect.any(Function));
     });
 
-    it('should set up graph polling', () => {
-      const setIntervalSpy = vi.spyOn(global, 'setInterval');
-      manager = new VRSceneManager(canvas);
-      expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 2000);
-    });
-
     it('should set up WebXR', async () => {
       manager = new VRSceneManager(canvas);
       await new Promise(resolve => setTimeout(resolve, 100));
       expect(manager).toBeDefined();
+    });
+  });
+
+  describe('Initialization', () => {
+    beforeEach(() => {
+      manager = new VRSceneManager(canvas);
+    });
+
+    it('should set up graph polling when initialized', async () => {
+      const setIntervalSpy = vi.spyOn(global, 'setInterval');
+      await manager.initialize();
+      expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 2000);
     });
   });
 

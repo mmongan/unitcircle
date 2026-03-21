@@ -13,6 +13,8 @@ export class VRSceneManager {
   private lastGraphUpdate: string = '';
   private meshFactory!: MeshFactory;
   private graphLoader: GraphLoader;
+  private currentNodeIds: Set<string> = new Set();
+  private currentEdges: Set<string> = new Set();
 
   constructor(canvas: HTMLCanvasElement) {
     this.engine = new BABYLON.Engine(canvas, true);
@@ -107,6 +109,10 @@ export class VRSceneManager {
       this.validateGraphData(graph);
       this.lastGraphUpdate = graph.lastUpdated || '';
       this.renderCodeGraph(graph);
+      
+      // Track initial state for incremental updates
+      this.currentNodeIds = new Set(graph.nodes.map(n => n.id));
+      this.currentEdges = new Set(graph.edges.map(e => `${e.from}→${e.to}`));
     } catch (error) {
       console.error('❌ Error initializing code visualization:', error);
     }
@@ -127,9 +133,7 @@ export class VRSceneManager {
         if (graph && this.graphLoader.hasGraphUpdated(this.lastGraphUpdate)) {
           console.log('📊 Graph updated, refreshing visualization...');
           this.lastGraphUpdate = graph.lastUpdated;
-          this.clearGraph();
-          this.validateGraphData(graph);
-          this.renderCodeGraph(graph);
+          this.updateCodeGraph(graph);
         }
       } catch (error) {
         // Silent fail - polling is optional
@@ -137,20 +141,7 @@ export class VRSceneManager {
     }, SceneConfig.GRAPH_POLL_INTERVAL_MS);
   }
 
-  private clearGraph(): void {
-    // Remove all graph meshes (keep ground and lights)
-    const meshes = this.scene.meshes.filter(m => m.name.startsWith('func_') || m.name.startsWith('var_') || m.name.startsWith('ext_') || m.name.startsWith('edge_') || m.name.startsWith('label_'));
-    for (const mesh of meshes) {
-      mesh.dispose();
-    }
-    
-    // Dispose all label textures
-    this.scene.textures.forEach(texture => {
-      if (texture.name.startsWith('labelTexture_')) {
-        texture.dispose();
-      }
-    });
-  }
+
 
   public renderCodeGraph(graph: GraphData): void {
     // Create positions using force-directed layout
@@ -165,6 +156,88 @@ export class VRSceneManager {
     this.renderEdges(graph.edges, layoutNodes);
 
     console.log(`✓ Rendered code graph with ${graph.nodes.length} functions and ${graph.edges.length} calls`);
+  }
+
+  /**
+   * Incrementally update the scene - only create/remove changed objects
+   */
+  private updateCodeGraph(graph: GraphData): void {
+    this.validateGraphData(graph);
+
+    // Compute layout for all nodes
+    const edges = this.buildEdgeList(graph.edges);
+    const layout = new ForceDirectedLayout(
+      graph.nodes.map(n => n.id),
+      edges
+    );
+    const layoutNodes = this.computeLayout(layout);
+
+    // Track new node IDs and edge pairs
+    const newNodeIds = new Set(graph.nodes.map(n => n.id));
+    const newEdgePairs = new Set(
+      graph.edges.map(e => `${e.from}→${e.to}`)
+    );
+
+    // Remove deleted nodes
+    const removedNodeIds = Array.from(this.currentNodeIds).filter(id => !newNodeIds.has(id));
+    for (const nodeId of removedNodeIds) {
+      this.removeMeshesForNode(nodeId);
+      this.currentNodeIds.delete(nodeId);
+    }
+
+    // Remove deleted edges
+    const removedEdges = Array.from(this.currentEdges).filter(edge => !newEdgePairs.has(edge));
+    for (const edgePair of removedEdges) {
+      this.removeMeshesForEdge(edgePair);
+      this.currentEdges.delete(edgePair);
+    }
+
+    // Create only new nodes
+    const newNodes = graph.nodes.filter(n => !this.currentNodeIds.has(n.id));
+    this.renderNodes(newNodes, layoutNodes);
+    newNodes.forEach(n => this.currentNodeIds.add(n.id));
+
+    // Create only new edges
+    const newEdges = graph.edges.filter(
+      e => !this.currentEdges.has(`${e.from}→${e.to}`)
+    );
+    this.renderEdges(newEdges, layoutNodes);
+    newEdges.forEach(e => this.currentEdges.add(`${e.from}→${e.to}`));
+
+    console.log(
+      `✓ Updated code graph: ${removedNodeIds.length} removed, ${newNodes.length} created, ` +
+      `${removedEdges.length} edges removed, ${newEdges.length} edges created`
+    );
+  }
+
+  /**
+   * Remove all meshes associated with a node
+   */
+  private removeMeshesForNode(nodeId: string): void {
+    const prefix = `func_${nodeId}`;
+    const meshes = this.scene.meshes.filter(m => m.name.startsWith(prefix));
+    for (const mesh of meshes) {
+      mesh.dispose();
+    }
+    
+    // Remove label texture if exists
+    const labelTexture = this.scene.textures.find(
+      t => t.name === `labelTexture_${nodeId}`
+    );
+    if (labelTexture) {
+      labelTexture.dispose();
+    }
+  }
+
+  /**
+   * Remove meshes associated with an edge
+   */
+  private removeMeshesForEdge(edgePair: string): void {
+    const edgeId = `edge_${edgePair.replace('→', '_to_')}`;
+    const meshes = this.scene.meshes.filter(m => m.name.startsWith(edgeId));
+    for (const mesh of meshes) {
+      mesh.dispose();
+    }
   }
 
   private buildEdgeList(edges: Array<{ from: string; to: string }>): ForceDirectedLayout['edges'] {
