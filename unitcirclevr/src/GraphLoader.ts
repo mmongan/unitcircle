@@ -6,6 +6,7 @@ import type { GraphData } from './types';
 export class GraphLoader {
   private cache: GraphData | null = null;
   private lastLoadTime: number = 0;
+  private lastSeenVersion: string = '';
   private pollIntervalMs: number;
 
   constructor(pollIntervalMs: number = 2000) {
@@ -13,7 +14,35 @@ export class GraphLoader {
   }
 
   /**
+   * Check if graph has been updated without loading full graph
+   * Polls lightweight version.json first, only loads graph.json if version changed
+   */
+  async checkForUpdates(): Promise<boolean> {
+    try {
+      const baseUrl = import.meta.env.BASE_URL;
+      const versionUrl = `${baseUrl}version.json`;
+      
+      const response = await fetch(versionUrl);
+      if (!response.ok) return false;
+      
+      const versionData = await response.json();
+      const currentVersion = versionData.buildTime;
+      
+      if (currentVersion !== this.lastSeenVersion) {
+        this.lastSeenVersion = currentVersion;
+        return true;  // Version changed, should reload graph
+      }
+      
+      return false;  // No update needed
+    } catch (error) {
+      console.warn('Error checking version:', error);
+      return false;
+    }
+  }
+
+  /**
    * Load graph from appropriate source based on environment
+   * Should only be called after checkForUpdates() returns true
    */
   async loadGraph(): Promise<GraphData | null> {
     try {
@@ -23,7 +52,6 @@ export class GraphLoader {
       const baseUrl = import.meta.env.BASE_URL;
       const url = `${baseUrl}graph.json`;
       
-      console.log(`📊 Loading graph from: ${url}`);
       const response = await fetch(url);
       
       if (response.ok) {
@@ -53,14 +81,6 @@ export class GraphLoader {
   }
 
   /**
-   * Check if graph has been updated since last load
-   */
-  hasGraphUpdated(lastSeenUpdate: string): boolean {
-    if (!this.cache) return false;
-    return this.cache.lastUpdated !== lastSeenUpdate;
-  }
-
-  /**
    * Get cached graph data
    */
   getCachedGraph(): GraphData | null {
@@ -68,25 +88,11 @@ export class GraphLoader {
   }
 
   /**
-   * Get time since last load in milliseconds
-   */
-  getTimeSinceLastLoad(): number {
-    return Date.now() - this.lastLoadTime;
-  }
-
-  /**
    * Check if enough time has passed for next poll
    */
   shouldPoll(): boolean {
-    return this.getTimeSinceLastLoad() >= this.pollIntervalMs;
-  }
-
-  /**
-   * Clear cached data
-   */
-  clearCache(): void {
-    this.cache = null;
-    this.lastLoadTime = 0;
+    const timeSinceLastLoad = Date.now() - this.lastLoadTime;
+    return timeSinceLastLoad >= this.pollIntervalMs;
   }
 
   /**

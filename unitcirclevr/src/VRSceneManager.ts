@@ -10,7 +10,6 @@ export class VRSceneManager {
   private scene: BABYLON.Scene;
   private camera!: BABYLON.UniversalCamera;
   private sceneRoot!: BABYLON.TransformNode;
-  private lastGraphUpdate: string = '';
   private meshFactory!: MeshFactory;
   private graphLoader: GraphLoader;
   private currentNodeIds: Set<string> = new Set();
@@ -20,6 +19,9 @@ export class VRSceneManager {
     this.engine = new BABYLON.Engine(canvas, true);
     this.scene = new BABYLON.Scene(this.engine);
     this.scene.collisionsEnabled = true;
+
+    // Initialize scene action manager for click handling
+    this.scene.actionManager = new BABYLON.ActionManager(this.scene);
 
     // Create scene root transform - all objects will be parented to this
     this.sceneRoot = new BABYLON.TransformNode('sceneRoot', this.scene);
@@ -107,7 +109,6 @@ export class VRSceneManager {
       
       console.log(`✓ Graph loaded: ${graph.nodes.length} nodes, ${graph.edges?.length || 0} edges`);
       this.validateGraphData(graph);
-      this.lastGraphUpdate = graph.lastUpdated || '';
       this.renderCodeGraph(graph);
       
       // Track initial state for incremental updates
@@ -129,10 +130,16 @@ export class VRSceneManager {
           return;
         }
 
+        // Check for updates via lightweight version.json (only ~100 bytes)
+        const hasUpdates = await this.graphLoader.checkForUpdates();
+        if (!hasUpdates) {
+          return;  // No updates, skip loading full graph
+        }
+
+        // Only load full graph.json if version changed
         const graph = await this.graphLoader.loadGraph();
-        if (graph && this.graphLoader.hasGraphUpdated(this.lastGraphUpdate)) {
+        if (graph) {
           console.log('📊 Graph updated, refreshing visualization...');
-          this.lastGraphUpdate = graph.lastUpdated;
           this.updateCodeGraph(graph);
         }
       } catch (error) {

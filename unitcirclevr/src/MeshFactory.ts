@@ -50,6 +50,7 @@ export class MeshFactory {
     );
     cylinder.position = position;
     cylinder.parent = this.sceneRoot;
+    cylinder.isPickable = true;
 
     const material = new BABYLON.StandardMaterial(`extMat_${node.id}`, this.scene);
     material.emissiveColor = new BABYLON.Color3(0.15, 0.15, 0.15);  // Subtle gray
@@ -75,6 +76,7 @@ export class MeshFactory {
     );
     sphere.position = position;
     sphere.parent = this.sceneRoot;
+    sphere.isPickable = true;
 
     const material = new BABYLON.StandardMaterial(`varMat_${node.id}`, this.scene);
     material.emissiveColor = new BABYLON.Color3(0.15, 0.15, 0.15);  // Subtle gray
@@ -96,6 +98,7 @@ export class MeshFactory {
     const box = BABYLON.MeshBuilder.CreateBox(`func_${node.id}`, { size: SceneConfig.FUNCTION_BOX_SIZE }, this.scene);
     box.position = position;
     box.parent = this.sceneRoot;
+    box.isPickable = true;
 
     const material = new BABYLON.StandardMaterial(`mat_${node.id}`, this.scene);
 
@@ -109,6 +112,9 @@ export class MeshFactory {
     // Use texture as emissive only (no additional color)
     material.emissiveTexture = signatureTexture;
     material.emissiveColor = new BABYLON.Color3(0, 0, 0);  // No additional emissive
+    // Add diffuse and reduce specular for less glare
+    material.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);  // Very low specularity
+    material.specularPower = 4;  // Low power for matte finish
     material.wireframe = false;
 
     box.material = material;
@@ -133,8 +139,8 @@ export class MeshFactory {
     ctx.fillStyle = 'rgba(0, 0, 0, 0)';
     ctx.fillRect(0, 0, textureSize, textureSize);
 
-    // Draw border frame
-    ctx.strokeStyle = '#ffffff';
+    // Draw border frame in dimmed gray
+    ctx.strokeStyle = '#888888';
     ctx.lineWidth = 3;
     ctx.strokeRect(
       SceneConfig.SIGNATURE_TEXTURE_BORDER_SIZE,
@@ -143,7 +149,7 @@ export class MeshFactory {
       textureSize - 2 * SceneConfig.SIGNATURE_TEXTURE_BORDER_SIZE
     );
 
-    // Draw text in white for visibility on any color
+    // Draw text in dimmed gray for less glare
     const lines: string[] = [node.name];
     if (node.isExported) {
       lines.push('Exported');
@@ -160,7 +166,7 @@ export class MeshFactory {
       node.type === 'function' ? 'Function' : node.type === 'variable' ? 'Variable' : 'External';
     lines.push(typeLabel);
 
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = '#cccccc';  // Dimmed gray instead of white
     ctx.font = `bold ${SceneConfig.SIGNATURE_FONT_SIZE_PX}px ${SceneConfig.SIGNATURE_FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
