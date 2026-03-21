@@ -516,7 +516,15 @@
       "id": "createEdge@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "createEdge",
       "file": "MeshFactory.ts",
-      "line": 299,
+      "line": 318,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "getEdgeOffsetPosition@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
+      "name": "getEdgeOffsetPosition",
+      "file": "MeshFactory.ts",
+      "line": 358,
       "isExported": false,
       "type": "function"
     },
@@ -524,7 +532,7 @@
       "id": "createArrowhead@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "createArrowhead",
       "file": "MeshFactory.ts",
-      "line": 329,
+      "line": 380,
       "isExported": false,
       "type": "function"
     },
@@ -1153,6 +1161,10 @@
     },
     {
       "from": "createEdge@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
+      "to": "getEdgeOffsetPosition@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts"
+    },
+    {
+      "from": "createEdge@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "to": "createArrowhead@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts"
     },
     {
@@ -1352,5 +1364,5 @@
       "to": "render@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-21T21:44:25.055Z"
+  "lastUpdated": "2026-03-21T22:02:10.671Z"
 }
