@@ -67,7 +67,7 @@ export class SceneConfig {
   // Animation
   static readonly FLY_TO_ANIMATION_TIME_MS = 800;
   static readonly FLY_TO_ANIMATION_FPS = 60;
-  static readonly FLY_TO_OFFSET = new BABYLON.Vector3(0, 0, 8);  // Position cube in front of camera
+  static readonly FLY_TO_OFFSET = new BABYLON.Vector3(0, 0, 3);  // Position cube in front of camera
 
   // Polling
   static readonly GRAPH_POLL_INTERVAL_MS = 2000;
