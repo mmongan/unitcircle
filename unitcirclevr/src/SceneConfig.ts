@@ -20,7 +20,7 @@ export class SceneConfig {
   static readonly EXTERNAL_MODULE_COLOR = new BABYLON.Color3(0.2, 0.4, 0.5);
 
   // Interaction Colors
-  static readonly HOVER_COLOR = new BABYLON.Color3(0.7, 0.7, 0.7);
+  static readonly HOVER_COLOR = new BABYLON.Color3(0.4, 0.4, 0.4);
   static readonly EDGE_COLOR = new BABYLON.Color3(0.5, 0.5, 0.5);
   static readonly GROUND_COLOR = new BABYLON.Color3(0.2, 0.7, 0.2);
 

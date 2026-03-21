@@ -52,7 +52,7 @@ export class MeshFactory {
     cylinder.parent = this.sceneRoot;
 
     const material = new BABYLON.StandardMaterial(`extMat_${node.id}`, this.scene);
-    material.emissiveColor = new BABYLON.Color3(0.3, 0.3, 0.3);  // Dark gray
+    material.emissiveColor = new BABYLON.Color3(0.15, 0.15, 0.15);  // Subtle gray
     material.wireframe = false;
     cylinder.material = material;
 
@@ -77,7 +77,7 @@ export class MeshFactory {
     sphere.parent = this.sceneRoot;
 
     const material = new BABYLON.StandardMaterial(`varMat_${node.id}`, this.scene);
-    material.emissiveColor = new BABYLON.Color3(0.3, 0.3, 0.3);  // Dark gray
+    material.emissiveColor = new BABYLON.Color3(0.15, 0.15, 0.15);  // Subtle gray
     material.wireframe = false;
     sphere.material = material;
 
@@ -106,9 +106,9 @@ export class MeshFactory {
     signatureTexture.uOffset = 0;
     signatureTexture.vOffset = 0;
     
-    // Use texture without emissive glow
+    // Use texture as emissive only (no additional color)
     material.emissiveTexture = signatureTexture;
-    material.emissiveColor = new BABYLON.Color3(0.3, 0.3, 0.3);  // Dark gray for visibility
+    material.emissiveColor = new BABYLON.Color3(0, 0, 0);  // No additional emissive
     material.wireframe = false;
 
     box.material = material;
