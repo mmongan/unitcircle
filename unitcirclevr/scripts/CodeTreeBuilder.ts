@@ -67,9 +67,29 @@ export class CodeTreeBuilder {
     // Get all TypeScript files
     const files = this.getAllTypeScriptFiles(this.sourceDir);
 
-    // Parse each file
+    // TWO-PASS APPROACH
+    // Pass 1: Extract all function and variable declarations
+    const sourceFiles: Array<{ filePath: string; sourceFile: ts.SourceFile; source: string }> = [];
+    
     for (const filePath of files) {
-      this.parseFile(filePath);
+      try {
+        const source = fs.readFileSync(filePath, 'utf-8');
+        const sourceFile = ts.createSourceFile(
+          filePath,
+          source,
+          ts.ScriptTarget.Latest,
+          true
+        );
+        sourceFiles.push({ filePath, sourceFile, source });
+        this.visitDeclarations(sourceFile, filePath);
+      } catch (error) {
+        console.warn(`Could not parse ${filePath}:`, error);
+      }
+    }
+
+    // Pass 2: Extract all function calls
+    for (const { filePath, sourceFile } of sourceFiles) {
+      this.visitCalls(sourceFile, filePath);
     }
 
     const nodes: CodeNode[] = [
@@ -108,23 +128,7 @@ export class CodeTreeBuilder {
     return files;
   }
 
-  private parseFile(filePath: string): void {
-    try {
-      const source = fs.readFileSync(filePath, 'utf-8');
-      const sourceFile = ts.createSourceFile(
-        filePath,
-        source,
-        ts.ScriptTarget.Latest,
-        true
-      );
-
-      this.visit(sourceFile, filePath);
-    } catch (error) {
-      console.warn(`Could not parse ${filePath}:`, error);
-    }
-  }
-
-  private visit(node: ts.Node, filePath: string): void {
+  private visitDeclarations(node: ts.Node, filePath: string): void {
     // Extract external module imports
     if (ts.isImportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) {
       const moduleName = node.moduleSpecifier.text;
@@ -197,6 +201,28 @@ export class CodeTreeBuilder {
       });
     }
 
+    // Extract arrow function methods in classes (e.g., private methodName = () => {})
+    if (ts.isPropertyDeclaration(node) && node.name && ts.isIdentifier(node.name) && node.initializer && ts.isArrowFunction(node.initializer)) {
+      const methodName = node.name.text;
+      const lineNumber = this.getLineNumber(node, filePath);
+      const id = `${methodName}@${filePath}`;
+      const isExported = node.modifiers?.some(mod => mod.kind === ts.SyntaxKind.ExportKeyword) ?? false;
+
+      this.functions.set(id, {
+        id,
+        name: methodName,
+        file: path.relative('./src', filePath),
+        line: lineNumber,
+        isExported,
+        type: 'function'
+      });
+    }
+
+    // Recurse through children
+    ts.forEachChild(node, (child) => this.visitDeclarations(child, filePath));
+  }
+
+  private visitCalls(node: ts.Node, filePath: string): void {
     // Extract function calls
     if (ts.isCallExpression(node)) {
       const caller = this.findEnclosingFunction(node, filePath);
@@ -206,16 +232,20 @@ export class CodeTreeBuilder {
         // Try to resolve the callee to a function we know about
         const resolvedCallee = this.resolveCalleeToFunction(callee, filePath);
         if (resolvedCallee && caller !== resolvedCallee) {
-          this.calls.push({
-            from: caller,
-            to: resolvedCallee
-          });
+          // Check if this edge already exists
+          const edgeExists = this.calls.some(call => call.from === caller && call.to === resolvedCallee);
+          if (!edgeExists) {
+            this.calls.push({
+              from: caller,
+              to: resolvedCallee
+            });
+          }
         }
       }
     }
 
     // Recurse through children
-    ts.forEachChild(node, (child) => this.visit(child, filePath));
+    ts.forEachChild(node, (child) => this.visitCalls(child, filePath));
   }
 
   private getLineNumber(node: ts.Node, filePath: string): number {

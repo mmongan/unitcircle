@@ -271,7 +271,7 @@ export class MeshFactory {
   ): void {
     // Create material for normal edges
     const edgeMaterial = new BABYLON.StandardMaterial('edgeMaterial', this.scene);
-    edgeMaterial.emissiveColor = new BABYLON.Color3(0.3, 0.3, 0.3);  // Dark gray
+    edgeMaterial.emissiveColor = new BABYLON.Color3(0.8, 0.8, 0.8);  // Bright gray
 
     // Create material for golden edges (calls to exported functions)
     const goldenEdgeMaterial = new BABYLON.StandardMaterial('goldenEdgeMaterial', this.scene);
@@ -312,7 +312,7 @@ export class MeshFactory {
       const tube = BABYLON.MeshBuilder.CreateTube(`edge_${index}`, {
         path: points,
         radius: SceneConfig.EDGE_RADIUS,
-      });
+      }, this.scene);
       tube.parent = this.sceneRoot;
       tube.material = material;
       tube.isPickable = false;  // Edges should not be clickable
