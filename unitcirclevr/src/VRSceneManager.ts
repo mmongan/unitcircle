@@ -274,12 +274,12 @@ export class VRSceneManager {
     );
     mesh.actionManager.registerAction(
       new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPickTrigger, () => {
-        this.sceneRootFlyTo(mesh.position, node);
+        this.sceneRootFlyTo(mesh.position, node, material);
       })
     );
   }
 
-  private sceneRootFlyTo(targetPosition: BABYLON.Vector3, node: GraphData['nodes'][0]): void {
+  private sceneRootFlyTo(targetPosition: BABYLON.Vector3, node: GraphData['nodes'][0], material: BABYLON.StandardMaterial): void {
     // Animate scene root position to place object directly below camera (top-down view)
     // Camera is fixed at (0, 0, -70); position object directly below
     const cameraPosition = new BABYLON.Vector3(0, 0, -70);
@@ -305,33 +305,14 @@ export class VRSceneManager {
       BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
     );
 
-    // Show function signature panel after animation completes (800ms)
-    setTimeout(() => this.create3DSignaturePanel(targetPosition, node), 800);
+    // Apply function signature texture after animation completes (800ms)
+    setTimeout(() => this.applySignatureTexture(material, node), 800);
   }
 
-  private create3DSignaturePanel(objectPosition: BABYLON.Vector3, node: GraphData['nodes'][0]): void {
-    // Remove any existing signature panel meshes
-    const existingPanel = this.scene.meshes.find(m => m.name === 'signaturePedestal');
-    const existingPlane = this.scene.meshes.find(m => m.name === 'signaturePlane');
-    if (existingPanel) existingPanel.dispose();
-    if (existingPlane) existingPlane.dispose();
-
-    // Create pedestal - thin cylinder standing on top of object
-    const pedestal = BABYLON.MeshBuilder.CreateCylinder('signaturePedestal', {
-      height: 1.2,
-      diameterTop: 0.8,
-      diameterBottom: 0.8
-    }, this.scene);
-    pedestal.position = objectPosition.add(new BABYLON.Vector3(0, 1.6, 0));
-    pedestal.parent = this.sceneRoot;
-
-    const pedestalMaterial = new BABYLON.StandardMaterial('pedestalMat', this.scene);
-    pedestalMaterial.emissiveColor = new BABYLON.Color3(0.3, 0.3, 0.3);
-    pedestal.material = pedestalMaterial;
-
+  private applySignatureTexture(material: BABYLON.StandardMaterial, node: GraphData['nodes'][0]): void {
     // Create dynamic texture for signature text
     const textureSize = 512;
-    const dynamicTexture = new BABYLON.DynamicTexture('signatureTexture', textureSize, this.scene);
+    const dynamicTexture = new BABYLON.DynamicTexture(`signatureTexture_${node.id}`, textureSize, this.scene);
     const ctx = dynamicTexture.getContext() as any;
 
     // Draw background
@@ -370,18 +351,8 @@ export class VRSceneManager {
 
     dynamicTexture.update();
 
-    // Create plane for signature display
-    const signaturePlane = BABYLON.MeshBuilder.CreatePlane('signaturePlane', {
-      width: 3,
-      height: 3
-    }, this.scene);
-    signaturePlane.position = objectPosition.add(new BABYLON.Vector3(0, 3.2, 0));
-    signaturePlane.parent = this.sceneRoot;
-
-    const planeMaterial = new BABYLON.StandardMaterial('signaturePlaneMat', this.scene);
-    planeMaterial.emissiveTexture = dynamicTexture;
-    planeMaterial.backFaceCulling = false;
-    signaturePlane.material = planeMaterial;
+    // Apply signature texture to cube's material
+    material.emissiveTexture = dynamicTexture;
   }
 
   private renderEdges(edges: Array<{ from: string; to: string }>, layoutNodes: Map<string, any>): void {
