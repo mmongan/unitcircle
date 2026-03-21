@@ -103,6 +103,9 @@ export class VRSceneManager {
     this.camera.attachControl(canvas, true);
     this.camera.inertia = SceneConfig.CAMERA_INERTIA;
     this.camera.angularSensibility = SceneConfig.CAMERA_ANGULAR_SENSIBILITY;
+    // Set camera frustum to support distant objects
+    this.camera.minZ = 0.1;    // Near clipping plane
+    this.camera.maxZ = 50000;  // Far clipping plane - allow raycasting to very distant meshes
   }
 
   private createGround(): void {
