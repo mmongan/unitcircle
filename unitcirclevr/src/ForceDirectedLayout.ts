@@ -21,7 +21,7 @@ export class ForceDirectedLayout {
   private repulsiveForce: number = 0.2; // Repulsive force strength (lower = stronger repulsion)
   private attractiveForce: number = 0.1; // Attractive force strength
   private damping: number = 0.95; // Velocity damping
-  private minSeparation: number = 5; // Minimum distance between node centers (cube size 4.0 + buffer)
+  private minSeparation: number = 6; // Minimum distance between node centers (increased for better spread)
 
   constructor(nodeIds: string[], edges: Edge[]) {
     this.nodes = new Map();
@@ -67,8 +67,8 @@ export class ForceDirectedLayout {
   }
 
   private constrainNodePositions(): void {
-    // Ensure nodes stay within bounds (±50 on each axis)
-    const BOUND = 50;
+    // Ensure nodes stay within bounds (±100 on each axis for better distribution)
+    const BOUND = 100;
     for (const node of this.nodes.values()) {
       node.position.x = Math.max(-BOUND, Math.min(BOUND, node.position.x));
       node.position.y = Math.max(-BOUND, Math.min(BOUND, node.position.y));

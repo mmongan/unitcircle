@@ -97,12 +97,12 @@ describe('ForceDirectedLayout', () => {
 
       for (const node of nodes) {
         const pos = result.get(node)?.position;
-        expect(pos?.x).toBeGreaterThanOrEqual(-50);
-        expect(pos?.x).toBeLessThanOrEqual(50);
-        expect(pos?.y).toBeGreaterThanOrEqual(-50);
-        expect(pos?.y).toBeLessThanOrEqual(50);
-        expect(pos?.z).toBeGreaterThanOrEqual(-50);
-        expect(pos?.z).toBeLessThanOrEqual(50);
+        expect(pos?.x).toBeGreaterThanOrEqual(-100);
+        expect(pos?.x).toBeLessThanOrEqual(100);
+        expect(pos?.y).toBeGreaterThanOrEqual(-100);
+        expect(pos?.y).toBeLessThanOrEqual(100);
+        expect(pos?.z).toBeGreaterThanOrEqual(-100);
+        expect(pos?.z).toBeLessThanOrEqual(100);
       }
     });
   });
