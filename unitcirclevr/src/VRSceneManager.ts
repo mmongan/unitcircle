@@ -1,18 +1,9 @@
 import * as BABYLON from '@babylonjs/core';
 import { ForceDirectedLayout } from './ForceDirectedLayout';
-
-interface GraphData {
-  nodes: Array<{ 
-    id: string; 
-    name: string; 
-    file?: string; 
-    line?: number; 
-    isExported?: boolean;
-    type?: 'function' | 'variable' | 'external';
-  }>;
-  edges: Array<{ from: string; to: string }>;
-  lastUpdated: string;
-}
+import type { GraphData, GraphNode } from './types';
+import { MeshFactory } from './MeshFactory';
+import { GraphLoader } from './GraphLoader';
+import { SceneConfig } from './SceneConfig';
 
 export class VRSceneManager {
   private engine: BABYLON.Engine;
@@ -20,6 +11,8 @@ export class VRSceneManager {
   private camera!: BABYLON.UniversalCamera;
   private sceneRoot!: BABYLON.TransformNode;
   private lastGraphUpdate: string = '';
+  private meshFactory!: MeshFactory;
+  private graphLoader: GraphLoader;
 
   constructor(canvas: HTMLCanvasElement) {
     this.engine = new BABYLON.Engine(canvas, true);
@@ -28,6 +21,10 @@ export class VRSceneManager {
 
     // Create scene root transform - all objects will be parented to this
     this.sceneRoot = new BABYLON.TransformNode('sceneRoot', this.scene);
+
+    // Initialize services
+    this.meshFactory = new MeshFactory(this.scene, this.sceneRoot);
+    this.graphLoader = new GraphLoader(SceneConfig.GRAPH_POLL_INTERVAL_MS);
 
     // Setup lighting
     this.setupLighting();
@@ -47,41 +44,50 @@ export class VRSceneManager {
     // Handle window resize
     window.addEventListener('resize', () => this.engine.resize());
 
-    // Poll for graph updates (every 2 seconds)
+    // Poll for graph updates
     this.setupGraphPolling();
   }
 
   private setupLighting(): void {
     const light = new BABYLON.HemisphericLight('light', new BABYLON.Vector3(0, 1, 0), this.scene);
-    light.intensity = 0.7;
+    light.intensity = SceneConfig.LIGHT_INTENSITY;
 
-    this.createPointLight();
-  }
-
-  private createPointLight(): void {
-    const pointLight = new BABYLON.PointLight('pointLight', new BABYLON.Vector3(5, 10, 5), this.scene);
-    pointLight.intensity = 0.5;
+    const pointLight = new BABYLON.PointLight(
+      'pointLight',
+      SceneConfig.POINT_LIGHT_POSITION,
+      this.scene
+    );
+    pointLight.intensity = SceneConfig.POINT_LIGHT_INTENSITY;
   }
 
   private setupCamera(canvas: HTMLCanvasElement): void {
-    this.camera = new BABYLON.UniversalCamera('camera', new BABYLON.Vector3(0, 0, -70), this.scene);
+    this.camera = new BABYLON.UniversalCamera(
+      'camera',
+      SceneConfig.CAMERA_POSITION,
+      this.scene
+    );
     this.camera.attachControl(canvas, true);
-    this.camera.inertia = 0.5;
-    this.camera.angularSensibility = 1000;
+    this.camera.inertia = SceneConfig.CAMERA_INERTIA;
+    this.camera.angularSensibility = SceneConfig.CAMERA_ANGULAR_SENSIBILITY;
   }
 
   private createGround(): void {
-    const ground = BABYLON.MeshBuilder.CreateGround('ground', { width: 150, height: 150 }, this.scene);
+    const ground = BABYLON.MeshBuilder.CreateGround(
+      'ground',
+      { width: SceneConfig.GROUND_WIDTH, height: SceneConfig.GROUND_HEIGHT },
+      this.scene
+    );
     ground.parent = this.sceneRoot;
     ground.material = new BABYLON.StandardMaterial('groundMat', this.scene);
-    (ground.material as BABYLON.StandardMaterial).emissiveColor = new BABYLON.Color3(0.2, 0.7, 0.2);
+    (ground.material as BABYLON.StandardMaterial).emissiveColor = SceneConfig.GROUND_COLOR;
   }
 
   private async initializeCodeVisualization(): Promise<void> {
     try {
-      const graph = await this.loadGraph();
+      const graph = await this.graphLoader.loadGraph();
       if (graph && graph.nodes.length > 0) {
         this.validateGraphData(graph);
+        this.lastGraphUpdate = graph.lastUpdated;
         this.renderCodeGraph(graph);
       }
     } catch (error) {
@@ -93,28 +99,15 @@ export class VRSceneManager {
     return graph.nodes && graph.nodes.length > 0 && graph.edges && Array.isArray(graph.edges);
   }
 
-  private async loadGraph(): Promise<GraphData | null> {
-    try {
-      // In development, use live API endpoint
-      // In production, use prebuilt graph.json
-      const isDev = import.meta.env.DEV;
-      const url = isDev ? '/api/graph.json' : '/unitcircle/graph.json';
-      
-      const response = await fetch(url);
-      if (response.ok) {
-        return await response.json();
-      }
-    } catch (error) {
-      console.warn('Could not load graph:', error);
-    }
-    return null;
-  }
-
   private setupGraphPolling(): void {
     setInterval(async () => {
       try {
-        const graph = await this.loadGraph();
-        if (graph && graph.lastUpdated !== this.lastGraphUpdate) {
+        if (!this.graphLoader.shouldPoll()) {
+          return;
+        }
+
+        const graph = await this.graphLoader.loadGraph();
+        if (graph && this.graphLoader.hasGraphUpdated(this.lastGraphUpdate)) {
           console.log('📊 Graph updated, refreshing visualization...');
           this.lastGraphUpdate = graph.lastUpdated;
           this.clearGraph();
@@ -124,7 +117,7 @@ export class VRSceneManager {
       } catch (error) {
         // Silent fail - polling is optional
       }
-    }, 2000);
+    }, SceneConfig.GRAPH_POLL_INTERVAL_MS);
   }
 
   private clearGraph(): void {
@@ -165,14 +158,18 @@ export class VRSceneManager {
   }
 
   private computeLayout(layout: ForceDirectedLayout): Map<string, any> {
-    return layout.simulate(100);
+    return layout.simulate(SceneConfig.LAYOUT_ITERATIONS);
   }
 
   private extractCallingFunctions(edges: Array<{ from: string; to: string }>): Set<string> {
     return new Set(edges.map(e => e.from));
   }
 
-  private renderNodes(nodes: GraphData['nodes'], layoutNodes: Map<string, any>, functionsWithCalls: Set<string>): void {
+  private renderNodes(
+    nodes: GraphNode[],
+    layoutNodes: Map<string, any>,
+    functionsWithCalls: Set<string>
+  ): void {
     for (const node of nodes) {
       const layoutNode = layoutNodes.get(node.id);
       if (!layoutNode) continue;
@@ -183,136 +180,22 @@ export class VRSceneManager {
         layoutNode.position.z
       );
 
-      this.createNodeMesh(node, position, functionsWithCalls);
+      this.meshFactory.createNodeMesh(node, position, functionsWithCalls, (mesh, material, n) =>
+        this.setupNodeInteraction(mesh, material, n)
+      );
     }
   }
 
-  private createNodeMesh(node: GraphData['nodes'][0], position: BABYLON.Vector3, functionsWithCalls: Set<string>): void {
-    if (node.type === 'external') {
-      this.createExternalModuleMesh(node, position);
-    } else if (node.type === 'variable') {
-      this.createVariableMesh(node, position);
-    } else {
-      this.createFunctionMesh(node, position, functionsWithCalls);
-    }
-  }
-
-  private createExternalModuleMesh(node: GraphData['nodes'][0], position: BABYLON.Vector3): void {
-    const externalModuleColor = new BABYLON.Color3(0.4, 0.8, 1);
-    const cylinder = BABYLON.MeshBuilder.CreateCylinder(`ext_${node.id}`, { height: 2.0, diameterTop: 1.2, diameterBottom: 1.2 }, this.scene);
-    cylinder.position = position;
-    cylinder.parent = this.sceneRoot;
-
-    const material = new BABYLON.StandardMaterial(`extMat_${node.id}`, this.scene);
-    material.emissiveColor = externalModuleColor;
-    material.wireframe = false;
-    cylinder.material = material;
-
-    this.createLabel(node.name, cylinder.position);
-    this.setupNodeInteraction(cylinder, material, node);
-  }
-
-  private createVariableMesh(node: GraphData['nodes'][0], position: BABYLON.Vector3): void {
-    const exportedVarColor = new BABYLON.Color3(1, 0.8, 0.2);
-    const unexportedVarColor = new BABYLON.Color3(0.6, 0.6, 0.6);
-    
-    const sphere = BABYLON.MeshBuilder.CreateSphere(`var_${node.id}`, { diameter: 1.5 }, this.scene);
-    sphere.position = position;
-    sphere.parent = this.sceneRoot;
-
-    const material = new BABYLON.StandardMaterial(`varMat_${node.id}`, this.scene);
-    material.emissiveColor = node.isExported ? exportedVarColor : unexportedVarColor;
-    material.wireframe = false;
-    sphere.material = material;
-
-    this.createLabel(node.name, sphere.position);
-    this.setupNodeInteraction(sphere, material, node);
-  }
-
-  private createFunctionMesh(node: GraphData['nodes'][0], position: BABYLON.Vector3, functionsWithCalls: Set<string>): void {
-    const exportedColor = new BABYLON.Color3(0.2, 1, 0.8);
-    const leafColor = new BABYLON.Color3(0.8, 0.8, 0.8);
-    const nonExportedColors = [
-      new BABYLON.Color3(1, 0.2, 0.2),
-      new BABYLON.Color3(0.2, 1, 0.2),
-      new BABYLON.Color3(0.2, 0.2, 1),
-      new BABYLON.Color3(1, 1, 0.2),
-      new BABYLON.Color3(1, 0.2, 1),
-    ];
-
-    const box = BABYLON.MeshBuilder.CreateBox(`func_${node.id}`, { size: 2.0 }, this.scene);
-    box.position = position;
-    box.parent = this.sceneRoot;
-
-    const material = new BABYLON.StandardMaterial(`mat_${node.id}`, this.scene);
-    
-    if (node.isExported) {
-      material.emissiveColor = exportedColor;
-    } else if (functionsWithCalls.has(node.id)) {
-      const colorIndex = Math.floor(Math.random() * nonExportedColors.length);
-      material.emissiveColor = nonExportedColors[colorIndex];
-    } else {
-      material.emissiveColor = leafColor;
-    }
-    
-    material.wireframe = false;
-    box.material = material;
-
-    // Apply signature texture immediately to all faces
-    const signatureTexture = this.createSignatureTexture(node);
-    material.emissiveTexture = signatureTexture;
-  }
-
-  private createSignatureTexture(node: GraphData['nodes'][0]): BABYLON.DynamicTexture {
-    // Create dynamic texture for signature
-    const textureSize = 512;
-    const dynamicTexture = new BABYLON.DynamicTexture(`signatureTexture_${node.id}`, textureSize, this.scene);
-    const ctx = dynamicTexture.getContext() as any;
-
-    // Draw background
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, textureSize, textureSize);
-    ctx.strokeStyle = '#00ff00';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(10, 10, textureSize - 20, textureSize - 20);
-
-    // Draw text
-    const lines: string[] = [node.name];
-    if (node.isExported) {
-      lines.push('Exported');
-    } else {
-      lines.push('Internal');
-    }
-    if (node.file) {
-      lines.push(node.file);
-    }
-    if (node.line) {
-      lines.push(`Line ${node.line}`);
-    }
-    const typeLabel = node.type === 'function' ? 'Function' : node.type === 'variable' ? 'Variable' : 'External';
-    lines.push(typeLabel);
-
-    ctx.fillStyle = '#00ff00';
-    ctx.font = 'bold 32px monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-
-    let yOffset = 60;
-    for (const line of lines) {
-      ctx.fillText(line, textureSize / 2, yOffset);
-      yOffset += 60;
-    }
-
-    dynamicTexture.update();
-    return dynamicTexture;
-  }
-
-  private setupNodeInteraction(mesh: BABYLON.Mesh, material: BABYLON.StandardMaterial, node: GraphData['nodes'][0]): void {
+  private setupNodeInteraction(
+    mesh: BABYLON.Mesh,
+    material: BABYLON.StandardMaterial,
+    node: GraphNode
+  ): void {
     const originalColor = material.emissiveColor.clone();
     mesh.actionManager = new BABYLON.ActionManager(this.scene);
     mesh.actionManager.registerAction(
       new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPointerOverTrigger, () => {
-        material.emissiveColor = new BABYLON.Color3(1, 1, 1);
+        material.emissiveColor = SceneConfig.HOVER_COLOR;
         this.showTooltip(node);
       })
     );
@@ -331,25 +214,25 @@ export class VRSceneManager {
 
   private sceneRootFlyTo(targetPosition: BABYLON.Vector3): void {
     // Animate scene root position to place object directly below camera (top-down view)
-    // Camera is fixed at (0, 0, -70); position object directly below
-    const cameraPosition = new BABYLON.Vector3(0, 0, -70);
-    
+    // Camera is fixed at CAMERA_POSITION; position object directly below
+    const cameraPosition = SceneConfig.CAMERA_POSITION;
+
     // Top-down viewing position: object centered below camera
-    const viewOffset = new BABYLON.Vector3(0, 0, -5);
-    
+    const viewOffset = SceneConfig.FLY_TO_OFFSET;
+
     // Calculate where the target should appear in world space
     const desiredWorldPosition = cameraPosition.add(viewOffset);
-    
+
     // Calculate scene root offset to position target at desired world position
     const sceneOffset = desiredWorldPosition.subtract(targetPosition);
 
-    // Animate scene root movement over 800ms for top-down view
+    // Animate scene root movement
     BABYLON.Animation.CreateAndStartAnimation(
       'sceneRootFly',
       this.sceneRoot,
       'position',
-      60,
-      48, // 800ms at 60fps
+      SceneConfig.FLY_TO_ANIMATION_FPS,
+      (SceneConfig.FLY_TO_ANIMATION_TIME_MS / 1000) * SceneConfig.FLY_TO_ANIMATION_FPS,
       this.sceneRoot.position.clone(),
       sceneOffset,
       BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
@@ -357,60 +240,7 @@ export class VRSceneManager {
   }
 
   private renderEdges(edges: Array<{ from: string; to: string }>, layoutNodes: Map<string, any>): void {
-    const edgeMaterial = new BABYLON.StandardMaterial('edgeMaterial', this.scene);
-    edgeMaterial.emissiveColor = new BABYLON.Color3(0.5, 0.5, 0.5);
-
-    let edgeIndex = 0;
-    for (const edge of edges) {
-      this.renderEdge(edge, layoutNodes, edgeMaterial, edgeIndex++);
-    }
-  }
-
-  private renderEdge(edge: { from: string; to: string }, layoutNodes: Map<string, any>, material: BABYLON.StandardMaterial, index: number): void {
-    const sourceNode = layoutNodes.get(edge.from);
-    const targetNode = layoutNodes.get(edge.to);
-
-    if (sourceNode && targetNode) {
-      const points = [
-        new BABYLON.Vector3(sourceNode.position.x, sourceNode.position.y, sourceNode.position.z),
-        new BABYLON.Vector3(targetNode.position.x, targetNode.position.y, targetNode.position.z)
-      ];
-
-      const tube = BABYLON.MeshBuilder.CreateTube(`edge_${index}`, {
-        path: points,
-        radius: 0.2
-      });
-      tube.parent = this.sceneRoot;
-      tube.material = material;
-    }
-  }
-
-  private createLabel(text: string, position: BABYLON.Vector3): void {
-    // Create dynamic texture for text
-    const dynamicTexture = new BABYLON.DynamicTexture('labelTexture_' + text, 512, this.scene);
-    const ctx = dynamicTexture.getContext() as any;
-    
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(0, 0, 512, 512);
-    
-    ctx.fillStyle = 'white';
-    ctx.font = 'bold 64px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, 256, 256);
-    
-    dynamicTexture.update();
-
-    // Create plane for label
-    const labelPlane = BABYLON.MeshBuilder.CreatePlane(`label_${text}`, { width: 2, height: 0.5 }, this.scene);
-    labelPlane.position = position.add(new BABYLON.Vector3(0, 1.2, 0));
-    labelPlane.parent = this.sceneRoot;
-    labelPlane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL; // Always face camera
-
-    const labelMaterial = new BABYLON.StandardMaterial(`labelMat_${text}`, this.scene);
-    labelMaterial.emissiveTexture = dynamicTexture;
-    labelMaterial.backFaceCulling = false;
-    labelPlane.material = labelMaterial;
+    this.meshFactory.createEdges(edges, layoutNodes);
   }
 
   private showTooltip(node: { name: string; file?: string; line?: number }): void {
