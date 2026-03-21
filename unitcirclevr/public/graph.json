@@ -492,7 +492,7 @@
       "id": "createSignatureTexture@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "createSignatureTexture",
       "file": "MeshFactory.ts",
-      "line": 142,
+      "line": 146,
       "isExported": false,
       "type": "function"
     },
@@ -500,7 +500,7 @@
       "id": "createLabel@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "createLabel",
       "file": "MeshFactory.ts",
-      "line": 225,
+      "line": 229,
       "isExported": false,
       "type": "function"
     },
@@ -508,7 +508,7 @@
       "id": "createEdges@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "createEdges",
       "file": "MeshFactory.ts",
-      "line": 267,
+      "line": 271,
       "isExported": false,
       "type": "function"
     },
@@ -516,7 +516,7 @@
       "id": "createEdge@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "createEdge",
       "file": "MeshFactory.ts",
-      "line": 295,
+      "line": 299,
       "isExported": false,
       "type": "function"
     },
@@ -524,7 +524,7 @@
       "id": "createArrowhead@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "createArrowhead",
       "file": "MeshFactory.ts",
-      "line": 325,
+      "line": 329,
       "isExported": false,
       "type": "function"
     },
@@ -1324,5 +1324,5 @@
       "to": "render@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-21T20:59:23.764Z"
+  "lastUpdated": "2026-03-21T21:00:25.970Z"
 }

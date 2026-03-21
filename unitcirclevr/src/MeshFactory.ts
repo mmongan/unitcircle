@@ -130,6 +130,10 @@ export class MeshFactory {
     material.specularColor = new BABYLON.Color3(0.2, 0.2, 0.2);
     material.specularPower = 16;
     material.wireframe = false;
+    
+    // Make cube faces transparent
+    material.alpha = 0.7;
+    material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
 
     box.material = material;
 
