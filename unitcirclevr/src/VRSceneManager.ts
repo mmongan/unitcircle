@@ -18,12 +18,16 @@ export class VRSceneManager {
   private engine: BABYLON.Engine;
   private scene: BABYLON.Scene;
   private camera!: BABYLON.UniversalCamera;
+  private sceneRoot!: BABYLON.TransformNode;
   private lastGraphUpdate: string = '';
 
   constructor(canvas: HTMLCanvasElement) {
     this.engine = new BABYLON.Engine(canvas, true);
     this.scene = new BABYLON.Scene(this.engine);
     this.scene.collisionsEnabled = true;
+
+    // Create scene root transform - all objects will be parented to this
+    this.sceneRoot = new BABYLON.TransformNode('sceneRoot', this.scene);
 
     // Setup lighting
     this.setupLighting();
@@ -68,6 +72,7 @@ export class VRSceneManager {
 
   private createGround(): void {
     const ground = BABYLON.MeshBuilder.CreateGround('ground', { width: 150, height: 150 }, this.scene);
+    ground.parent = this.sceneRoot;
     ground.material = new BABYLON.StandardMaterial('groundMat', this.scene);
     (ground.material as BABYLON.StandardMaterial).emissiveColor = new BABYLON.Color3(0.2, 0.7, 0.2);
   }
@@ -191,6 +196,7 @@ export class VRSceneManager {
     const externalModuleColor = new BABYLON.Color3(0.4, 0.8, 1);
     const cylinder = BABYLON.MeshBuilder.CreateCylinder(`ext_${node.id}`, { height: 2.0, diameterTop: 1.2, diameterBottom: 1.2 }, this.scene);
     cylinder.position = position;
+    cylinder.parent = this.sceneRoot;
 
     const material = new BABYLON.StandardMaterial(`extMat_${node.id}`, this.scene);
     material.emissiveColor = externalModuleColor;
@@ -207,6 +213,7 @@ export class VRSceneManager {
     
     const sphere = BABYLON.MeshBuilder.CreateSphere(`var_${node.id}`, { diameter: 1.5 }, this.scene);
     sphere.position = position;
+    sphere.parent = this.sceneRoot;
 
     const material = new BABYLON.StandardMaterial(`varMat_${node.id}`, this.scene);
     material.emissiveColor = node.isExported ? exportedVarColor : unexportedVarColor;
@@ -230,6 +237,7 @@ export class VRSceneManager {
 
     const box = BABYLON.MeshBuilder.CreateBox(`func_${node.id}`, { size: 2.0 }, this.scene);
     box.position = position;
+    box.parent = this.sceneRoot;
 
     const material = new BABYLON.StandardMaterial(`mat_${node.id}`, this.scene);
     
@@ -264,6 +272,33 @@ export class VRSceneManager {
         this.hideTooltip();
       })
     );
+    mesh.actionManager.registerAction(
+      new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPickTrigger, () => {
+        this.sceneRootFlyTo(mesh.position);
+      })
+    );
+  }
+
+  private sceneRootFlyTo(targetPosition: BABYLON.Vector3): void {
+    // Animate scene root position to bring target into focus
+    // The target position becomes the new origin for scene rotation
+    const sceneOffset = new BABYLON.Vector3(
+      -targetPosition.x,
+      -targetPosition.y,
+      -targetPosition.z
+    );
+
+    // Animate scene root movement over 800ms
+    BABYLON.Animation.CreateAndStartAnimation(
+      'sceneRootFly',
+      this.sceneRoot,
+      'position',
+      60,
+      48, // 800ms at 60fps
+      this.sceneRoot.position.clone(),
+      sceneOffset,
+      BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+    );
   }
 
   private renderEdges(edges: Array<{ from: string; to: string }>, layoutNodes: Map<string, any>): void {
@@ -290,6 +325,7 @@ export class VRSceneManager {
         path: points,
         radius: 0.2
       });
+      tube.parent = this.sceneRoot;
       tube.material = material;
     }
   }
@@ -313,6 +349,7 @@ export class VRSceneManager {
     // Create plane for label
     const labelPlane = BABYLON.MeshBuilder.CreatePlane(`label_${text}`, { width: 2, height: 0.5 }, this.scene);
     labelPlane.position = position.add(new BABYLON.Vector3(0, 1.2, 0));
+    labelPlane.parent = this.sceneRoot;
     labelPlane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL; // Always face camera
 
     const labelMaterial = new BABYLON.StandardMaterial(`labelMat_${text}`, this.scene);
