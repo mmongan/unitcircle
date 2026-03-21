@@ -1,409 +1,548 @@
 {
   "nodes": [
     {
-      "id": "parseSourceFiles@src\\CodeParser.ts",
+      "id": "parseSourceFiles@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\CodeParser.ts",
       "name": "parseSourceFiles",
       "file": "CodeParser.ts",
-      "line": 20
+      "line": 20,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "extractFunctionDefinitions@src\\CodeParser.ts",
+      "id": "extractFunctionDefinitions@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\CodeParser.ts",
       "name": "extractFunctionDefinitions",
       "file": "CodeParser.ts",
-      "line": 33
+      "line": 33,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "processFunctionDeclarations@src\\CodeParser.ts",
+      "id": "processFunctionDeclarations@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\CodeParser.ts",
       "name": "processFunctionDeclarations",
       "file": "CodeParser.ts",
-      "line": 39
+      "line": 39,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "calculateLineNumber@src\\CodeParser.ts",
+      "id": "calculateLineNumber@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\CodeParser.ts",
       "name": "calculateLineNumber",
       "file": "CodeParser.ts",
-      "line": 53
+      "line": 53,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "extractFunctionCalls@src\\CodeParser.ts",
+      "id": "extractFunctionCalls@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\CodeParser.ts",
       "name": "extractFunctionCalls",
       "file": "CodeParser.ts",
-      "line": 57
+      "line": 57,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "processFunctionCalls@src\\CodeParser.ts",
+      "id": "processFunctionCalls@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\CodeParser.ts",
       "name": "processFunctionCalls",
       "file": "CodeParser.ts",
-      "line": 63
+      "line": 63,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "registerFunctionCall@src\\CodeParser.ts",
+      "id": "registerFunctionCall@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\CodeParser.ts",
       "name": "registerFunctionCall",
       "file": "CodeParser.ts",
-      "line": 74
+      "line": 74,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "findFunctionsByName@src\\CodeParser.ts",
+      "id": "findFunctionsByName@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\CodeParser.ts",
       "name": "findFunctionsByName",
       "file": "CodeParser.ts",
-      "line": 90
+      "line": 90,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "isKeyword@src\\CodeParser.ts",
+      "id": "isKeyword@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\CodeParser.ts",
       "name": "isKeyword",
       "file": "CodeParser.ts",
-      "line": 96
+      "line": 96,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "findFunctionAtLine@src\\CodeParser.ts",
+      "id": "findFunctionAtLine@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\CodeParser.ts",
       "name": "findFunctionAtLine",
       "file": "CodeParser.ts",
-      "line": 108
+      "line": 108,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "setupCounter@src\\counter.ts",
+      "id": "setupCounter@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\counter.ts",
       "name": "setupCounter",
       "file": "counter.ts",
-      "line": 1
+      "line": 1,
+      "isExported": true,
+      "type": "function"
     },
     {
-      "id": "updateCounterDisplay@src\\counter.ts",
+      "id": "updateCounterDisplay@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\counter.ts",
       "name": "updateCounterDisplay",
       "file": "counter.ts",
-      "line": 10
+      "line": 10,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "formatCounterText@src\\counter.ts",
+      "id": "formatCounterText@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\counter.ts",
       "name": "formatCounterText",
       "file": "counter.ts",
-      "line": 14
+      "line": 14,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "initializeCounter@src\\counter.ts",
+      "id": "initializeCounter@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\counter.ts",
       "name": "initializeCounter",
       "file": "counter.ts",
-      "line": 18
+      "line": 18,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "incrementCounterValue@src\\counter.ts",
+      "id": "incrementCounterValue@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\counter.ts",
       "name": "incrementCounterValue",
       "file": "counter.ts",
-      "line": 22
+      "line": 22,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "simulate@src\\ForceDirectedLayout.ts",
+      "id": "simulate@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "simulate",
       "file": "ForceDirectedLayout.ts",
-      "line": 50
+      "line": 50,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "initializeNodeData@src\\ForceDirectedLayout.ts",
+      "id": "initializeNodeData@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "initializeNodeData",
       "file": "ForceDirectedLayout.ts",
-      "line": 59
+      "line": 59,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "constrainNodePositions@src\\ForceDirectedLayout.ts",
+      "id": "constrainNodePositions@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "constrainNodePositions",
       "file": "ForceDirectedLayout.ts",
-      "line": 68
+      "line": 68,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "simulationStep@src\\ForceDirectedLayout.ts",
+      "id": "simulationStep@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "simulationStep",
       "file": "ForceDirectedLayout.ts",
-      "line": 78
+      "line": 78,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "calculateForces@src\\ForceDirectedLayout.ts",
+      "id": "calculateForces@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "calculateForces",
       "file": "ForceDirectedLayout.ts",
-      "line": 83
+      "line": 83,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "applyRepulsiveForces@src\\ForceDirectedLayout.ts",
+      "id": "applyRepulsiveForces@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "applyRepulsiveForces",
       "file": "ForceDirectedLayout.ts",
-      "line": 94
+      "line": 94,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "applyAttractiveForces@src\\ForceDirectedLayout.ts",
+      "id": "applyAttractiveForces@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "applyAttractiveForces",
       "file": "ForceDirectedLayout.ts",
-      "line": 128
+      "line": 128,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "applyForces@src\\ForceDirectedLayout.ts",
+      "id": "applyForces@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "applyForces",
       "file": "ForceDirectedLayout.ts",
-      "line": 162
+      "line": 162,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "updateNodeVelocity@src\\ForceDirectedLayout.ts",
+      "id": "updateNodeVelocity@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "updateNodeVelocity",
       "file": "ForceDirectedLayout.ts",
-      "line": 172
+      "line": 172,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "updateNodePosition@src\\ForceDirectedLayout.ts",
+      "id": "updateNodePosition@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "updateNodePosition",
       "file": "ForceDirectedLayout.ts",
-      "line": 178
+      "line": 178,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "getNodes@src\\ForceDirectedLayout.ts",
+      "id": "getNodes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "getNodes",
       "file": "ForceDirectedLayout.ts",
-      "line": 184
+      "line": 184,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "getEdges@src\\ForceDirectedLayout.ts",
+      "id": "getEdges@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "getEdges",
       "file": "ForceDirectedLayout.ts",
-      "line": 188
+      "line": 188,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "logBuildVersion@src\\main.ts",
+      "id": "logBuildVersion@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
       "name": "logBuildVersion",
       "file": "main.ts",
-      "line": 5
+      "line": 5,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "logFormattedMessage@src\\main.ts",
+      "id": "logFormattedMessage@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
       "name": "logFormattedMessage",
       "file": "main.ts",
-      "line": 18
+      "line": 18,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "initializeScene@src\\main.ts",
+      "id": "initializeScene@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
       "name": "initializeScene",
       "file": "main.ts",
-      "line": 23
+      "line": 23,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "getCanvasElement@src\\main.ts",
+      "id": "getCanvasElement@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
       "name": "getCanvasElement",
       "file": "main.ts",
-      "line": 28
+      "line": 28,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "initializeApplication@src\\main.ts",
+      "id": "initializeApplication@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
       "name": "initializeApplication",
       "file": "main.ts",
-      "line": 36
+      "line": 36,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "createVRScene@src\\main.ts",
+      "id": "createVRScene@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
       "name": "createVRScene",
       "file": "main.ts",
-      "line": 42
+      "line": 42,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "runVRScene@src\\main.ts",
+      "id": "runVRScene@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
       "name": "runVRScene",
       "file": "main.ts",
-      "line": 47
+      "line": 47,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "setupWindowCleanup@src\\main.ts",
+      "id": "setupWindowCleanup@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
       "name": "setupWindowCleanup",
       "file": "main.ts",
-      "line": 51
+      "line": 51,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "setupLighting@src\\VRSceneManager.ts",
+      "id": "setupLighting@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "setupLighting",
       "file": "VRSceneManager.ts",
-      "line": 54
+      "line": 54,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "createPointLight@src\\VRSceneManager.ts",
+      "id": "createPointLight@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "createPointLight",
       "file": "VRSceneManager.ts",
-      "line": 61
+      "line": 61,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "setupCamera@src\\VRSceneManager.ts",
+      "id": "setupCamera@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "setupCamera",
       "file": "VRSceneManager.ts",
-      "line": 66
+      "line": 66,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "createGround@src\\VRSceneManager.ts",
+      "id": "createGround@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "createGround",
       "file": "VRSceneManager.ts",
-      "line": 73
+      "line": 73,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "initializeCodeVisualization@src\\VRSceneManager.ts",
+      "id": "initializeCodeVisualization@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "initializeCodeVisualization",
       "file": "VRSceneManager.ts",
-      "line": 80
+      "line": 80,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "validateGraphData@src\\VRSceneManager.ts",
+      "id": "validateGraphData@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "validateGraphData",
       "file": "VRSceneManager.ts",
-      "line": 92
+      "line": 92,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "loadGraph@src\\VRSceneManager.ts",
+      "id": "loadGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "loadGraph",
       "file": "VRSceneManager.ts",
-      "line": 96
+      "line": 96,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "setupGraphPolling@src\\VRSceneManager.ts",
+      "id": "setupGraphPolling@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "setupGraphPolling",
       "file": "VRSceneManager.ts",
-      "line": 108
+      "line": 108,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "clearGraph@src\\VRSceneManager.ts",
+      "id": "clearGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "clearGraph",
       "file": "VRSceneManager.ts",
-      "line": 125
+      "line": 125,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "renderCodeGraph@src\\VRSceneManager.ts",
+      "id": "renderCodeGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "renderCodeGraph",
       "file": "VRSceneManager.ts",
-      "line": 140
+      "line": 140,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "buildEdgeList@src\\VRSceneManager.ts",
+      "id": "buildEdgeList@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "buildEdgeList",
       "file": "VRSceneManager.ts",
-      "line": 158
+      "line": 158,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "computeLayout@src\\VRSceneManager.ts",
+      "id": "computeLayout@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "computeLayout",
       "file": "VRSceneManager.ts",
-      "line": 162
+      "line": 162,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "extractCallingFunctions@src\\VRSceneManager.ts",
+      "id": "extractCallingFunctions@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "extractCallingFunctions",
       "file": "VRSceneManager.ts",
-      "line": 166
+      "line": 166,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "renderNodes@src\\VRSceneManager.ts",
+      "id": "renderNodes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "renderNodes",
       "file": "VRSceneManager.ts",
-      "line": 170
+      "line": 170,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "createNodeMesh@src\\VRSceneManager.ts",
+      "id": "createNodeMesh@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "createNodeMesh",
       "file": "VRSceneManager.ts",
-      "line": 185
+      "line": 185,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "createExternalModuleMesh@src\\VRSceneManager.ts",
+      "id": "createExternalModuleMesh@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "createExternalModuleMesh",
       "file": "VRSceneManager.ts",
-      "line": 195
+      "line": 195,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "createVariableMesh@src\\VRSceneManager.ts",
+      "id": "createVariableMesh@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "createVariableMesh",
       "file": "VRSceneManager.ts",
-      "line": 210
+      "line": 210,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "createFunctionMesh@src\\VRSceneManager.ts",
+      "id": "createFunctionMesh@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "createFunctionMesh",
       "file": "VRSceneManager.ts",
-      "line": 227
+      "line": 227,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "setupNodeInteraction@src\\VRSceneManager.ts",
+      "id": "setupNodeInteraction@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "setupNodeInteraction",
       "file": "VRSceneManager.ts",
-      "line": 260
+      "line": 260,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "sceneRootFlyTo@src\\VRSceneManager.ts",
+      "id": "sceneRootFlyTo@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "sceneRootFlyTo",
       "file": "VRSceneManager.ts",
-      "line": 282
+      "line": 282,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "renderEdges@src\\VRSceneManager.ts",
+      "id": "showFunctionSignature@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "name": "showFunctionSignature",
+      "file": "VRSceneManager.ts",
+      "line": 312,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "renderEdges@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "renderEdges",
       "file": "VRSceneManager.ts",
-      "line": 304
+      "line": 357,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "renderEdge@src\\VRSceneManager.ts",
+      "id": "renderEdge@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "renderEdge",
       "file": "VRSceneManager.ts",
-      "line": 314
+      "line": 367,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "createLabel@src\\VRSceneManager.ts",
+      "id": "createLabel@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "createLabel",
       "file": "VRSceneManager.ts",
-      "line": 333
+      "line": 386,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "showTooltip@src\\VRSceneManager.ts",
+      "id": "showTooltip@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "showTooltip",
       "file": "VRSceneManager.ts",
-      "line": 361
+      "line": 414,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "hideTooltip@src\\VRSceneManager.ts",
+      "id": "hideTooltip@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "hideTooltip",
       "file": "VRSceneManager.ts",
-      "line": 391
+      "line": 444,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "setupWebXR@src\\VRSceneManager.ts",
+      "id": "setupWebXR@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "setupWebXR",
       "file": "VRSceneManager.ts",
-      "line": 396
+      "line": 449,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "run@src\\VRSceneManager.ts",
+      "id": "run@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "run",
       "file": "VRSceneManager.ts",
-      "line": 406
+      "line": 459,
+      "isExported": false,
+      "type": "function"
     },
     {
-      "id": "dispose@src\\VRSceneManager.ts",
+      "id": "dispose@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "dispose",
       "file": "VRSceneManager.ts",
-      "line": 412
+      "line": 465,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "ext:@babylonjs/core",
+      "name": "@babylonjs/core",
+      "type": "external"
     }
   ],
   "edges": [
     {
-      "from": "processFunctionCalls@src\\CodeParser.ts",
-      "to": "calculateLineNumber@src\\CodeParser.ts"
+      "from": "processFunctionCalls@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\CodeParser.ts",
+      "to": "calculateLineNumber@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\CodeParser.ts"
     },
     {
-      "from": "initializeCounter@src\\counter.ts",
-      "to": "updateCounterDisplay@src\\counter.ts"
+      "from": "initializeCounter@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\counter.ts",
+      "to": "updateCounterDisplay@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\counter.ts"
     },
     {
-      "from": "initializeApplication@src\\main.ts",
-      "to": "logBuildVersion@src\\main.ts"
+      "from": "initializeApplication@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
+      "to": "logBuildVersion@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts"
     },
     {
-      "from": "setupGraphPolling@src\\VRSceneManager.ts",
-      "to": "loadGraph@src\\VRSceneManager.ts"
+      "from": "setupGraphPolling@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "to": "loadGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
     },
     {
-      "from": "setupGraphPolling@src\\VRSceneManager.ts",
-      "to": "validateGraphData@src\\VRSceneManager.ts"
+      "from": "setupGraphPolling@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "to": "validateGraphData@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
     },
     {
-      "from": "computeLayout@src\\VRSceneManager.ts",
-      "to": "simulate@src\\ForceDirectedLayout.ts"
+      "from": "computeLayout@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "to": "simulate@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts"
     }
   ],
-  "lastUpdated": "2026-03-21T15:01:13.947Z"
+  "lastUpdated": "2026-03-21T15:07:16.297Z"
 }

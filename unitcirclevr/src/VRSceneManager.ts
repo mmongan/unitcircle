@@ -274,19 +274,24 @@ export class VRSceneManager {
     );
     mesh.actionManager.registerAction(
       new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPickTrigger, () => {
-        this.sceneRootFlyTo(mesh.position);
+        this.sceneRootFlyTo(mesh.position, node);
       })
     );
   }
 
-  private sceneRootFlyTo(targetPosition: BABYLON.Vector3): void {
-    // Animate scene root position to bring target into focus
-    // The target position becomes the new origin for scene rotation
-    const sceneOffset = new BABYLON.Vector3(
-      -targetPosition.x,
-      -targetPosition.y,
-      -targetPosition.z
-    );
+  private sceneRootFlyTo(targetPosition: BABYLON.Vector3, node: GraphData['nodes'][0]): void {
+    // Animate scene root position to place object directly below camera (top-down view)
+    // Camera is fixed at (0, 0, -70); position object directly below
+    const cameraPosition = new BABYLON.Vector3(0, 0, -70);
+    
+    // Top-down viewing position: object centered below camera
+    const viewOffset = new BABYLON.Vector3(0, 0, -5);
+    
+    // Calculate where the target should appear in world space
+    const desiredWorldPosition = cameraPosition.add(viewOffset);
+    
+    // Calculate scene root offset to position target at desired world position
+    const sceneOffset = desiredWorldPosition.subtract(targetPosition);
 
     // Animate scene root movement over 800ms
     BABYLON.Animation.CreateAndStartAnimation(
@@ -299,6 +304,54 @@ export class VRSceneManager {
       sceneOffset,
       BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
     );
+
+    // Show function signature panel after animation completes (800ms)
+    setTimeout(() => this.showFunctionSignature(node), 800);
+  }
+
+  private showFunctionSignature(node: GraphData['nodes'][0]): void {
+    // Create or update the signature panel
+    const existing = document.getElementById('signaturePanel');
+    if (existing) existing.remove();
+
+    const panel = document.createElement('div');
+    panel.id = 'signaturePanel';
+    
+    // Build signature display
+    let signatureHtml = `<div><strong>${node.name}</strong></div>`;
+    
+    if (node.isExported) {
+      signatureHtml += `<div style="color: #00ff00; margin-top: 4px;">📤 Exported</div>`;
+    } else {
+      signatureHtml += `<div style="color: #ffaa00; margin-top: 4px;">📦 Internal</div>`;
+    }
+    
+    if (node.file) {
+      signatureHtml += `<div style="color: #88ff88; margin-top: 4px;">📄 ${node.file}</div>`;
+    }
+    
+    if (node.line) {
+      signatureHtml += `<div style="color: #88ff88;">📍 Line ${node.line}</div>`;
+    }
+    
+    if (node.type) {
+      const typeLabel = node.type === 'function' ? '⚙️ Function' : node.type === 'variable' ? '📊 Variable' : '🔌 External';
+      signatureHtml += `<div style="color: #aaccff; margin-top: 4px;">${typeLabel}</div>`;
+    }
+    
+    panel.innerHTML = `
+      <div style="background: rgba(0, 0, 0, 0.95); color: white; padding: 16px; border-radius: 8px; font-family: monospace; font-size: 14px; border: 2px solid #00ff00; max-width: 300px; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.8);">
+        ${signatureHtml}
+      </div>
+    `;
+    
+    panel.style.position = 'fixed';
+    panel.style.top = '50%';
+    panel.style.left = '50%';
+    panel.style.transform = 'translate(-50%, -50%)';
+    panel.style.zIndex = '1000';
+    
+    document.body.appendChild(panel);
   }
 
   private renderEdges(edges: Array<{ from: string; to: string }>, layoutNodes: Map<string, any>): void {
