@@ -337,10 +337,10 @@ export class VRSceneManager {
 
     // Landing position: on top of the cube (add height for landing on top surface)
     const landingHeight = SceneConfig.FUNCTION_BOX_SIZE / 2 + 3;  // Land on top with 3 unit offset
+    const landingPosition = targetPosition.add(new BABYLON.Vector3(0, landingHeight, 0));
     const targetSceneRootPosition = cameraPosition
       .add(viewOffset)
-      .subtract(targetPosition)
-      .add(new BABYLON.Vector3(0, landingHeight, 0));
+      .subtract(landingPosition);
 
     // Create parabolic position animation
     const positionAnimation = new BABYLON.Animation(
