@@ -714,10 +714,10 @@ export class VRSceneManager {
       this.isAnimating = true;
     }
     
-    // Safety timeout to reset animation flag (2 second absolute maximum)
+    // Safety timeout to reset animation flag (ensure it's longer than animation duration)
     setTimeout(() => {
       this.isAnimating = false;
-    }, Math.max(300 + 100, 2000));
+    }, Math.max(SceneConfig.FLY_TO_ANIMATION_TIME_MS + 200, 3000));
   }
 
   private calculateIndegree(edges: Array<{ from: string; to: string }>): Map<string, number> {
