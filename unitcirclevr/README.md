@@ -186,12 +186,14 @@ npm run preview
 ### Development vs Production
 
 **Local Development** (`npm run dev` or `npm run dev:watch`):
+
 - Graph is **parsed live** from source files in `src/`
 - No prebuilt graph needed
 - Changes visible immediately on refresh
 - Vite plugin intercepts `/api/graph.json` requests
 
 **Production** (GitHub Pages):
+
 - Graph is **prebuilt** at build time via `npm run graph:build`
 - Static `public/graph.json` copied to `dist/`
 - Fast load times, no server processing required
@@ -201,7 +203,7 @@ npm run preview
 
 The code visualization for production uses a **prebuilt graph.json** file:
 
-```
+```text
 npm run build
 ├─ graph:build
 │  ├─ Parse src/VRSceneManager.ts for live code
