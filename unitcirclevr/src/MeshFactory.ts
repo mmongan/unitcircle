@@ -20,7 +20,6 @@ export class MeshFactory {
   createNodeMesh(
     node: GraphNode,
     position: BABYLON.Vector3,
-    functionsWithCalls: Set<string>,
     onNodeInteraction: (mesh: BABYLON.Mesh, material: BABYLON.StandardMaterial, node: GraphNode) => void
   ): void {
     if (node.type === 'external') {
@@ -28,7 +27,7 @@ export class MeshFactory {
     } else if (node.type === 'variable') {
       this.createVariableMesh(node, position, onNodeInteraction);
     } else {
-      this.createFunctionMesh(node, position, functionsWithCalls, onNodeInteraction);
+      this.createFunctionMesh(node, position, onNodeInteraction);
     }
   }
 
@@ -93,34 +92,50 @@ export class MeshFactory {
   private createFunctionMesh(
     node: GraphNode,
     position: BABYLON.Vector3,
-    functionsWithCalls: Set<string>,
     onNodeInteraction: (mesh: BABYLON.Mesh, material: BABYLON.StandardMaterial, node: GraphNode) => void
   ): void {
     const box = BABYLON.MeshBuilder.CreateBox(`func_${node.id}`, { size: SceneConfig.FUNCTION_BOX_SIZE }, this.scene);
     box.position = position;
     box.parent = this.sceneRoot;
 
-    const material = new BABYLON.StandardMaterial(`mat_${node.id}`, this.scene);
+    // Create signature texture for each face
+    const signatureTexture = this.createSignatureTexture(node);
 
-    // Determine color based on export status and whether it's called
+    // Determine base color
+    let baseColor: BABYLON.Color3;
     if (node.isExported) {
-      material.emissiveColor = SceneConfig.EXPORTED_FUNCTION_COLOR;
-    } else if (functionsWithCalls.has(node.id)) {
-      const colorIndex = Math.floor(Math.random() * SceneConfig.CALLED_FUNCTION_COLORS.length);
-      material.emissiveColor = SceneConfig.CALLED_FUNCTION_COLORS[colorIndex];
+      baseColor = SceneConfig.EXPORTED_FUNCTION_COLOR;
     } else {
-      material.emissiveColor = SceneConfig.LEAF_FUNCTION_COLOR;
+      baseColor = SceneConfig.LEAF_FUNCTION_COLOR;
     }
 
-    material.wireframe = false;
-    box.material = material;
+    // Create multi-material with 6 identical signature materials (one per face)
+    const multiMaterial = new BABYLON.MultiMaterial(`multiMat_${node.id}`, this.scene);
+    
+    for (let i = 0; i < 6; i++) {
+      const material = new BABYLON.StandardMaterial(`faceMat_${node.id}_${i}`, this.scene);
+      material.emissiveColor = baseColor;
+      material.emissiveTexture = signatureTexture;
+      material.wireframe = false;
+      multiMaterial.subMaterials.push(material);
+    }
 
-    // Apply signature texture
-    const signatureTexture = this.createSignatureTexture(node);
-    material.emissiveTexture = signatureTexture;
+    // Clear existing submeshes and create proper submeshes for each face
+    box.subMeshes.length = 0;
+    const vertexCount = box.getTotalVertices();
+    const facets = 6;
+    const indicesPerFace = box.getIndices()!.length / facets;
+
+    for (let i = 0; i < facets; i++) {
+      box.subMeshes.push(
+        new BABYLON.SubMesh(i, 0, vertexCount, i * indicesPerFace, indicesPerFace, box)
+      );
+    }
+
+    box.material = multiMaterial;
 
     this.createLabel(node.name, box.position);
-    onNodeInteraction(box as BABYLON.Mesh, material, node);
+    onNodeInteraction(box as BABYLON.Mesh, multiMaterial.subMaterials[0] as BABYLON.StandardMaterial, node);
   }
 
   /**
@@ -135,19 +150,11 @@ export class MeshFactory {
     );
     const ctx = dynamicTexture.getContext() as any;
 
-    // Draw background
-    ctx.fillStyle = '#000000';
+    // Draw transparent background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0)';
     ctx.fillRect(0, 0, textureSize, textureSize);
-    ctx.strokeStyle = SceneConfig.SIGNATURE_BORDER_COLOR;
-    ctx.lineWidth = 4;
-    ctx.strokeRect(
-      SceneConfig.SIGNATURE_TEXTURE_BORDER_SIZE,
-      SceneConfig.SIGNATURE_TEXTURE_BORDER_SIZE,
-      textureSize - 2 * SceneConfig.SIGNATURE_TEXTURE_BORDER_SIZE,
-      textureSize - 2 * SceneConfig.SIGNATURE_TEXTURE_BORDER_SIZE
-    );
 
-    // Draw text
+    // Draw text in white for visibility on any color
     const lines: string[] = [node.name];
     if (node.isExported) {
       lines.push('Exported');
@@ -164,7 +171,7 @@ export class MeshFactory {
       node.type === 'function' ? 'Function' : node.type === 'variable' ? 'Variable' : 'External';
     lines.push(typeLabel);
 
-    ctx.fillStyle = SceneConfig.SIGNATURE_TEXT_COLOR;
+    ctx.fillStyle = '#ffffff';
     ctx.font = `bold ${SceneConfig.SIGNATURE_FONT_SIZE_PX}px ${SceneConfig.SIGNATURE_FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';

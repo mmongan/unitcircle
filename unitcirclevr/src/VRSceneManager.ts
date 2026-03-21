@@ -78,8 +78,7 @@ export class VRSceneManager {
       this.scene
     );
     ground.parent = this.sceneRoot;
-    ground.material = new BABYLON.StandardMaterial('groundMat', this.scene);
-    (ground.material as BABYLON.StandardMaterial).emissiveColor = SceneConfig.GROUND_COLOR;
+    ground.visibility = 0;
   }
 
   private async initializeCodeVisualization(): Promise<void> {
@@ -144,10 +143,7 @@ export class VRSceneManager {
     );
     const layoutNodes = this.computeLayout(layout);
 
-    // Find functions that call other functions (have outgoing edges)
-    const functionsWithCalls = this.extractCallingFunctions(graph.edges);
-
-    this.renderNodes(graph.nodes, layoutNodes, functionsWithCalls);
+    this.renderNodes(graph.nodes, layoutNodes);
     this.renderEdges(graph.edges, layoutNodes);
 
     console.log(`✓ Rendered code graph with ${graph.nodes.length} functions and ${graph.edges.length} calls`);
@@ -161,14 +157,9 @@ export class VRSceneManager {
     return layout.simulate(SceneConfig.LAYOUT_ITERATIONS);
   }
 
-  private extractCallingFunctions(edges: Array<{ from: string; to: string }>): Set<string> {
-    return new Set(edges.map(e => e.from));
-  }
-
   private renderNodes(
     nodes: GraphNode[],
-    layoutNodes: Map<string, any>,
-    functionsWithCalls: Set<string>
+    layoutNodes: Map<string, any>
   ): void {
     for (const node of nodes) {
       const layoutNode = layoutNodes.get(node.id);
@@ -180,7 +171,7 @@ export class VRSceneManager {
         layoutNode.position.z
       );
 
-      this.meshFactory.createNodeMesh(node, position, functionsWithCalls, (mesh, material, n) =>
+      this.meshFactory.createNodeMesh(node, position, (mesh, material, n) =>
         this.setupNodeInteraction(mesh, material, n)
       );
     }

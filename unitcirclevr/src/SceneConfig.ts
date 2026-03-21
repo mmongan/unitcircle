@@ -25,7 +25,7 @@ export class SceneConfig {
   static readonly GROUND_COLOR = new BABYLON.Color3(0.2, 0.7, 0.2);
 
   // Node Dimensions
-  static readonly FUNCTION_BOX_SIZE = 2.0;
+  static readonly FUNCTION_BOX_SIZE = 4.0;
   static readonly VARIABLE_SPHERE_DIAMETER = 1.5;
   static readonly EXTERNAL_CYLINDER_DIAMETER = 1.2;
   static readonly EXTERNAL_CYLINDER_HEIGHT = 2.0;
