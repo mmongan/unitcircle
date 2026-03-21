@@ -61,12 +61,17 @@ export class VRSceneManager {
         const pickResult = this.scene.pick(this.scene.pointerX, this.scene.pointerY);
         if (pickResult && pickResult.hit && pickResult.pickedMesh) {
           const clickedNode = (pickResult.pickedMesh as any).nodeData as GraphNode;
-          // Only jump if clicking a different function
-          if (clickedNode && clickedNode.id !== this.currentFunctionId) {
+          if (clickedNode) {
             this.isAnimating = true;
-            this.currentFunctionId = clickedNode.id;
-            // Use local position (relative to sceneRoot) so clicks on same node land consistently
-            this.sceneRootFlyTo(pickResult.pickedMesh.position);
+            if (clickedNode.id === this.currentFunctionId) {
+              // Same function clicked - slide to show that face
+              const normal = (pickResult as any).normal || new BABYLON.Vector3(0, 0, 1);
+              this.slideFaceView(pickResult.pickedMesh.position, normal);
+            } else {
+              // Different function - jump to it
+              this.currentFunctionId = clickedNode.id;
+              this.sceneRootFlyTo(pickResult.pickedMesh.position);
+            }
           }
         }
       }
@@ -590,6 +595,70 @@ export class VRSceneManager {
     this.scene.beginDirectAnimation(
       this.sceneRoot,
       [positionAnimation],
+      0,
+      totalFrames,
+      false,
+      1,
+      () => {
+        // Animation completed - allow next click
+        this.isAnimating = false;
+      }
+    );
+  }
+
+  /**
+   * Slide view to show a specific face of the cube
+   */
+  private slideFaceView(cubePosition: BABYLON.Vector3, faceNormal: BABYLON.Vector3): void {
+    // Stop any existing animation
+    this.scene.stopAnimation(this.sceneRoot);
+
+    const cameraPosition = SceneConfig.CAMERA_POSITION;
+    
+    // Normalize the face normal and scale it to position camera at that face
+    // Distance: half cube size + offset from camera to node
+    const cubeHalfSize = SceneConfig.FUNCTION_BOX_SIZE / 2;
+    const viewDistance = cubeHalfSize + 6.5;  // Same offset as FLY_TO_OFFSET
+    
+    // Calculate position offset from cube center based on clicked face normal
+    const normalizedFace = faceNormal.normalize();
+    const faceOffset = normalizedFace.scale(viewDistance);
+    
+    // Target sceneRoot position: camera - (cube center + face offset)
+    const targetSceneRootPosition = cameraPosition.subtract(cubePosition.add(faceOffset));
+
+    // Quick animation to slide to this view (300ms instead of 600ms)
+    const slideAnimation = new BABYLON.Animation(
+      'slidePosition',
+      'position',
+      SceneConfig.FLY_TO_ANIMATION_FPS,
+      BABYLON.Animation.ANIMATIONTYPE_VECTOR3
+    );
+    
+    const startPos = this.sceneRoot.position.clone();
+    const totalFrames = (300 / 1000) * SceneConfig.FLY_TO_ANIMATION_FPS;  // 300ms animation
+    
+    // Smooth easing for slide
+    const keys = [];
+    for (let i = 0; i <= totalFrames; i++) {
+      const t = i / totalFrames;
+      // Ease-out cubic for smooth deceleration
+      const easeT = 1 - Math.pow(1 - t, 3);
+      
+      const x = startPos.x + (targetSceneRootPosition.x - startPos.x) * easeT;
+      const y = startPos.y + (targetSceneRootPosition.y - startPos.y) * easeT;
+      const z = startPos.z + (targetSceneRootPosition.z - startPos.z) * easeT;
+      
+      keys.push({
+        frame: i,
+        value: new BABYLON.Vector3(x, y, z),
+      });
+    }
+    slideAnimation.setKeys(keys);
+    
+    this.scene.beginDirectAnimation(
+      this.sceneRoot,
+      [slideAnimation],
       0,
       totalFrames,
       false,
