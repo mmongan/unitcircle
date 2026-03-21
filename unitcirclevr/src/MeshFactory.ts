@@ -52,7 +52,7 @@ export class MeshFactory {
     cylinder.parent = this.sceneRoot;
 
     const material = new BABYLON.StandardMaterial(`extMat_${node.id}`, this.scene);
-    material.emissiveColor = SceneConfig.EXTERNAL_MODULE_COLOR;
+    material.emissiveColor = new BABYLON.Color3(0.3, 0.3, 0.3);  // Dark gray
     material.wireframe = false;
     cylinder.material = material;
 
@@ -77,8 +77,7 @@ export class MeshFactory {
     sphere.parent = this.sceneRoot;
 
     const material = new BABYLON.StandardMaterial(`varMat_${node.id}`, this.scene);
-    const varColor = node.isExported ? SceneConfig.EXPORTED_VARIABLE_COLOR : SceneConfig.INTERNAL_VARIABLE_COLOR;
-    material.emissiveColor = varColor;
+    material.emissiveColor = new BABYLON.Color3(0.3, 0.3, 0.3);  // Dark gray
     material.wireframe = false;
     sphere.material = material;
 
@@ -100,20 +99,16 @@ export class MeshFactory {
 
     const material = new BABYLON.StandardMaterial(`mat_${node.id}`, this.scene);
 
-    // Determine base color
-    if (node.isExported) {
-      material.emissiveColor = SceneConfig.EXPORTED_FUNCTION_COLOR;
-    } else {
-      material.emissiveColor = SceneConfig.LEAF_FUNCTION_COLOR;
-    }
-
-    // Apply signature texture to all faces
+    // Apply signature texture with minimal color overlay
     const signatureTexture = this.createSignatureTexture(node);
     signatureTexture.uScale = 1.0;
     signatureTexture.vScale = 1.0;
     signatureTexture.uOffset = 0;
     signatureTexture.vOffset = 0;
+    
+    // Use texture without emissive glow
     material.emissiveTexture = signatureTexture;
+    material.emissiveColor = new BABYLON.Color3(0.5, 0.5, 0.5);  // Subtle gray instead of bright color
     material.wireframe = false;
 
     box.material = material;
@@ -227,7 +222,7 @@ export class MeshFactory {
     layoutNodes: Map<string, any>
   ): void {
     const edgeMaterial = new BABYLON.StandardMaterial('edgeMaterial', this.scene);
-    edgeMaterial.emissiveColor = SceneConfig.EDGE_COLOR;
+    edgeMaterial.emissiveColor = new BABYLON.Color3(0.3, 0.3, 0.3);  // Dark gray
 
     let edgeIndex = 0;
     for (const edge of edges) {
