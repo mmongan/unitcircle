@@ -104,11 +104,13 @@ Manually regenerate the function dependency graph:
 npm run graph:build
 ```
 
-Outputs to `public/unitcircle/graph.json` containing:
+This script:
 
-- 65 functions extracted from `src/VRSceneManager.ts`
-- Function metadata (name, export status, file, line numbers)
-- Call relationships and dependencies
+1. Parses `src/VRSceneManager.ts` for functions, variables, and calls
+2. Generates `public/graph.json` with extracted metadata
+3. Creates `public/version.json` with build timestamp
+
+The graph.json is then included as a static asset when you deploy.
 
 ## Testing
 
@@ -169,6 +171,40 @@ Preview the production build:
 npm run preview
 ```
 
+## Build Pipeline & Static Assets
+
+### Graph Generation
+
+The code visualization uses a **prebuilt graph.json** file generated at build time:
+
+```
+npm run build
+├─ graph:build
+│  ├─ Parse src/VRSceneManager.ts
+│  └─ Generate public/graph.json
+├─ tsc (TypeScript compilation)
+└─ vite build
+   ├─ Copy public/ → dist/
+   ├─ Transpile TypeScript sources
+   └─ Bundle and minify assets
+```
+
+**Key Points**:
+
+- Graph is generated **once at build time** (not at runtime)
+- Graph.json is a **static asset** served by GitHub Pages
+- Benefits: Fast load times, no server-side processing, simple deployment
+
+### Deployed Assets
+
+GitHub Pages serves these files from the `dist/` folder:
+
+- `index.html` - Application entry point
+- `graph.json` - Prebuilt code graph (static)
+- `version.json` - Build timestamp
+- `assets/*.js` - Minified application code
+- `assets/*.css` - Compiled styles
+
 ## Deployment to GitHub Pages
 
 The project is configured for automatic deployment to GitHub Pages at `https://mmongan.github.io/unitcircle`
@@ -193,8 +229,9 @@ npm run deploy
 This command:
 
 1. Runs full build pipeline (`graph:build` → `tsc` → `vite build`)
-2. Pushes compiled files to GitHub Pages hosting
-3. GitHub Pages automatically serves at `https://mmongan.github.io/unitcircle`
+2. Generates `dist/` with prebuilt graph.json and compiled code
+3. Pushes compiled files to GitHub Pages hosting
+4. GitHub Pages automatically serves at `https://mmongan.github.io/unitcircle`
 
 **Deployment time**: ~30 seconds
 **Verification**: Check GitHub Actions for status
