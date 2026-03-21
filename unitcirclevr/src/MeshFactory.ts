@@ -208,7 +208,7 @@ export class MeshFactory {
     const panelY = yOffset - panelPadding;
 
     // Draw dark semi-transparent background panel
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.95)';
     ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
 
     // Draw white text on the dark panel
