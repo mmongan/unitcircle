@@ -563,6 +563,11 @@ export class VRSceneManager {
         this.isAnimating = false;
       }
     );
+    
+    // Safety timeout to reset animation flag in case callback fails
+    setTimeout(() => {
+      this.isAnimating = false;
+    }, 300 + 100);  // 300ms animation + 100ms buffer
   }
 
   private renderEdges(edges: Array<{ from: string; to: string }>, layoutNodes: Map<string, any>): void {
