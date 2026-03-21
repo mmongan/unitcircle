@@ -15,6 +15,8 @@ export class VRSceneManager {
   private currentNodeIds: Set<string> = new Set();
   private currentEdges: Set<string> = new Set();
   private isAnimating: boolean = false;
+  private fileColorMap: Map<string, BABYLON.Color3> = new Map();
+  private currentFunctionId: string | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.engine = new BABYLON.Engine(canvas, true);
@@ -59,8 +61,10 @@ export class VRSceneManager {
         const pickResult = this.scene.pick(this.scene.pointerX, this.scene.pointerY);
         if (pickResult && pickResult.hit && pickResult.pickedMesh) {
           const clickedNode = (pickResult.pickedMesh as any).nodeData as GraphNode;
-          if (clickedNode) {
+          // Only jump if clicking a different function
+          if (clickedNode && clickedNode.id !== this.currentFunctionId) {
             this.isAnimating = true;
+            this.currentFunctionId = clickedNode.id;
             // Use local position (relative to sceneRoot) so clicks on same node land consistently
             this.sceneRootFlyTo(pickResult.pickedMesh.position);
           }
@@ -80,6 +84,78 @@ export class VRSceneManager {
     
     // Start polling for graph updates
     this.setupGraphPolling();
+  }
+
+  /**
+   * Generate a unique, consistent color for a file based on its name
+   */
+  private getFileColor(fileName: string): BABYLON.Color3 {
+    // Return cached color if already generated
+    if (this.fileColorMap.has(fileName)) {
+      return this.fileColorMap.get(fileName)!;
+    }
+
+    // Generate color from filename hash
+    const color = this.generateColorFromString(fileName);
+    this.fileColorMap.set(fileName, color);
+    return color;
+  }
+
+  /**
+   * Generate a consistent color from a string using a simple hash algorithm
+   */
+  private generateColorFromString(str: string): BABYLON.Color3 {
+    // Simple hash function
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+
+    // Convert hash to RGB - use different ranges to get vibrant colors
+    const hue = (Math.abs(hash) % 360) / 360;
+    const saturation = 0.5 + ((Math.abs(hash) >> 8) % 100) / 200; // 0.5-1.0
+    const brightness = 0.6 + ((Math.abs(hash) >> 16) % 100) / 250; // 0.6-1.0
+
+    // Convert HSB to RGB
+    const rgb = this.hsbToRgb(hue, saturation, brightness);
+    return new BABYLON.Color3(rgb.r, rgb.g, rgb.b);
+  }
+
+  /**
+   * Convert HSB color space to RGB
+   */
+  private hsbToRgb(h: number, s: number, b: number): { r: number; g: number; b: number } {
+    const i = Math.floor(h * 6);
+    const f = h * 6 - i;
+    const p = b * (1 - s);
+    const q = b * (1 - f * s);
+    const t = b * (1 - (1 - f) * s);
+
+    let r = 0, g = 0, b_out = 0;
+    switch (i % 6) {
+      case 0:
+        (r = b), (g = t), (b_out = p);
+        break;
+      case 1:
+        (r = q), (g = b), (b_out = p);
+        break;
+      case 2:
+        (r = p), (g = b), (b_out = t);
+        break;
+      case 3:
+        (r = p), (g = q), (b_out = b);
+        break;
+      case 4:
+        (r = t), (g = p), (b_out = b);
+        break;
+      case 5:
+        (r = b), (g = p), (b_out = q);
+        break;
+    }
+
+    return { r, g, b: b_out };
   }
 
   private setupLighting(): void {
@@ -308,7 +384,10 @@ export class VRSceneManager {
         layoutNode.position.z
       );
 
-      this.meshFactory.createNodeMesh(node, position, (mesh, material, n) =>
+      // Get or generate color for this file
+      const fileColor = node.file ? this.getFileColor(node.file) : null;
+
+      this.meshFactory.createNodeMesh(node, position, fileColor, (mesh, material, n) =>
         this.setupNodeInteraction(mesh, material, n)
       );
     }

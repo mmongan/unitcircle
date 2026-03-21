@@ -20,6 +20,7 @@ export class MeshFactory {
   createNodeMesh(
     node: GraphNode,
     position: BABYLON.Vector3,
+    fileColor: BABYLON.Color3 | null,
     onNodeInteraction: (mesh: BABYLON.Mesh, material: BABYLON.StandardMaterial, node: GraphNode) => void
   ): void {
     if (node.type === 'external') {
@@ -27,7 +28,7 @@ export class MeshFactory {
     } else if (node.type === 'variable') {
       this.createVariableMesh(node, position, onNodeInteraction);
     } else {
-      this.createFunctionMesh(node, position, onNodeInteraction);
+      this.createFunctionMesh(node, position, fileColor, onNodeInteraction);
     }
   }
 
@@ -93,6 +94,7 @@ export class MeshFactory {
   private createFunctionMesh(
     node: GraphNode,
     position: BABYLON.Vector3,
+    fileColor: BABYLON.Color3 | null,
     onNodeInteraction: (mesh: BABYLON.Mesh, material: BABYLON.StandardMaterial, node: GraphNode) => void
   ): void {
     const box = BABYLON.MeshBuilder.CreateBox(`func_${node.id}`, { size: SceneConfig.FUNCTION_BOX_SIZE }, this.scene);
@@ -111,7 +113,19 @@ export class MeshFactory {
     
     // Use texture as diffuse (primary visual) for proper lighting response
     material.diffuseTexture = signatureTexture;
-    material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 1.0);  // Vibrant primary blue
+    
+    // Apply file color as a tint to the base blue
+    let diffuseColor = new BABYLON.Color3(0.3, 0.7, 1.0);  // Vibrant primary blue
+    if (fileColor) {
+      // Blend file color with base blue (70% base, 30% file color)
+      diffuseColor = new BABYLON.Color3(
+        diffuseColor.r * 0.7 + fileColor.r * 0.3,
+        diffuseColor.g * 0.7 + fileColor.g * 0.3,
+        diffuseColor.b * 0.7 + fileColor.b * 0.3
+      );
+    }
+    
+    material.diffuseColor = diffuseColor;
     // Minimal emissive for glow
     material.emissiveColor = new BABYLON.Color3(0.05, 0.15, 0.3);  // Very subtle blue glow
     material.specularColor = new BABYLON.Color3(0.2, 0.2, 0.2);
