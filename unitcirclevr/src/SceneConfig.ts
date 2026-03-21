@@ -4,23 +4,23 @@
 import * as BABYLON from '@babylonjs/core';
 
 export class SceneConfig {
-  // Node Colors
-  static readonly EXPORTED_FUNCTION_COLOR = new BABYLON.Color3(0.2, 1, 0.8);
-  static readonly LEAF_FUNCTION_COLOR = new BABYLON.Color3(0.8, 0.8, 0.8);
+  // Node Colors (reduced brightness to prevent washout)
+  static readonly EXPORTED_FUNCTION_COLOR = new BABYLON.Color3(0.15, 0.5, 0.4);
+  static readonly LEAF_FUNCTION_COLOR = new BABYLON.Color3(0.4, 0.4, 0.4);
   static readonly CALLED_FUNCTION_COLORS = [
-    new BABYLON.Color3(1, 0.2, 0.2),
-    new BABYLON.Color3(0.2, 1, 0.2),
-    new BABYLON.Color3(0.2, 0.2, 1),
-    new BABYLON.Color3(1, 1, 0.2),
-    new BABYLON.Color3(1, 0.2, 1),
+    new BABYLON.Color3(0.5, 0.1, 0.1),
+    new BABYLON.Color3(0.1, 0.5, 0.1),
+    new BABYLON.Color3(0.1, 0.1, 0.5),
+    new BABYLON.Color3(0.5, 0.5, 0.1),
+    new BABYLON.Color3(0.5, 0.1, 0.5),
   ];
 
-  static readonly EXPORTED_VARIABLE_COLOR = new BABYLON.Color3(1, 0.8, 0.2);
-  static readonly INTERNAL_VARIABLE_COLOR = new BABYLON.Color3(0.6, 0.6, 0.6);
-  static readonly EXTERNAL_MODULE_COLOR = new BABYLON.Color3(0.4, 0.8, 1);
+  static readonly EXPORTED_VARIABLE_COLOR = new BABYLON.Color3(0.5, 0.4, 0.1);
+  static readonly INTERNAL_VARIABLE_COLOR = new BABYLON.Color3(0.3, 0.3, 0.3);
+  static readonly EXTERNAL_MODULE_COLOR = new BABYLON.Color3(0.2, 0.4, 0.5);
 
   // Interaction Colors
-  static readonly HOVER_COLOR = new BABYLON.Color3(1, 1, 1);
+  static readonly HOVER_COLOR = new BABYLON.Color3(0.7, 0.7, 0.7);
   static readonly EDGE_COLOR = new BABYLON.Color3(0.5, 0.5, 0.5);
   static readonly GROUND_COLOR = new BABYLON.Color3(0.2, 0.7, 0.2);
 
