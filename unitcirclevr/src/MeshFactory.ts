@@ -114,20 +114,25 @@ export class MeshFactory {
     // Use texture as diffuse (primary visual) for proper lighting response
     material.diffuseTexture = signatureTexture;
     
-    // Apply file color as a tint to the base blue
-    let diffuseColor = new BABYLON.Color3(0.3, 0.7, 1.0);  // Vibrant primary blue
+    // Use file color as the primary cube color
     if (fileColor) {
-      // Blend file color with base blue (70% base, 30% file color)
-      diffuseColor = new BABYLON.Color3(
-        diffuseColor.r * 0.7 + fileColor.r * 0.3,
-        diffuseColor.g * 0.7 + fileColor.g * 0.3,
-        diffuseColor.b * 0.7 + fileColor.b * 0.3
+      // Use file color directly with enhanced brightness
+      material.diffuseColor = new BABYLON.Color3(
+        Math.min(1, fileColor.r * 1.2),
+        Math.min(1, fileColor.g * 1.2),
+        Math.min(1, fileColor.b * 1.2)
       );
+      material.emissiveColor = new BABYLON.Color3(
+        fileColor.r * 0.15,
+        fileColor.g * 0.15,
+        fileColor.b * 0.15
+      );
+    } else {
+      // Fallback to blue if no file color
+      material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 1.0);
+      material.emissiveColor = new BABYLON.Color3(0.05, 0.15, 0.3);
     }
     
-    material.diffuseColor = diffuseColor;
-    // Minimal emissive for glow
-    material.emissiveColor = new BABYLON.Color3(0.05, 0.15, 0.3);  // Very subtle blue glow
     material.specularColor = new BABYLON.Color3(0.2, 0.2, 0.2);
     material.specularPower = 16;
     material.wireframe = false;
