@@ -17,18 +17,43 @@ export class GraphLoader {
    */
   async loadGraph(): Promise<GraphData | null> {
     try {
-      // In development, use live API endpoint
+      // In development, try live API first, then fall back to prebuilt
       // In production, use prebuilt graph.json
       const isDev = import.meta.env.DEV;
-      const url = isDev ? '/api/graph.json' : '/unitcircle/graph.json';
-
-      const response = await fetch(url);
-      if (response.ok) {
-        const data = await response.json();
-        this.cache = data;
-        this.lastLoadTime = Date.now();
-        return data;
+      
+      if (isDev) {
+        // Try API endpoint first in dev mode
+        try {
+          const response = await fetch('/api/graph.json');
+          if (response.ok) {
+            const data = await response.json();
+            this.cache = data;
+            this.lastLoadTime = Date.now();
+            return data;
+          }
+        } catch (apiError) {
+          // API not available, fall through to prebuilt
+        }
+        
+        // Fall back to prebuilt graph.json
+        const response = await fetch('/graph.json');
+        if (response.ok) {
+          const data = await response.json();
+          this.cache = data;
+          this.lastLoadTime = Date.now();
+          return data;
+        }
+      } else {
+        // Production: use prebuilt graph.json
+        const response = await fetch('/unitcircle/graph.json');
+        if (response.ok) {
+          const data = await response.json();
+          this.cache = data;
+          this.lastLoadTime = Date.now();
+          return data;
+        }
       }
+      
       return null;
     } catch (error) {
       console.error('Error loading graph:', error);
