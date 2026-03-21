@@ -836,7 +836,7 @@
       "id": "slideFaceView@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "slideFaceView",
       "file": "VRSceneManager.ts",
-      "line": 624,
+      "line": 628,
       "isExported": false,
       "type": "function"
     },
@@ -844,7 +844,7 @@
       "id": "renderEdges@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "renderEdges",
       "file": "VRSceneManager.ts",
-      "line": 693,
+      "line": 697,
       "isExported": false,
       "type": "function"
     },
@@ -852,7 +852,7 @@
       "id": "showTooltip@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "showTooltip",
       "file": "VRSceneManager.ts",
-      "line": 697,
+      "line": 701,
       "isExported": false,
       "type": "function"
     },
@@ -860,7 +860,7 @@
       "id": "hideTooltip@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "hideTooltip",
       "file": "VRSceneManager.ts",
-      "line": 727,
+      "line": 731,
       "isExported": false,
       "type": "function"
     },
@@ -868,7 +868,7 @@
       "id": "setupWebXR@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "setupWebXR",
       "file": "VRSceneManager.ts",
-      "line": 732,
+      "line": 736,
       "isExported": false,
       "type": "function"
     },
@@ -876,7 +876,7 @@
       "id": "run@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "run",
       "file": "VRSceneManager.ts",
-      "line": 742,
+      "line": 746,
       "isExported": false,
       "type": "function"
     },
@@ -884,7 +884,7 @@
       "id": "dispose@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "dispose",
       "file": "VRSceneManager.ts",
-      "line": 748,
+      "line": 752,
       "isExported": false,
       "type": "function"
     },
@@ -1008,5 +1008,5 @@
       "to": "render@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-21T20:29:15.565Z"
+  "lastUpdated": "2026-03-21T20:33:44.372Z"
 }

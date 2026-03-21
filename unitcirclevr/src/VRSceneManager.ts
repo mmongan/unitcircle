@@ -554,13 +554,17 @@ export class VRSceneManager {
     this.scene.stopAnimation(this.sceneRoot);
 
     const cameraPosition = SceneConfig.CAMERA_POSITION;
-    const viewOffset = SceneConfig.FLY_TO_OFFSET;
-
-    // Landing position: on top of the cube (add height for landing on top surface)
-    const landingHeight = SceneConfig.FUNCTION_BOX_SIZE / 2 + 3;  // Land on top with 3 unit offset
-    const landingPosition = targetPosition.add(new BABYLON.Vector3(0, landingHeight, 0));
+    
+    // Landing position: directly on top of the object like a platform
+    // Position camera high enough above the object to look down at it
+    const platformHeight = SceneConfig.FUNCTION_BOX_SIZE / 2 + 8;  // Land on top with 8 unit offset for platform view
+    const landingPosition = targetPosition.add(new BABYLON.Vector3(0, platformHeight, 0));
+    
+    // Scene root position: camera at (0,0,-70) + offset pointing down from above
+    // We want camera looking down at the landing position
+    const downwardViewOffset = new BABYLON.Vector3(0, 0, 0);  // No additional offset, look straight down
     const targetSceneRootPosition = cameraPosition
-      .add(viewOffset)
+      .add(downwardViewOffset)
       .subtract(landingPosition);
 
     // Create parabolic position animation
