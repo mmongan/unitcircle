@@ -521,6 +521,14 @@
       "type": "function"
     },
     {
+      "id": "createArrowhead@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
+      "name": "createArrowhead",
+      "file": "MeshFactory.ts",
+      "line": 328,
+      "isExported": false,
+      "type": "function"
+    },
+    {
       "id": "loadGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts",
       "name": "loadGraph",
       "file": "VRGraphViewer.ts",
@@ -1008,5 +1016,5 @@
       "to": "render@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-21T20:41:47.303Z"
+  "lastUpdated": "2026-03-21T20:45:44.656Z"
 }
