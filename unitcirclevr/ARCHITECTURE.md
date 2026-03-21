@@ -103,7 +103,7 @@ Sensitivity: 1000          // Reduced for precision
 
 **Scene Root Hierarchy**:
 
-```
+```text
 Scene
 └── sceneRoot (TransformNode)
     ├── ground
@@ -134,28 +134,34 @@ Target Z: -5 (top-down view below camera)
 **Algorithm**:
 
 1. **Function Detection**:
+
    ```regex
    (?:(?:private|public|static|async)\s+)*
    (?:function\s+(\w+)|(\w+)\s*\([^)]*\)\s*(?::|=))
    ```
+
    - Matches `function name() {}`
    - Matches method declarations with type annotations
    - Matched with modifiers (private, static, async)
 
 2. **Call Detection**:
+
    ```regex
    (\w+)\s*\(
    ```
+
    - Matches function invocations
    - Filters JavaScript keywords
    - Links caller to called functions
 
 3. **Line Number Calculation**:
+
    ```typescript
    lineNumber = content.substring(0, index).split('\n').length
    ```
 
 **Limitations**:
+
 - Doesn't parse string literals (regex patterns treated as code)
 - Can't distinguish built-in functions from user functions
 - Misses some complex patterns (destructuring calls, optional chaining)
@@ -164,6 +170,7 @@ Target Z: -5 (top-down view below camera)
 
 ```typescript
 {
+
   functions: Map<uniqueId, CodeFunction>,
   calls: Map<callerId, Set<calleeIds>>
 }
@@ -175,7 +182,7 @@ Target Z: -5 (top-down view below camera)
 
 **Algorithm**:
 
-```
+```text
 For 100 iterations:
   For each node:
     Force = 0
@@ -215,7 +222,7 @@ Bounds: [-50, -50, -50] to [50, 50, 50]
 
 **Operation**:
 
-```
+```text
 File system event → debounce (500ms) → regenerate graph
 ```
 
@@ -277,6 +284,7 @@ material.emissiveColor = white    // For bright visibility
 ```
 
 **Why Emissive?**:
+
 - Doesn't require complex lighting setup
 - Visible from all angles
 - Works well with orthogonal textures
@@ -284,7 +292,7 @@ material.emissiveColor = white    // For bright visibility
 
 ## Build Pipeline
 
-```
+```text
 npm run build
 ├── npm run graph:build
 │   ├── Parse src/VRSceneManager.ts
@@ -303,6 +311,7 @@ npm run build
 ```
 
 **Output**:
+
 - `dist/index.html` - Entry point
 - `dist/unitcircle/graph.json` - Code visualization data
 - `dist/assets/*.js` - Bundled JavaScript
@@ -312,7 +321,7 @@ npm run build
 
 ### Click on Node
 
-```
+```text
 1. Browser dispatches click event
    ↓
 2. ActionManager detects OnPickTrigger
@@ -342,7 +351,7 @@ npm run build
 
 ### Hover Over Node
 
-```
+```text
 1. ActionManager detects OnPointerOverTrigger
    ↓
 2. material.emissiveColor = white (highlight)
@@ -357,7 +366,7 @@ npm run build
 
 ### Graph Update (File Change)
 
-```
+```text
 1. FileWatcher detects source change
    ↓
 2. Debounce 500ms
@@ -385,11 +394,13 @@ npm run build
 ## Performance Optimizations
 
 ### 1. Camera Fixed Position
+
 - Scene moves, not camera
 - Prevents motion sickness in VR
 - Simpler perspective mathematics
 
 ### 2. Material Reuse
+
 ```typescript
 // Reuse material for multiple nodes
 const material = new StandardMaterial('mat', scene)
@@ -397,6 +408,7 @@ const material = new StandardMaterial('mat', scene)
 ```
 
 ### 3. Texture Caching
+
 ```typescript
 // Each function gets unique texture
 // No shared textures (identity required)
@@ -404,6 +416,7 @@ const textureId = `signatureTexture_${node.id}`
 ```
 
 ### 4. Polling Optimization
+
 ```typescript
 // Only regenerate if graph actually changed
 if (graph.lastUpdated !== this.lastGraphUpdate) {
@@ -412,6 +425,7 @@ if (graph.lastUpdated !== this.lastGraphUpdate) {
 ```
 
 ### 5. Animation Loop
+
 ```typescript
 // 60 FPS render loop (standard browsers)
 engine.runRenderLoop(() => {
@@ -422,11 +436,13 @@ engine.runRenderLoop(() => {
 ## Testing Architecture
 
 ### Unit Tests
+
 - **CodeParser**: Regex pattern matching
 - **counter**: DOM manipulation
 - **Tests**: 100+ unit test cases
 
 ### Integration Tests
+
 - **VRSceneManager**: Scene creation with mocked Babylon.js
 - **ForceDirectedLayout**: Full physics simulation
 - **FileWatcher**: File system integration
@@ -444,6 +460,7 @@ vi.mock('@babylonjs/core', () => ({
 ```
 
 Enables:
+
 - Fast test execution (<5 seconds)
 - No graphics hardware needed
 - CI/CD compatibility
@@ -452,6 +469,7 @@ Enables:
 ## Scalability Considerations
 
 ### Current Limits
+
 - **Nodes**: 65 (extracted from single file)
 - **Edges**: 6 (function calls)
 - **Graph generation**: <100ms
@@ -460,25 +478,10 @@ Enables:
 
 ### Scaling to Larger Codebases
 
-**Option 1: Module-Based Visualization**
-- Parse each module separately
-- Show inter-module calls only
-- Reduce node count to 50-100
-
-**Option 2: Hierarchical Clustering**
-- Group functions by module/class
-- First level shows modules
-- Drill-down to function level
-
-**Option 3: Time-Windowed Loading**
-- Load functions in batches
-- Show loading indicator
-- Progressive rendering
-
-**Option 4: Server-Side Graph Calculation**
-- Pre-calculate all graphs on build
-- Send compressed graph.json
-- Browser just renders
+- **Option 1: Module-Based Visualization** - Parse each module separately, show inter-module calls only, reduce node count to 50-100
+- **Option 2: Hierarchical Clustering** - Group functions by module/class, first level shows modules, drill-down to function level
+- **Option 3: Time-Windowed Loading** - Load functions in batches, show loading indicator, progressive rendering
+- **Option 4: Server-Side Graph Calculation** - Pre-calculate all graphs on build, send compressed graph.json, browser just renders
 
 ## Error Handling
 
@@ -516,12 +519,14 @@ try {
 ## Security Considerations
 
 ### Non-Applicable
+
 - No user input beyond file system
 - No network requests beyond fetch graph.json
 - No eval() or dynamic code execution
 - TypeScript types prevent many injection attacks
 
 ### Best Practices Applied
+
 - No innerHTML from user input
 - Regex patterns are static (not user input)
 - CORS enabled for GitHub Pages domain
@@ -530,12 +535,14 @@ try {
 ## Future Improvements
 
 ### Short Term (1-2 weeks)
+
 - [ ] Variable and external module signatures
 - [ ] Search/filter by node type
 - [ ] UI panel for node details
 - [ ] Keyboard shortcuts (F: focus, E: export, etc.)
 
 ### Medium Term (1-2 months)
+
 - [ ] Multi-file visualization
 - [ ] Call stack visualization
 - [ ] Performance profiling overlay
@@ -543,6 +550,7 @@ try {
 - [ ] VR hand controller support
 
 ### Long Term (3+ months)
+
 - [ ] Large codebase handling (100+ files)
 - [ ] AST-based parsing for accuracy
 - [ ] Dependency graph overlays

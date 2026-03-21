@@ -24,14 +24,16 @@ npm run dev:watch
 ```
 
 This starts both:
+
 - File watcher (regenerates graph.json on code changes)
-- Vite dev server (http://localhost:5173)
+- [Vite dev server](http://localhost:5173)
 
 ## Workflow
 
 ### Making Changes
 
 1. **Create a feature branch**:
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
@@ -45,27 +47,32 @@ This starts both:
    - Follow existing test style
 
 5. **Run tests**:
+
    ```bash
    npm test -- --watch
    ```
 
 6. **Check coverage**:
+
    ```bash
    npm test -- --coverage
    ```
 
 7. **Verify build**:
+
    ```bash
    npm run build
    ```
 
 8. **Commit with descriptive message**:
+
    ```bash
    git add -A
    git commit -m "Add feature: description of changes"
    ```
 
 9. **Push and create Pull Request**:
+
    ```bash
    git push origin feature/your-feature-name
    ```
@@ -163,7 +170,7 @@ npm test -- --coverage
 
 Use clear, descriptive commit messages:
 
-```
+```text
 # Good
 git commit -m "Add VRSceneManager tests with 74 test cases
 
@@ -183,7 +190,7 @@ git commit -m "Fixed bugs"
 
 ### Commit Message Format
 
-```
+```text
 <type>: <subject>
 
 <body (optional)>
@@ -192,6 +199,7 @@ git commit -m "Fixed bugs"
 ```
 
 **Type**: The kind of change
+
 - `feat`: New feature
 - `fix`: Bug fix
 - `test`: Test additions/updates
@@ -201,6 +209,7 @@ git commit -m "Fixed bugs"
 - `perf`: Performance improvement
 
 **Subject**: Imperative, present tense, no period
+
 - ✅ "Add function call analysis"
 - ❌ "Added function call analysis"
 - ❌ "Adds function call analysis"
@@ -214,21 +223,25 @@ git commit -m "Fixed bugs"
 ### Before Submitting
 
 1. **Run full test suite**:
+
    ```bash
    npm test
    ```
 
 2. **Check TypeScript compilation**:
+
    ```bash
    npx tsc --noEmit
    ```
 
 3. **Verify build succeeds**:
+
    ```bash
    npm run build
    ```
 
 4. **Check coverage didn't decrease**:
+
    ```bash
    npm test -- --coverage
    ```
@@ -321,6 +334,7 @@ Fixes #123
 ### Updating README
 
 The README is the main user documentation. Update when:
+
 - Adding new features
 - Changing deployment process
 - Adding new commands
@@ -329,6 +343,7 @@ The README is the main user documentation. Update when:
 ### Updating ARCHITECTURE.md
 
 Update ARCHITECTURE documentation when:
+
 - Significantly changing how modules interact
 - Adding new modules
 - Changing data structures
@@ -337,12 +352,14 @@ Update ARCHITECTURE documentation when:
 ### Code Comments
 
 Add comments for:
+
 - Complex algorithms (explain "why")
 - Magic numbers (explain intention)
 - Non-obvious code patterns
 - Workarounds for edge cases
 
 Avoid comments for:
+
 - Self-documenting code
 - Obvious logic
 - Things that change frequently
@@ -352,6 +369,7 @@ Avoid comments for:
 ### Code Review Checklist
 
 Reviewers check:
+
 - [ ] Tests are comprehensive
 - [ ] No TypeScript errors
 - [ ] Code follows style guide
@@ -370,10 +388,10 @@ Reviewers check:
 
 ## Resources
 
-- **Babylon.js Docs**: https://doc.babylonjs.com/
-- **Vitest Guide**: https://vitest.dev/
-- **TypeScript Handbook**: https://www.typescriptlang.org/docs/
-- **Git Commit Guide**: https://www.conventionalcommits.org/
+- [**Babylon.js Docs**](https://doc.babylonjs.com/)
+- [**Vitest Guide**](https://vitest.dev/)
+- [**TypeScript Handbook**](https://www.typescriptlang.org/docs/)
+- [**Conventional Commits**](https://www.conventionalcommits.org/)
 
 ## Questions?
 

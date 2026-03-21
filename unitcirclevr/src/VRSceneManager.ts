@@ -137,7 +137,7 @@ export class VRSceneManager {
     });
   }
 
-  private renderCodeGraph(graph: GraphData): void {
+  public renderCodeGraph(graph: GraphData): void {
     // Create positions using force-directed layout
     const edges = this.buildEdgeList(graph.edges);
     const layout = new ForceDirectedLayout(

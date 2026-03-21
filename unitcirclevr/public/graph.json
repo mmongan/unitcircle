@@ -417,6 +417,142 @@
       "type": "function"
     },
     {
+      "id": "loadGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts",
+      "name": "loadGraph",
+      "file": "VRGraphViewer.ts",
+      "line": 58,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "renderGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts",
+      "name": "renderGraph",
+      "file": "VRGraphViewer.ts",
+      "line": 75,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "run@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts",
+      "name": "run",
+      "file": "VRGraphViewer.ts",
+      "line": 86,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "dispose@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts",
+      "name": "dispose",
+      "file": "VRGraphViewer.ts",
+      "line": 93,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "refreshGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts",
+      "name": "refreshGraph",
+      "file": "VRGraphViewer.ts",
+      "line": 100,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "getGraphData@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts",
+      "name": "getGraphData",
+      "file": "VRGraphViewer.ts",
+      "line": 109,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "getOriginalGraphData@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts",
+      "name": "getOriginalGraphData",
+      "file": "VRGraphViewer.ts",
+      "line": 116,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "getNodeCount@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts",
+      "name": "getNodeCount",
+      "file": "VRGraphViewer.ts",
+      "line": 123,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "getEdgeCount@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts",
+      "name": "getEdgeCount",
+      "file": "VRGraphViewer.ts",
+      "line": 131,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "showNodeTypes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts",
+      "name": "showNodeTypes",
+      "file": "VRGraphViewer.ts",
+      "line": 140,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "showExportedOnly@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts",
+      "name": "showExportedOnly",
+      "file": "VRGraphViewer.ts",
+      "line": 162,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "showAll@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts",
+      "name": "showAll",
+      "file": "VRGraphViewer.ts",
+      "line": 183,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "getStats@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts",
+      "name": "getStats",
+      "file": "VRGraphViewer.ts",
+      "line": 192,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "getNode@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts",
+      "name": "getNode",
+      "file": "VRGraphViewer.ts",
+      "line": 217,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "findCallsFrom@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts",
+      "name": "findCallsFrom",
+      "file": "VRGraphViewer.ts",
+      "line": 225,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "findCallsTo@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts",
+      "name": "findCallsTo",
+      "file": "VRGraphViewer.ts",
+      "line": 233,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "isReady@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts",
+      "name": "isReady",
+      "file": "VRGraphViewer.ts",
+      "line": 241,
+      "isExported": false,
+      "type": "function"
+    },
+    {
       "id": "setupLighting@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "setupLighting",
       "file": "VRSceneManager.ts",
@@ -696,6 +832,18 @@
       "to": "logBuildVersion@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts"
     },
     {
+      "from": "refreshGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts",
+      "to": "dispose@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts"
+    },
+    {
+      "from": "refreshGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts",
+      "to": "loadGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts"
+    },
+    {
+      "from": "refreshGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts",
+      "to": "run@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts"
+    },
+    {
       "from": "initializeCodeVisualization@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "to": "loadGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
     },
@@ -708,6 +856,14 @@
       "to": "validateGraphData@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
     },
     {
+      "from": "clearGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "to": "dispose@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts"
+    },
+    {
+      "from": "clearGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "to": "dispose@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts"
+    },
+    {
       "from": "computeLayout@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "to": "simulate@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts"
     },
@@ -716,5 +872,5 @@
       "to": "render@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-21T15:34:57.349Z"
+  "lastUpdated": "2026-03-21T16:05:07.678Z"
 }
