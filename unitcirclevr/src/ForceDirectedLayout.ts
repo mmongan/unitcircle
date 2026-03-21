@@ -18,10 +18,10 @@ export class ForceDirectedLayout {
   private nodes: Map<string, Node>;
   private edges: Edge[];
   private k: number = 1; // Optimal distance
-  private repulsiveForce: number = 0.2; // Repulsive force strength (lower = stronger repulsion)
-  private attractiveForce: number = 0.1; // Attractive force strength
+  private repulsiveForce: number = 0.15; // Repulsive force strength (lower = stronger repulsion)
+  private attractiveForce: number = 0.05; // Attractive force strength
   private damping: number = 0.95; // Velocity damping
-  private minSeparation: number = 6; // Minimum distance between node centers (increased for better spread)
+  private minSeparation: number = 10; // Minimum distance between node centers (accounts for variable box sizes)
 
   constructor(nodeIds: string[], edges: Edge[]) {
     this.nodes = new Map();
@@ -107,7 +107,7 @@ export class ForceDirectedLayout {
 
         // Enforce minimum separation - push nodes apart if too close
         if (distance < this.minSeparation) {
-          const pushForce = (this.minSeparation - distance) * 2; // Exponential push force
+          const pushForce = Math.pow(this.minSeparation - distance, 1.5) * 5; // Aggressive push force
           const fx = (dx / distance) * pushForce;
           const fy = (dy / distance) * pushForce;
           const fz = (dz / distance) * pushForce;

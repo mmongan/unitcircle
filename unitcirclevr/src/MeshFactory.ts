@@ -289,20 +289,8 @@ export class MeshFactory {
     const goldenEdgeMaterial = new BABYLON.StandardMaterial('goldenEdgeMaterial', this.scene);
     goldenEdgeMaterial.emissiveColor = new BABYLON.Color3(1.0, 0.84, 0.0);  // Golden yellow
 
-    // Group edges by target to avoid collisions
-    const edgesByTarget = new Map<string, Array<{ edge: { from: string; to: string }; index: number }>>();
+    // Render all edges connecting to function centers
     let edgeIndex = 0;
-    
-    for (const edge of edges) {
-      if (!edgesByTarget.has(edge.to)) {
-        edgesByTarget.set(edge.to, []);
-      }
-      edgesByTarget.get(edge.to)!.push({ edge, index: edgeIndex });
-      edgeIndex++;
-    }
-
-    // Render edges with offset positions based on how many connect to same target
-    edgeIndex = 0;
     for (const edge of edges) {
       // Extract file paths from edge endpoints (format: "functionName@/path/to/file.ts")
       const fromFile = edge.from.split('@')[1];
@@ -312,11 +300,7 @@ export class MeshFactory {
       const isCrossFile = fromFile !== toFile;
       const material = isCrossFile ? goldenEdgeMaterial : edgeMaterial;
       
-      // Get all edges pointing to the same target
-      const targetEdges = edgesByTarget.get(edge.to) || [];
-      const edgePositionIndex = targetEdges.findIndex(e => e.index === edgeIndex);
-      
-      this.createEdge(edge, layoutNodes, material, edgeIndex, edgePositionIndex, targetEdges.length);
+      this.createEdge(edge, layoutNodes, material, edgeIndex);
       edgeIndex++;
     }
   }
@@ -328,22 +312,14 @@ export class MeshFactory {
     edge: { from: string; to: string },
     layoutNodes: Map<string, any>,
     material: BABYLON.StandardMaterial,
-    index: number,
-    positionIndex: number = 0,
-    totalPositions: number = 1
+    index: number
   ): void {
     const sourceNode = layoutNodes.get(edge.from);
     const targetNode = layoutNodes.get(edge.to);
 
     if (sourceNode && targetNode) {
       const sourcePos = new BABYLON.Vector3(sourceNode.position.x, sourceNode.position.y, sourceNode.position.z);
-      let targetPos = new BABYLON.Vector3(targetNode.position.x, targetNode.position.y, targetNode.position.z);
-      
-      // Offset target position based on which edge this is among edges targeting the same node
-      // This prevents edge collisions when multiple edges converge on the same function
-      const offset = this.getEdgeOffsetPosition(positionIndex, totalPositions);
-      const nodeSize = 4.0;  // SceneConfig.FUNCTION_BOX_SIZE
-      targetPos = targetPos.add(offset.scale(nodeSize / 2 + 0.5));
+      const targetPos = new BABYLON.Vector3(targetNode.position.x, targetNode.position.y, targetNode.position.z);
       
       const points = [sourcePos, targetPos];
 
@@ -358,29 +334,6 @@ export class MeshFactory {
       // Create arrowhead at the end of the edge
       this.createArrowhead(sourcePos, targetPos, material, index);
     }
-  }
-
-  /**
-   * Calculate offset position for edge endpoint to distribute multiple edges
-   * Spreads edges around the target node to avoid collisions
-   */
-  private getEdgeOffsetPosition(positionIndex: number, totalPositions: number): BABYLON.Vector3 {
-    if (totalPositions === 1) {
-      return new BABYLON.Vector3(0, 0, 1);  // Default front face
-    }
-
-    // Distribute edges around the cube faces
-    // Use angles around the vertical axis to spread edges
-    const angle = (positionIndex / totalPositions) * Math.PI * 2;
-    const radius = 0.7;  // Distance from center on the cube surface
-    
-    const x = Math.cos(angle) * radius;
-    const z = Math.sin(angle) * radius;
-    
-    // Add slight vertical offset to vary entry points
-    const yOffset = (positionIndex % 3 - 1) * 0.3;  // Spread over 3 different heights
-    
-    return new BABYLON.Vector3(x, yOffset, z).normalize();
   }
 
   /**
