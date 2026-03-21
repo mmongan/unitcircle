@@ -322,7 +322,8 @@ export class VRSceneManager {
           // Verify the mesh corresponds to the correct node and fly to it
           const clickedNode = (mesh as any).nodeData as GraphNode;
           if (clickedNode) {
-            originalFlyTo(mesh.position, normal ?? undefined);
+            // Use world position, not local position, since scene root moves
+            originalFlyTo(mesh.getAbsolutePosition(), normal ?? undefined);
           }
         }
       }
@@ -336,13 +337,12 @@ export class VRSceneManager {
     const cameraPosition = SceneConfig.CAMERA_POSITION;
     const viewOffset = SceneConfig.FLY_TO_OFFSET;
 
-    // Calculate where sceneRoot should be positioned
-    // We want the target mesh (at local position targetPosition) to appear at:
-    // world position = cameraPosition + viewOffset
-    // Since: meshWorldPosition = sceneRoot.position + targetPosition
-    // We solve: cameraPosition + viewOffset = sceneRoot.position + targetPosition
-    // Therefore: sceneRoot.position = cameraPosition + viewOffset - targetPosition
-    const targetSceneRootPosition = cameraPosition.add(viewOffset).subtract(targetPosition);
+    // Landing position: on top of the cube (add height for landing on top surface)
+    const landingHeight = SceneConfig.FUNCTION_BOX_SIZE / 2 + 3;  // Land on top with 3 unit offset
+    const targetSceneRootPosition = cameraPosition
+      .add(viewOffset)
+      .subtract(targetPosition)
+      .add(new BABYLON.Vector3(0, landingHeight, 0));
 
     // Calculate rotation to face the clicked face toward camera
     let rotationQuaternion = BABYLON.Quaternion.Identity();
@@ -354,7 +354,7 @@ export class VRSceneManager {
       rotationQuaternion = BABYLON.Quaternion.FromUnitVectorsToRef(faceNormal, targetDirection, rotationQuaternion);
     }
 
-    // Create animations
+    // Create parabolic position animation
     const positionAnimation = new BABYLON.Animation(
       'sceneRootFlyPosition',
       'position',
@@ -362,27 +362,37 @@ export class VRSceneManager {
       BABYLON.Animation.ANIMATIONTYPE_VECTOR3
     );
     
-    const keys = [];
-    keys.push({
-      frame: 0,
-      value: this.sceneRoot.position.clone(),
-    });
-    keys.push({
-      frame: (SceneConfig.FLY_TO_ANIMATION_TIME_MS / 1000) * SceneConfig.FLY_TO_ANIMATION_FPS,
-      value: targetSceneRootPosition,
-    });
-    positionAnimation.setKeys(keys);
+    const startPos = this.sceneRoot.position.clone();
+    const totalFrames = (SceneConfig.FLY_TO_ANIMATION_TIME_MS / 1000) * SceneConfig.FLY_TO_ANIMATION_FPS;
+    const peakHeight = 15;  // Maximum height above starting point
     
-    // Add smooth easing for natural acceleration/deceleration
-    const positionEasing = new BABYLON.QuadraticEase();
-    positionEasing.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
-    positionAnimation.setEasingFunction(positionEasing);
+    // Create keyframes along parabolic path
+    const keys = [];
+    for (let i = 0; i <= totalFrames; i++) {
+      const t = i / totalFrames;  // 0 to 1
+      
+      // Linear interpolation for X and Z
+      const x = startPos.x + (targetSceneRootPosition.x - startPos.x) * t;
+      const z = startPos.z + (targetSceneRootPosition.z - startPos.z) * t;
+      
+      // Parabolic path for Y: peak at t=0.5, reach target at t=1
+      // Formula: y = startY + gravity_arc + (targetY - startY) * t
+      // where gravity_arc = -peakHeight * (1 - 4*(t-0.5)²) creates upward arc
+      const gravityArc = -peakHeight * Math.max(0, 1 - 4 * Math.pow(t - 0.5, 2));
+      const y = startPos.y + (targetSceneRootPosition.y - startPos.y) * t + gravityArc;
+      
+      keys.push({
+        frame: i,
+        value: new BABYLON.Vector3(x, y, z),
+      });
+    }
+    positionAnimation.setKeys(keys);
     
     this.scene.beginDirectAnimation(
       this.sceneRoot,
       [positionAnimation],
       0,
-      (SceneConfig.FLY_TO_ANIMATION_TIME_MS / 1000) * SceneConfig.FLY_TO_ANIMATION_FPS,
+      totalFrames,
       false
     );
 
@@ -401,7 +411,7 @@ export class VRSceneManager {
         value: this.sceneRoot.rotationQuaternion || BABYLON.Quaternion.Identity(),
       });
       rotKeys.push({
-        frame: (SceneConfig.FLY_TO_ANIMATION_TIME_MS / 1000) * SceneConfig.FLY_TO_ANIMATION_FPS,
+        frame: totalFrames,
         value: rotationQuaternion,
       });
       rotationAnimation.setKeys(rotKeys);
@@ -415,7 +425,7 @@ export class VRSceneManager {
         this.sceneRoot,
         [rotationAnimation],
         0,
-        (SceneConfig.FLY_TO_ANIMATION_TIME_MS / 1000) * SceneConfig.FLY_TO_ANIMATION_FPS,
+        totalFrames,
         false
       );
     }
