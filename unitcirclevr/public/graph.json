@@ -217,6 +217,142 @@
       "type": "function"
     },
     {
+      "id": "loadGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
+      "name": "loadGraph",
+      "file": "GraphViewer.ts",
+      "line": 58,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "search@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
+      "name": "search",
+      "file": "GraphViewer.ts",
+      "line": 78,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "filterByType@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
+      "name": "filterByType",
+      "file": "GraphViewer.ts",
+      "line": 86,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "applyFilters@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
+      "name": "applyFilters",
+      "file": "GraphViewer.ts",
+      "line": 94,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "getStats@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
+      "name": "getStats",
+      "file": "GraphViewer.ts",
+      "line": 131,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "findCallsFrom@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
+      "name": "findCallsFrom",
+      "file": "GraphViewer.ts",
+      "line": 156,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "findCallsTo@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
+      "name": "findCallsTo",
+      "file": "GraphViewer.ts",
+      "line": 164,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "getNode@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
+      "name": "getNode",
+      "file": "GraphViewer.ts",
+      "line": 172,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "render@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
+      "name": "render",
+      "file": "GraphViewer.ts",
+      "line": 180,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "renderNodesTable@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
+      "name": "renderNodesTable",
+      "file": "GraphViewer.ts",
+      "line": 242,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "renderNodeRow@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
+      "name": "renderNodeRow",
+      "file": "GraphViewer.ts",
+      "line": 274,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "renderEdgesTable@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
+      "name": "renderEdgesTable",
+      "file": "GraphViewer.ts",
+      "line": 305,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "renderEdgeRow@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
+      "name": "renderEdgeRow",
+      "file": "GraphViewer.ts",
+      "line": 334,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "getTypeColor@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
+      "name": "getTypeColor",
+      "file": "GraphViewer.ts",
+      "line": 356,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "setupEventListeners@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
+      "name": "setupEventListeners",
+      "file": "GraphViewer.ts",
+      "line": 368,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "switchTab@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
+      "name": "switchTab",
+      "file": "GraphViewer.ts",
+      "line": 395,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "showError@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
+      "name": "showError",
+      "file": "GraphViewer.ts",
+      "line": 419,
+      "isExported": false,
+      "type": "function"
+    },
+    {
       "id": "logBuildVersion@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
       "name": "logBuildVersion",
       "file": "main.ts",
@@ -528,8 +664,40 @@
       "to": "updateCounterDisplay@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\counter.ts"
     },
     {
+      "from": "render@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
+      "to": "getStats@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
+    },
+    {
+      "from": "renderNodeRow@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
+      "to": "findCallsFrom@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
+    },
+    {
+      "from": "renderNodeRow@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
+      "to": "findCallsTo@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
+    },
+    {
+      "from": "renderEdgeRow@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
+      "to": "getNode@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
+    },
+    {
+      "from": "renderEdgeRow@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
+      "to": "getNode@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
+    },
+    {
+      "from": "setupEventListeners@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
+      "to": "search@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
+    },
+    {
+      "from": "setupEventListeners@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
+      "to": "filterByType@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
+    },
+    {
       "from": "initializeApplication@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
       "to": "logBuildVersion@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts"
+    },
+    {
+      "from": "initializeCodeVisualization@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "to": "loadGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
     },
     {
       "from": "setupGraphPolling@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
@@ -542,7 +710,11 @@
     {
       "from": "computeLayout@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "to": "simulate@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts"
+    },
+    {
+      "from": "run@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "to": "render@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-21T15:24:57.756Z"
+  "lastUpdated": "2026-03-21T15:34:57.349Z"
 }

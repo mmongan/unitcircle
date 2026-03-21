@@ -20,7 +20,8 @@ npm test
 ```
 
 Output:
-```
+
+```text
  Test Files  6 passed (6)
       Tests  180 passed (180)
    Duration  4.59s
@@ -51,6 +52,7 @@ npm test -- --coverage
 ```
 
 Creates HTML report in `coverage/index.html`:
+
 - Per-file coverage metrics
 - Uncovered line highlighting
 - Branch coverage analysis
@@ -64,7 +66,7 @@ Tests the core 3D visualization engine using mocked Babylon.js.
 **Test Categories**:
 
 | Category | Tests | Focus |
-|----------|-------|-------|
+| --- | --- | --- |
 | Constructor | 7 | Engine, scene, camera, lighting setup |
 | Graph Loading | 5 | Loading graph.json with error handling |
 | Scene Root & Transforms | 3 | Node hierarchy, parenting |
@@ -99,7 +101,7 @@ Tests TypeScript function extraction and call relationship analysis.
 **Test Categories**:
 
 | Category | Tests | Focus |
-|----------|-------|-------|
+| --- | --- | --- |
 | Extraction | 7 | Single/multiple files, empty files |
 | Declarations | 9 | Named/arrow/async functions, methods |
 | Calls | 10 | Call tracking, multiple calls, nested |
@@ -135,7 +137,7 @@ Tests DOM manipulation and click event handling.
 **Test Categories**:
 
 | Category | Tests | Focus |
-|----------|-------|-------|
+| --- | --- | --- |
 | Initialization | 2 | Setup and display |
 | Incrementing | 8 | Single/multiple clicks, rapid fire |
 | State | 4 | Multiple instances, independent state |
@@ -166,6 +168,7 @@ test('each button instance maintains independent state', () => {
 Tests physics-based node positioning algorithm.
 
 **Existing Tests**:
+
 - Initialization with node and edge lists
 - Simulation convergence
 - Position constraints within bounds
@@ -178,6 +181,7 @@ Tests physics-based node positioning algorithm.
 Tests file change detection and graph regeneration.
 
 **Existing Tests**:
+
 - File creation/modification/deletion
 - Debouncing behavior (500ms)
 - Selective TypeScript file watching
@@ -189,6 +193,7 @@ Tests file change detection and graph regeneration.
 Tests graph.json generation from source code.
 
 **Existing Tests**:
+
 - Output structure validation
 - Function node construction
 - Variable and external module nodes
@@ -198,7 +203,7 @@ Tests graph.json generation from source code.
 
 ### Current Coverage by File
 
-```
+```text
 All files          |  72.89 | 81.37 | 81.66 |
 CodeParser.ts      |    100 | 92.85 |   100 |  ✅ Excellent
 counter.ts         |    100 |   100 |   100 |  ✅ Perfect
@@ -217,6 +222,7 @@ VRSceneManager has lower coverage (55.81%) due to its complexity:
 - **Mesh Operations**: Complex 3D object creation with many parameters
 
 **Covered Functionality**:
+
 - Constructor and initialization ✅
 - Scene hierarchy and transforms ✅
 - Mesh creation and materials ✅
@@ -245,6 +251,7 @@ describe('MyModule', () => {
 ### Best Practices
 
 1. **Descriptive Names**: Test names should answer "what should happen"
+
    ```typescript
    // ✅ Good
    it('should increment counter by 1 on each click', () => {})
@@ -254,6 +261,7 @@ describe('MyModule', () => {
    ```
 
 2. **Arrange-Act-Assert**: Clear test structure
+
    ```typescript
    it('should calculate sum correctly', () => {
      // Arrange
@@ -268,6 +276,7 @@ describe('MyModule', () => {
    ```
 
 3. **One Assertion Focus**: Test one behavior per test
+
    ```typescript
    // ✅ Good: Focused tests
    it('should create function with correct color', () => {})
@@ -278,6 +287,7 @@ describe('MyModule', () => {
    ```
 
 4. **Use beforeEach for Setup**:
+
    ```typescript
    describe('API', () => {
      let api
@@ -293,6 +303,7 @@ describe('MyModule', () => {
    ```
 
 5. **Mock External Dependencies**:
+
    ```typescript
    vi.mock('../external', () => ({
      fetch: vi.fn(() => Promise.resolve({ ok: true }))
@@ -382,6 +393,7 @@ Press F5 to start debugging.
 Tests run automatically on:
 
 1. **Pre-commit**: (Configure with husky)
+
    ```bash
    npm test -- --run
    ```

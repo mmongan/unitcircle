@@ -3,6 +3,7 @@
 ## System Overview
 
 Unit Circle VR visualizes code structure as an interactive 3D graph where:
+
 - **Functions** = Colored cubes (cyan/random/gray by hierarchy)
 - **Variables** = Gold or gray spheres
 - **External Modules** = Blue cylinders
@@ -12,7 +13,7 @@ The system automatically extracts TypeScript code, calculates positions using fo
 
 ## High-Level Data Flow
 
-```
+```text
 Source Code (src/VRSceneManager.ts)
           ↓
     [CodeParser]
@@ -47,6 +48,7 @@ Source Code (src/VRSceneManager.ts)
 **Purpose**: Orchestrates all 3D visualization using Babylon.js 8.54.3
 
 **Responsibilities**:
+
 - Scene initialization (lighting, camera, ground)
 - Graph loading and parsing
 - Mesh creation (functions, variables, externals)

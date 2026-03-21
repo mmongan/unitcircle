@@ -25,7 +25,7 @@ A TypeScript-based virtual reality code visualization application that renders i
 
 ## Project Structure
 
-```
+```bash
 src/
 ├── main.ts                  # Application entry point
 ├── VRSceneManager.ts        # VR scene orchestration (466 lines)
@@ -105,6 +105,7 @@ npm run graph:build
 ```
 
 Outputs to `public/unitcircle/graph.json` containing:
+
 - 65 functions extracted from `src/VRSceneManager.ts`
 - Function metadata (name, export status, file, line numbers)
 - Call relationships and dependencies
@@ -130,7 +131,7 @@ npm test -- --coverage
 ### Coverage Summary
 
 | File | Statements | Branches | Functions | Tests |
-|------|-----------|----------|-----------|-------|
+| --- | --- | --- | --- | --- |
 | CodeParser.ts | 100% ✅ | 92.85% | 100% ✅ | 66 |
 | counter.ts | 100% ✅ | 100% ✅ | 100% ✅ | 40 |
 | ForceDirectedLayout.ts | 95.68% | 80.76% | 85.71% | 16 |
@@ -153,6 +154,7 @@ npm run build
 ```
 
 Build process:
+
 1. Runs `graph:build` to generate graph.json
 2. Transpiles TypeScript with `tsc`
 3. Bundles with Vite (2174+ modules optimized)
@@ -189,6 +191,7 @@ npm run deploy
 ```
 
 This command:
+
 1. Runs full build pipeline (`graph:build` → `tsc` → `vite build`)
 2. Pushes compiled files to GitHub Pages hosting
 3. GitHub Pages automatically serves at `https://mmongan.github.io/unitcircle`
@@ -219,6 +222,7 @@ Orchestrates the Babylon.js 3D visualization with:
 - **Interaction**: Click/hover handlers with tooltip display
 
 **Key Methods**:
+
 - `renderCodeGraph()` - Parse graph.json and render 3D objects
 - `createFunctionMesh()` - Create color-coded function cubes with signatures
 - `createSignatureTexture()` - Generate metadata textures dynamically
@@ -265,15 +269,18 @@ Function nodes are color-encoded by call hierarchy:
 ## Interaction Guide
 
 ### Hover
+
 - Hover over any node to highlight it white
 - Tooltip appears showing name, file path, and line number
 
 ### Click
+
 - Click any function cube to fly to top-down view
 - Scene animates smoothly (800ms) to focus on target
 - Function signature visible on cube face
 
 ### Navigation
+
 - Standard Babylon.js camera controls
 - Right-click drag to rotate
 - Scroll to zoom
@@ -281,7 +288,7 @@ Function nodes are color-encoded by call hierarchy:
 ## Technologies
 
 | Package | Version | Purpose |
-|---------|---------|---------|
+| --- | --- | --- |
 | @babylonjs/core | 8.54.3 | 3D rendering engine |
 | @babylonjs/loaders | 8.54.3 | 3D asset loading |
 | @babylonjs/serializers | 8.54.3 | Serialization utils |
