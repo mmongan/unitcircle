@@ -76,20 +76,23 @@ export class VRSceneManager {
             const isSameFunction = clickedNode.id === this.currentFunctionId;
             const isSameFace = isSameFunction && this.isFaceNormalEqual(faceNormal, this.currentFaceNormal);
             
-            this.isAnimating = true;
-            
-            if (isSameFace) {
-              // Same face clicked again - slide to show that face
-              this.slideFaceView(pickResult.pickedMesh.position, faceNormal);
-            } else if (isSameFunction) {
-              // Different face of same function - slide to new face
-              this.currentFaceNormal = faceNormal.clone();
-              this.slideFaceView(pickResult.pickedMesh.position, faceNormal);
-            } else {
-              // Different function - jump to it
-              this.currentFunctionId = clickedNode.id;
-              this.currentFaceNormal = faceNormal.clone();  // Preserve the face we're landing on
-              this.sceneRootFlyTo(pickResult.pickedMesh.position);
+            try {
+              if (isSameFace) {
+                // Same face clicked again - slide to show that face
+                this.slideFaceView(pickResult.pickedMesh.position, faceNormal);
+              } else if (isSameFunction) {
+                // Different face of same function - slide to new face
+                this.currentFaceNormal = faceNormal.clone();
+                this.slideFaceView(pickResult.pickedMesh.position, faceNormal);
+              } else {
+                // Different function - jump to it
+                this.currentFunctionId = clickedNode.id;
+                this.currentFaceNormal = faceNormal.clone();  // Preserve the face we're landing on
+                this.sceneRootFlyTo(pickResult.pickedMesh.position);
+              }
+            } catch (error) {
+              console.error('Error during animation setup:', error);
+              this.isAnimating = false;  // Reset on error
             }
           }
         }
@@ -602,6 +605,7 @@ export class VRSceneManager {
     positionAnimation.setKeys(keys);
     
     const animationDurationMs = SceneConfig.FLY_TO_ANIMATION_TIME_MS;
+    let animationStarted = false;
     
     this.scene.beginDirectAnimation(
       this.sceneRoot,
@@ -615,11 +619,17 @@ export class VRSceneManager {
         this.isAnimating = false;
       }
     );
+    animationStarted = true;
+
+    // Set flag only after animation successfully started
+    if (animationStarted) {
+      this.isAnimating = true;
+    }
     
-    // Safety timeout to reset animation flag in case callback fails
+    // Safety timeout to reset animation flag (2 second absolute maximum)
     setTimeout(() => {
       this.isAnimating = false;
-    }, animationDurationMs + 100);
+    }, Math.max(animationDurationMs + 100, 2000));
   }
 
   /**
@@ -675,6 +685,7 @@ export class VRSceneManager {
     }
     slideAnimation.setKeys(keys);
     
+    let animationStarted = false;
     this.scene.beginDirectAnimation(
       this.sceneRoot,
       [slideAnimation],
@@ -687,11 +698,17 @@ export class VRSceneManager {
         this.isAnimating = false;
       }
     );
+    animationStarted = true;
+
+    // Set flag only after animation successfully started
+    if (animationStarted) {
+      this.isAnimating = true;
+    }
     
-    // Safety timeout to reset animation flag in case callback fails
+    // Safety timeout to reset animation flag (2 second absolute maximum)
     setTimeout(() => {
       this.isAnimating = false;
-    }, 300 + 100);  // 300ms animation + 100ms buffer
+    }, Math.max(300 + 100, 2000));
   }
 
   private renderEdges(
