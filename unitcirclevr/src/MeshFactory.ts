@@ -139,8 +139,8 @@ export class MeshFactory {
     ctx.fillStyle = 'rgba(0, 0, 0, 0)';
     ctx.fillRect(0, 0, textureSize, textureSize);
 
-    // Draw border frame in dark gray
-    ctx.strokeStyle = '#222222';
+    // Draw border frame in white for contrast
+    ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 3;
     ctx.strokeRect(
       SceneConfig.SIGNATURE_TEXTURE_BORDER_SIZE,
@@ -166,14 +166,19 @@ export class MeshFactory {
       node.type === 'function' ? 'Function' : node.type === 'variable' ? 'Variable' : 'External';
     lines.push(typeLabel);
 
-    ctx.fillStyle = '#222222';  // Dark gray text for readability
+    ctx.fillStyle = '#ffffff';  // White text for maximum contrast
     ctx.font = `bold ${SceneConfig.SIGNATURE_FONT_SIZE_PX}px ${SceneConfig.SIGNATURE_FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
 
+    // Draw dark text outline/stroke for readability
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3;
+
     const lineHeight = SceneConfig.SIGNATURE_FONT_SIZE_PX * 1.5;
     let yOffset = lineHeight + 20;
     for (const line of lines) {
+      ctx.strokeText(line, textureSize / 2, yOffset);
       ctx.fillText(line, textureSize / 2, yOffset);
       yOffset += lineHeight;
     }
@@ -196,10 +201,14 @@ export class MeshFactory {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.fillRect(0, 0, SceneConfig.LABEL_TEXTURE_SIZE, SceneConfig.LABEL_TEXTURE_SIZE);
 
-    ctx.fillStyle = '#222222';  // Dark gray for readability
+    ctx.fillStyle = '#ffffff';  // White text for contrast
     ctx.font = 'bold 64px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    
+    // Draw dark outline for readability
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3;
     ctx.fillText(text, SceneConfig.LABEL_TEXTURE_SIZE / 2, SceneConfig.LABEL_TEXTURE_SIZE / 2);
 
     dynamicTexture.update();
