@@ -11,7 +11,7 @@ A TypeScript-based virtual reality application built with Babylon.js and WebXR, 
 
 ## Project Structure
 
-```
+```typescript
 src/
 ├── main.ts              # Application entry point
 ├── VRSceneManager.ts    # VR scene setup and management
@@ -60,9 +60,10 @@ npm run preview
 
 This project is configured for automatic deployment to GitHub Pages at `https://mmongan.github.io/unitcircle`
 
-### Prerequisites
+### Setup
 
 Ensure your GitHub repository is properly configured:
+
 1. Repository must be public
 2. Ensure you have git credentials configured
 
@@ -75,6 +76,7 @@ npm run deploy
 ```
 
 This command will:
+
 1. Build the project with the correct base path (`/unitcircle/`)
 2. Push the compiled files to the `gh-pages` branch
 3. GitHub Pages will automatically serve the application
@@ -82,6 +84,7 @@ This command will:
 ### Verify Deployment
 
 After running `npm run deploy`:
+
 1. Go to your repository settings on GitHub
 2. Scroll to "GitHub Pages" section
 3. Verify it shows "Your site is live at `https://mmongan.github.io/unitcircle`"
