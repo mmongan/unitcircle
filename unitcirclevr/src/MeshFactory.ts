@@ -139,8 +139,8 @@ export class MeshFactory {
     ctx.fillStyle = 'rgba(0, 0, 0, 0)';
     ctx.fillRect(0, 0, textureSize, textureSize);
 
-    // Draw border frame in white
-    ctx.strokeStyle = '#ffffff';
+    // Draw border frame in dark gray
+    ctx.strokeStyle = '#222222';
     ctx.lineWidth = 3;
     ctx.strokeRect(
       SceneConfig.SIGNATURE_TEXTURE_BORDER_SIZE,
@@ -166,7 +166,7 @@ export class MeshFactory {
       node.type === 'function' ? 'Function' : node.type === 'variable' ? 'Variable' : 'External';
     lines.push(typeLabel);
 
-    ctx.fillStyle = '#ffffff';  // Clear white text
+    ctx.fillStyle = '#222222';  // Dark gray text for readability
     ctx.font = `bold ${SceneConfig.SIGNATURE_FONT_SIZE_PX}px ${SceneConfig.SIGNATURE_FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
@@ -196,7 +196,7 @@ export class MeshFactory {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.fillRect(0, 0, SceneConfig.LABEL_TEXTURE_SIZE, SceneConfig.LABEL_TEXTURE_SIZE);
 
-    ctx.fillStyle = 'white';
+    ctx.fillStyle = '#222222';  // Dark gray for readability
     ctx.font = 'bold 64px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
