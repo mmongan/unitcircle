@@ -102,19 +102,20 @@ export class MeshFactory {
 
     const material = new BABYLON.StandardMaterial(`mat_${node.id}`, this.scene);
 
-    // Apply signature texture with minimal color overlay
+    // Apply signature texture 
     const signatureTexture = this.createSignatureTexture(node);
     signatureTexture.uScale = 1.0;
     signatureTexture.vScale = 1.0;
     signatureTexture.uOffset = 0;
     signatureTexture.vOffset = 0;
     
-    // Use texture as emissive with primary blue tint
-    material.emissiveTexture = signatureTexture;
-    material.emissiveColor = new BABYLON.Color3(0.2, 0.6, 1.0);  // Vibrant primary blue
-    // Add specular for subtle shine
-    material.specularColor = new BABYLON.Color3(0.3, 0.3, 0.3);
-    material.specularPower = 12;  // Moderate to sharp shine
+    // Use texture as diffuse (primary visual) for proper lighting response
+    material.diffuseTexture = signatureTexture;
+    material.diffuseColor = new BABYLON.Color3(0.3, 0.7, 1.0);  // Vibrant primary blue
+    // Minimal emissive for glow
+    material.emissiveColor = new BABYLON.Color3(0.05, 0.15, 0.3);  // Very subtle blue glow
+    material.specularColor = new BABYLON.Color3(0.2, 0.2, 0.2);
+    material.specularPower = 16;
     material.wireframe = false;
 
     box.material = material;
