@@ -306,52 +306,82 @@ export class VRSceneManager {
     );
 
     // Show function signature panel after animation completes (800ms)
-    setTimeout(() => this.showFunctionSignature(node), 800);
+    setTimeout(() => this.create3DSignaturePanel(targetPosition, node), 800);
   }
 
-  private showFunctionSignature(node: GraphData['nodes'][0]): void {
-    // Create or update the signature panel
-    const existing = document.getElementById('signaturePanel');
-    if (existing) existing.remove();
+  private create3DSignaturePanel(objectPosition: BABYLON.Vector3, node: GraphData['nodes'][0]): void {
+    // Remove any existing signature panel meshes
+    const existingPanel = this.scene.meshes.find(m => m.name === 'signaturePedestal');
+    const existingPlane = this.scene.meshes.find(m => m.name === 'signaturePlane');
+    if (existingPanel) existingPanel.dispose();
+    if (existingPlane) existingPlane.dispose();
 
-    const panel = document.createElement('div');
-    panel.id = 'signaturePanel';
-    
-    // Build signature display
-    let signatureHtml = `<div><strong>${node.name}</strong></div>`;
-    
+    // Create pedestal - thin cylinder standing on top of object
+    const pedestal = BABYLON.MeshBuilder.CreateCylinder('signaturePedestal', {
+      height: 1.2,
+      diameterTop: 0.8,
+      diameterBottom: 0.8
+    }, this.scene);
+    pedestal.position = objectPosition.add(new BABYLON.Vector3(0, 1.6, 0));
+    pedestal.parent = this.sceneRoot;
+
+    const pedestalMaterial = new BABYLON.StandardMaterial('pedestalMat', this.scene);
+    pedestalMaterial.emissiveColor = new BABYLON.Color3(0.3, 0.3, 0.3);
+    pedestal.material = pedestalMaterial;
+
+    // Create dynamic texture for signature text
+    const textureSize = 512;
+    const dynamicTexture = new BABYLON.DynamicTexture('signatureTexture', textureSize, this.scene);
+    const ctx = dynamicTexture.getContext() as any;
+
+    // Draw background
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, textureSize, textureSize);
+    ctx.strokeStyle = '#00ff00';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(10, 10, textureSize - 20, textureSize - 20);
+
+    // Draw text
+    const lines: string[] = [node.name];
     if (node.isExported) {
-      signatureHtml += `<div style="color: #00ff00; margin-top: 4px;">📤 Exported</div>`;
+      lines.push('Exported');
     } else {
-      signatureHtml += `<div style="color: #ffaa00; margin-top: 4px;">📦 Internal</div>`;
+      lines.push('Internal');
     }
-    
     if (node.file) {
-      signatureHtml += `<div style="color: #88ff88; margin-top: 4px;">📄 ${node.file}</div>`;
+      lines.push(node.file);
     }
-    
     if (node.line) {
-      signatureHtml += `<div style="color: #88ff88;">📍 Line ${node.line}</div>`;
+      lines.push(`Line ${node.line}`);
     }
-    
-    if (node.type) {
-      const typeLabel = node.type === 'function' ? '⚙️ Function' : node.type === 'variable' ? '📊 Variable' : '🔌 External';
-      signatureHtml += `<div style="color: #aaccff; margin-top: 4px;">${typeLabel}</div>`;
+    const typeLabel = node.type === 'function' ? 'Function' : node.type === 'variable' ? 'Variable' : 'External';
+    lines.push(typeLabel);
+
+    ctx.fillStyle = '#00ff00';
+    ctx.font = 'bold 32px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+
+    let yOffset = 60;
+    for (const line of lines) {
+      ctx.fillText(line, textureSize / 2, yOffset);
+      yOffset += 60;
     }
-    
-    panel.innerHTML = `
-      <div style="background: rgba(0, 0, 0, 0.95); color: white; padding: 16px; border-radius: 8px; font-family: monospace; font-size: 14px; border: 2px solid #00ff00; max-width: 300px; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.8);">
-        ${signatureHtml}
-      </div>
-    `;
-    
-    panel.style.position = 'fixed';
-    panel.style.top = '50%';
-    panel.style.left = '50%';
-    panel.style.transform = 'translate(-50%, -50%)';
-    panel.style.zIndex = '1000';
-    
-    document.body.appendChild(panel);
+
+    dynamicTexture.update();
+
+    // Create plane for signature display
+    const signaturePlane = BABYLON.MeshBuilder.CreatePlane('signaturePlane', {
+      width: 3,
+      height: 3
+    }, this.scene);
+    signaturePlane.position = objectPosition.add(new BABYLON.Vector3(0, 3.2, 0));
+    signaturePlane.parent = this.sceneRoot;
+
+    const planeMaterial = new BABYLON.StandardMaterial('signaturePlaneMat', this.scene);
+    planeMaterial.emissiveTexture = dynamicTexture;
+    planeMaterial.backFaceCulling = false;
+    signaturePlane.material = planeMaterial;
   }
 
   private renderEdges(edges: Array<{ from: string; to: string }>, layoutNodes: Map<string, any>): void {
