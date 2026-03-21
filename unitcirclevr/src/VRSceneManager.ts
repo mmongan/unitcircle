@@ -397,8 +397,7 @@ export class VRSceneManager {
     radius: number;
     minRadius: number;
   }>): void {
-    const maxIterations = 10;
-    const tolerance = 0.5; // Gap to maintain between spheres
+    const maxIterations = 20;
 
     for (let iteration = 0; iteration < maxIterations; iteration++) {
       let hasOverlap = false;
@@ -414,21 +413,20 @@ export class VRSceneManager {
           const dz = s2.center.z - s1.center.z;
           const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-          // Check if spheres overlap or are too close
-          const minDistance = s1.radius + s2.radius + tolerance;
-          if (distance < minDistance) {
+          // Check if spheres physically overlap (surface to surface contact is OK)
+          const totalRadius = s1.radius + s2.radius;
+          if (distance < totalRadius) {
             hasOverlap = true;
 
-            // Calculate how much we need to shrink
-            const overlap = minDistance - distance;
-            const totalRadii = s1.radius + s2.radius;
-
-            // Reduce both radii proportionally, respecting minimum bounds
-            const reduction1 = (overlap * s1.radius) / totalRadii;
-            const reduction2 = (overlap * s2.radius) / totalRadii;
-
-            s1.radius = Math.max(s1.minRadius, s1.radius - reduction1);
-            s2.radius = Math.max(s2.minRadius, s2.radius - reduction2);
+            // Calculate how much we need to shrink to just touch
+            const overlap = totalRadius - distance;
+            
+            // Only reduce the larger sphere to prevent the smaller from shrinking below its minimum
+            if (s1.radius >= s2.radius) {
+              s1.radius = Math.max(s1.minRadius, s1.radius - overlap * 0.6);
+            } else {
+              s2.radius = Math.max(s2.minRadius, s2.radius - overlap * 0.6);
+            }
           }
         }
       }
