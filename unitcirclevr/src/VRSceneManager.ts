@@ -387,7 +387,7 @@ export class VRSceneManager {
     const layoutNodes = this.computeLayout(layout);
 
     this.renderNodes(graph.nodes, layoutNodes);
-    this.renderEdges(graph.edges, graph.nodes, layoutNodes);
+    this.renderEdges(graph.edges, layoutNodes);
 
     console.log(`✓ Rendered code graph with ${graph.nodes.length} functions and ${graph.edges.length} calls`);
   }
@@ -435,7 +435,7 @@ export class VRSceneManager {
     const newEdges = graph.edges.filter(
       e => !this.currentEdges.has(`${e.from}→${e.to}`)
     );
-    this.renderEdges(newEdges, graph.nodes, layoutNodes);
+    this.renderEdges(newEdges, layoutNodes);
     newEdges.forEach(e => this.currentEdges.add(`${e.from}→${e.to}`));
 
     console.log(
@@ -713,10 +713,9 @@ export class VRSceneManager {
 
   private renderEdges(
     edges: Array<{ from: string; to: string }>,
-    nodes: GraphNode[],
     layoutNodes: Map<string, any>
   ): void {
-    this.meshFactory.createEdges(edges, nodes, layoutNodes);
+    this.meshFactory.createEdges(edges, layoutNodes);
   }
 
   private showTooltip(node: { name: string; file?: string; line?: number }): void {

@@ -266,28 +266,25 @@ export class MeshFactory {
    */
   createEdges(
     edges: Array<{ from: string; to: string }>,
-    nodes: Array<any>,
     layoutNodes: Map<string, any>
   ): void {
-    // Create material for normal edges
+    // Create material for normal edges (same-file calls)
     const edgeMaterial = new BABYLON.StandardMaterial('edgeMaterial', this.scene);
     edgeMaterial.emissiveColor = new BABYLON.Color3(0.8, 0.8, 0.8);  // Bright gray
 
-    // Create material for golden edges (calls to exported functions)
+    // Create material for golden edges (cross-file calls)
     const goldenEdgeMaterial = new BABYLON.StandardMaterial('goldenEdgeMaterial', this.scene);
     goldenEdgeMaterial.emissiveColor = new BABYLON.Color3(1.0, 0.84, 0.0);  // Golden yellow
 
-    // Build a map of exported functions for quick lookup
-    const exportedFunctions = new Set(
-      nodes
-        .filter((n: any) => n.isExported && n.type === 'function')
-        .map((n: any) => n.id)
-    );
-
     let edgeIndex = 0;
     for (const edge of edges) {
-      const isCallToExported = exportedFunctions.has(edge.to);
-      const material = isCallToExported ? goldenEdgeMaterial : edgeMaterial;
+      // Extract file paths from edge endpoints (format: "functionName@/path/to/file.ts")
+      const fromFile = edge.from.split('@')[1];
+      const toFile = edge.to.split('@')[1];
+      
+      // Color golden if calling across files, gray if same file
+      const isCrossFile = fromFile !== toFile;
+      const material = isCrossFile ? goldenEdgeMaterial : edgeMaterial;
       this.createEdge(edge, layoutNodes, material, edgeIndex++);
     }
   }
