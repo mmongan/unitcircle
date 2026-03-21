@@ -173,7 +173,7 @@ export class MeshFactory {
       textureSize - 2 * SceneConfig.SIGNATURE_TEXTURE_BORDER_SIZE
     );
 
-    // Draw text in dimmed gray for less glare
+    // Draw text with dark background panel for legibility
     const lines: string[] = [node.name];
     if (node.isExported) {
       lines.push('Exported');
@@ -190,19 +190,28 @@ export class MeshFactory {
       node.type === 'function' ? 'Function' : node.type === 'variable' ? 'Variable' : 'External';
     lines.push(typeLabel);
 
-    ctx.fillStyle = '#ffffff';  // White text for maximum contrast
     ctx.font = `bold ${SceneConfig.SIGNATURE_FONT_SIZE_PX}px ${SceneConfig.SIGNATURE_FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
 
-    // Draw dark text outline/stroke for readability
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 3;
-
     const lineHeight = SceneConfig.SIGNATURE_FONT_SIZE_PX * 1.5;
     let yOffset = lineHeight + 20;
+    
+    // Calculate panel dimensions
+    const panelPadding = 15;
+    const panelWidth = textureSize - 4 * SceneConfig.SIGNATURE_TEXTURE_BORDER_SIZE;
+    const panelHeight = lines.length * lineHeight + 2 * panelPadding;
+    const panelX = (textureSize - panelWidth) / 2;
+    const panelY = yOffset - panelPadding;
+
+    // Draw dark semi-transparent background panel
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+
+    // Draw white text on the dark panel
+    ctx.fillStyle = '#ffffff';  // White text for maximum contrast
+    yOffset = panelY + panelPadding;
     for (const line of lines) {
-      ctx.strokeText(line, textureSize / 2, yOffset);
       ctx.fillText(line, textureSize / 2, yOffset);
       yOffset += lineHeight;
     }
