@@ -204,6 +204,9 @@ export class VRSceneManager {
   }
 
   private sceneRootFlyTo(targetPosition: BABYLON.Vector3): void {
+    // Stop any existing animation on the scene root
+    this.scene.stopAnimation(this.sceneRoot);
+
     // Animate scene root position to place object directly below camera (top-down view)
     // Camera is fixed at CAMERA_POSITION; position object directly below
     const cameraPosition = SceneConfig.CAMERA_POSITION;
