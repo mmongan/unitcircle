@@ -10,6 +10,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const builder = new CodeTreeBuilder(path.join(__dirname, '../src'));
 const graph = builder.build();
 
+// Add timestamp to ensure all updates are processed
+const timestamp = new Date().toISOString();
+graph.lastUpdated = timestamp;
+
 // Write to public folder
 const outputPath = path.join(__dirname, '../public/graph.json');
 fs.writeFileSync(outputPath, JSON.stringify(graph, null, 2));
@@ -19,9 +23,9 @@ console.log(`✓ Saved to ${outputPath}`);
 
 // Generate version/build timestamp
 const versionData = {
-  buildTime: new Date().toISOString(),
+  buildTime: timestamp,
   buildTimestamp: Date.now()
 };
 const versionPath = path.join(__dirname, '../public/version.json');
 fs.writeFileSync(versionPath, JSON.stringify(versionData, null, 2));
-console.log(`✓ Build timestamp: ${versionData.buildTime}`);
+console.log(`✓ Build timestamp: ${timestamp}`);

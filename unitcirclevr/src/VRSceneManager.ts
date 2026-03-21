@@ -186,6 +186,7 @@ export class VRSceneManager {
     const layoutNodes = this.computeLayout(layout);
 
     this.renderNodes(graph.nodes, layoutNodes);
+    this.renderFileContainers(graph.nodes, layoutNodes);
     this.renderEdges(graph.edges, layoutNodes);
 
     console.log(`✓ Rendered code graph with ${graph.nodes.length} functions and ${graph.edges.length} calls`);
@@ -310,6 +311,129 @@ export class VRSceneManager {
       this.meshFactory.createNodeMesh(node, position, (mesh, material, n) =>
         this.setupNodeInteraction(mesh, material, n)
       );
+    }
+  }
+
+  /**
+   * Create transparent sphere containers for each file
+   */
+  private renderFileContainers(
+    nodes: GraphNode[],
+    layoutNodes: Map<string, any>
+  ): void {
+    // Group nodes by file
+    const nodesByFile = new Map<string, GraphNode[]>();
+    for (const node of nodes) {
+      if (node.file) {
+        if (!nodesByFile.has(node.file)) {
+          nodesByFile.set(node.file, []);
+        }
+        nodesByFile.get(node.file)!.push(node);
+      }
+    }
+
+    // Calculate initial sphere data for each file
+    const sphereData: Array<{
+      fileName: string;
+      center: BABYLON.Vector3;
+      radius: number;
+      minRadius: number;
+    }> = [];
+
+    for (const [fileName, fileNodes] of nodesByFile.entries()) {
+      let centerX = 0;
+      let centerY = 0;
+      let centerZ = 0;
+      let maxDistance = 0;
+
+      // Calculate the center and radius of the sphere
+      for (const node of fileNodes) {
+        const layoutNode = layoutNodes.get(node.id);
+        if (layoutNode) {
+          centerX += layoutNode.position.x;
+          centerY += layoutNode.position.y;
+          centerZ += layoutNode.position.z;
+        }
+      }
+
+      centerX /= fileNodes.length;
+      centerY /= fileNodes.length;
+      centerZ /= fileNodes.length;
+
+      // Calculate minimum radius (max distance from center to any node)
+      for (const node of fileNodes) {
+        const layoutNode = layoutNodes.get(node.id);
+        if (layoutNode) {
+          const dx = layoutNode.position.x - centerX;
+          const dy = layoutNode.position.y - centerY;
+          const dz = layoutNode.position.z - centerZ;
+          const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          maxDistance = Math.max(maxDistance, distance);
+        }
+      }
+
+      const minRadius = maxDistance;
+      const radius = minRadius + SceneConfig.FUNCTION_BOX_SIZE;
+      const center = new BABYLON.Vector3(centerX, centerY, centerZ);
+
+      sphereData.push({ fileName, center, radius, minRadius });
+    }
+
+    // Resolve overlaps between spheres
+    this.resolveSphericalOverlaps(sphereData);
+
+    // Create spheres with adjusted radii
+    for (const sphere of sphereData) {
+      this.meshFactory.createFileSphere(sphere.fileName, sphere.center, sphere.radius);
+    }
+  }
+
+  /**
+   * Resolve overlapping spheres by reducing radii while maintaining minimum bounds
+   */
+  private resolveSphericalOverlaps(spheres: Array<{
+    fileName: string;
+    center: BABYLON.Vector3;
+    radius: number;
+    minRadius: number;
+  }>): void {
+    const maxIterations = 10;
+    const tolerance = 0.5; // Gap to maintain between spheres
+
+    for (let iteration = 0; iteration < maxIterations; iteration++) {
+      let hasOverlap = false;
+
+      // Check all pairs for overlaps
+      for (let i = 0; i < spheres.length; i++) {
+        for (let j = i + 1; j < spheres.length; j++) {
+          const s1 = spheres[i];
+          const s2 = spheres[j];
+
+          const dx = s2.center.x - s1.center.x;
+          const dy = s2.center.y - s1.center.y;
+          const dz = s2.center.z - s1.center.z;
+          const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+          // Check if spheres overlap or are too close
+          const minDistance = s1.radius + s2.radius + tolerance;
+          if (distance < minDistance) {
+            hasOverlap = true;
+
+            // Calculate how much we need to shrink
+            const overlap = minDistance - distance;
+            const totalRadii = s1.radius + s2.radius;
+
+            // Reduce both radii proportionally, respecting minimum bounds
+            const reduction1 = (overlap * s1.radius) / totalRadii;
+            const reduction2 = (overlap * s2.radius) / totalRadii;
+
+            s1.radius = Math.max(s1.minRadius, s1.radius - reduction1);
+            s2.radius = Math.max(s2.minRadius, s2.radius - reduction2);
+          }
+        }
+      }
+
+      if (!hasOverlap) break;
     }
   }
 

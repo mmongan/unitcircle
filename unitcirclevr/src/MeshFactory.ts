@@ -272,4 +272,34 @@ export class MeshFactory {
       tube.material = material;
     }
   }
+
+  /**
+   * Create a transparent sphere container for functions in a specific file
+   */
+  createFileSphere(fileName: string, position: BABYLON.Vector3, radius: number): BABYLON.Mesh {
+    const sphere = BABYLON.MeshBuilder.CreateSphere(
+      `file_sphere_${fileName}`,
+      {
+        segments: 32,
+        diameter: radius * 2,
+      },
+      this.scene
+    );
+    
+    sphere.position = position;
+    sphere.parent = this.sceneRoot;
+
+    // Create transparent material for the sphere
+    const material = new BABYLON.StandardMaterial(`fileMat_${fileName}`, this.scene);
+    material.diffuseColor = new BABYLON.Color3(0.4, 0.6, 1.0);  // Light blue
+    material.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+    material.alpha = 0.15;  // Transparent
+    material.wireframe = false;
+    material.backFaceCulling = false;
+
+    sphere.material = material;
+    sphere.isPickable = false;  // Don't allow clicking on sphere itself
+
+    return sphere;
+  }
 }
