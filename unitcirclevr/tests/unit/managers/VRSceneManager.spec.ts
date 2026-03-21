@@ -49,6 +49,14 @@ vi.mock('@babylonjs/core', () => {
     dispose: vi.fn(),
     render: vi.fn(),
     createDefaultXRExperienceAsync: vi.fn(async () => ({})),
+    onPointerObservable: {
+      add: vi.fn(),
+    },
+    pick: vi.fn(),
+    pointerX: 0,
+    pointerY: 0,
+    stopAnimation: vi.fn(),
+    beginDirectAnimation: vi.fn(),
   };
 
   const mockEngine = {

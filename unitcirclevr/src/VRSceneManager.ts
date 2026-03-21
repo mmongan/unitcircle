@@ -14,6 +14,7 @@ export class VRSceneManager {
   private graphLoader: GraphLoader;
   private currentNodeIds: Set<string> = new Set();
   private currentEdges: Set<string> = new Set();
+  private isAnimating: boolean = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.engine = new BABYLON.Engine(canvas, true);
@@ -44,6 +45,31 @@ export class VRSceneManager {
 
     // Handle window resize
     window.addEventListener('resize', () => this.engine.resize());
+
+    // Setup single scene-level click handler
+    this.setupClickHandler();
+  }
+
+  /**
+   * Add a single scene-level observer for all mesh clicks
+   */
+  private setupClickHandler(): void {
+    this.scene.onPointerObservable.add((pointerEvent) => {
+      if (pointerEvent.type === BABYLON.PointerEventTypes.POINTERDOWN && !this.isAnimating) {
+        const pickResult = this.scene.pick(this.scene.pointerX, this.scene.pointerY);
+        if (pickResult && pickResult.hit && pickResult.pickedMesh) {
+          const clickedNode = (pickResult.pickedMesh as any).nodeData as GraphNode;
+          if (clickedNode) {
+            this.isAnimating = true;
+            this.sceneRootFlyTo(pickResult.pickedMesh.getAbsolutePosition());
+            // Allow next click after animation completes
+            setTimeout(() => {
+              this.isAnimating = false;
+            }, SceneConfig.FLY_TO_ANIMATION_TIME_MS);
+          }
+        }
+      }
+    });
   }
 
   /**
@@ -294,7 +320,7 @@ export class VRSceneManager {
   ): void {
     const originalColor = material.emissiveColor.clone();
     
-    // Store node reference on the mesh for later retrieval
+    // Store node reference on the mesh for later retrieval during clicks
     (mesh as any).nodeData = node;
     
     mesh.actionManager = new BABYLON.ActionManager(this.scene);
@@ -310,22 +336,6 @@ export class VRSceneManager {
         this.hideTooltip();
       })
     );
-    
-    // Use scene-level pick trigger to capture the exact hit point
-    const originalFlyTo = this.sceneRootFlyTo.bind(this);
-    this.scene.onPointerObservable.add((pointerEvent) => {
-      if (pointerEvent.type === BABYLON.PointerEventTypes.POINTERDOWN && mesh.isPickable) {
-        const pickResult = this.scene.pick(this.scene.pointerX, this.scene.pointerY);
-        if (pickResult && pickResult.hit && pickResult.pickedMesh === mesh) {
-          // Verify the mesh corresponds to the correct node and fly to it
-          const clickedNode = (mesh as any).nodeData as GraphNode;
-          if (clickedNode) {
-            // Use world position, not local position, since scene root moves
-            originalFlyTo(mesh.getAbsolutePosition());
-          }
-        }
-      }
-    });
   }
 
   private sceneRootFlyTo(targetPosition: BABYLON.Vector3): void {
