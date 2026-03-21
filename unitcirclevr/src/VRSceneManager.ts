@@ -18,6 +18,7 @@ export class VRSceneManager {
   private fileColorMap: Map<string, BABYLON.Color3> = new Map();
   private currentFunctionId: string | null = null;
   private currentFaceNormal: BABYLON.Vector3 | null = null;
+  private xrExperience: BABYLON.WebXRDefaultExperience | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.engine = new BABYLON.Engine(canvas, true);
@@ -755,11 +756,96 @@ export class VRSceneManager {
 
   private async setupWebXR(): Promise<void> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      await this.scene.createDefaultXRExperienceAsync();
+      this.xrExperience = await this.scene.createDefaultXRExperienceAsync();
       console.log('WebXR experience created successfully');
+
+      // Setup VR controller input
+      const xrInput = this.xrExperience.input;
+      xrInput.onControllerAddedObservable.add((controller) => {
+        // Track motion controller for raycasting
+        controller.onMotionControllerInitObservable.add((motionController) => {
+          // Look for trigger button (usually squeeze/grip button in VR)
+          const triggerComponent = motionController.getComponent('xr-standard-trigger');
+          const squeezeComponent = motionController.getComponent('xr-standard-squeeze');
+          
+          const activationComponent = triggerComponent || squeezeComponent;
+          
+          if (activationComponent) {
+            activationComponent.onButtonStateChangedObservable.add(() => {
+              // Trigger pressed - perform raycast from controller to select object
+              if (activationComponent.pressed && !this.isAnimating) {
+                this.handleVRControllerClick(controller);
+              }
+            });
+          }
+        });
+      });
+
+      // Fallback: Also support pointer down for desktop VR
+      xrInput.onControllerRemovedObservable.add((_controller) => {
+        console.log('VR Controller disconnected');
+      });
     } catch (error) {
       console.warn('WebXR not available or failed to initialize:', error);
+    }
+  }
+
+  private handleVRControllerClick(controller: BABYLON.WebXRInputSource): void {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // Raycast from controller forward
+    const controllerAim = controller.pointer;
+    
+    // Create ray from controller position in forward direction
+    const origin = controllerAim.position.clone();
+    const direction = BABYLON.Vector3.Normalize(controllerAim.getDirection(BABYLON.Axis.Z));
+    
+    const length = 1000;
+    const ray = new BABYLON.Ray(origin, direction, length);
+    
+    // Cast ray and check for hits
+    const hit = this.scene.pickWithRay(ray, (mesh) => {
+      // Only pick clickable meshes with nodeData
+      return mesh.isPickable && !!(mesh as any).nodeData;
+    });
+    
+    if (hit && hit.hit && hit.pickedMesh) {
+      const clickedNode = (hit.pickedMesh as any).nodeData as GraphNode;
+      if (clickedNode) {
+        // Use hit point to determine which face was clicked
+        const hitPoint = hit.pickedPoint || origin;
+        const cubePosition = hit.pickedMesh.position;
+        
+        // Get face normal from hit
+        let faceNormal = hit.getNormal(true) || new BABYLON.Vector3(0, 0, 1);
+        
+        // Check if click is near an edge
+        const adjacentFaceNormal = this.getAdjacentFaceIfNearEdge(hitPoint, cubePosition, faceNormal);
+        if (adjacentFaceNormal) {
+          faceNormal = adjacentFaceNormal;
+        }
+        
+        const isSameFunction = clickedNode.id === this.currentFunctionId;
+        const isSameFace = isSameFunction && this.isFaceNormalEqual(faceNormal, this.currentFaceNormal);
+        
+        try {
+          if (isSameFace) {
+            // Same face clicked again - slide to show that face
+            this.slideFaceView(hit.pickedMesh.position, faceNormal);
+          } else if (isSameFunction) {
+            // Different face of same function - slide to new face
+            this.currentFaceNormal = faceNormal.clone();
+            this.slideFaceView(hit.pickedMesh.position, faceNormal);
+          } else {
+            // Different function - jump to it
+            this.currentFunctionId = clickedNode.id;
+            this.currentFaceNormal = faceNormal.clone();
+            this.sceneRootFlyTo(hit.pickedMesh.position);
+          }
+        } catch (error) {
+          console.error('Error during VR animation setup:', error);
+          this.isAnimating = false;
+        }
+      }
     }
   }
 
