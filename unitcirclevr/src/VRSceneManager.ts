@@ -434,9 +434,9 @@ export class VRSceneManager {
       this.currentEdges.delete(edgePair);
     }
 
-    // Create only new nodes - start at center and animate to equilibrium
+    // Create only new nodes - place directly at target positions (no animation)
     const newNodes = graph.nodes.filter(n => !this.currentNodeIds.has(n.id));
-    this.renderNodesWithAnimation(newNodes, layoutNodes, indegreeMap, true);  // animated=true
+    this.renderNodesWithAnimation(newNodes, layoutNodes, indegreeMap, false);  // animated=false - place directly
     newNodes.forEach(n => this.currentNodeIds.add(n.id));
 
     // Create only new edges
@@ -618,8 +618,8 @@ export class VRSceneManager {
     layoutNodes: Map<string, any>,
     indegreeMap: Map<string, number> = new Map()
   ): void {
-    // Use the animated version for initial render as well
-    this.renderNodesWithAnimation(nodes, layoutNodes, indegreeMap, true);  // animated=true for initial load
+    // Place nodes directly at target positions (no animation)
+    this.renderNodesWithAnimation(nodes, layoutNodes, indegreeMap, false);  // animated=false - place immediately
   }
 
   /**
