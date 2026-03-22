@@ -212,12 +212,18 @@ export class VRSceneManager {
           this.fileLayout.updateFrame();
           const filePositions = this.fileLayout.getNodes();
           
+          // Debug: log available file positions on first frame
+          if (this.physicsIterationCount === 0) {
+            console.log(`  Available file positions: ${Array.from(filePositions.keys()).map(k => `"${k}"`).join(', ')}`);
+            console.log(`  File boxes to update: ${Array.from(this.fileBoxMeshes.keys()).map(k => `"${k}"`).join(', ')}`);
+          }
+          
           // Step 2: Update each file's internal layout (positions nodes within the file)
           for (const [_file, internalLayout] of this.fileInternalLayouts.entries()) {
             internalLayout.updateFrame();
           }
           
-          // Step 3: Position nodes based on file-internal layout (local to file box parent)
+          // Step 3: Position nodes based on composite positioning (file position + local position)
           for (const [nodeId, mesh] of this.nodeMeshMap.entries()) {
             const file = this.nodeToFile.get(nodeId);
             if (!file) continue;
@@ -228,25 +234,30 @@ export class VRSceneManager {
             const internalNode = internalLayout.getNodes().get(nodeId);
             if (!internalNode) continue;
             
-            // Position is local to file box parent (no need to add file position)
-            mesh.position.x = internalNode.position.x;
-            mesh.position.y = internalNode.position.y;
-            mesh.position.z = internalNode.position.z;
+            const fileNode = filePositions.get(file);
+            if (!fileNode) continue;
+            
+            // Position is: file position + local position within file
+            mesh.position.x = fileNode.position.x + internalNode.position.x;
+            mesh.position.y = fileNode.position.y + internalNode.position.y;
+            mesh.position.z = fileNode.position.z + internalNode.position.z;
           }
 
           // Step 4: Update file box positions and sizes based on file-level layout
           for (const [file, fileBox] of this.fileBoxMeshes.entries()) {
             const fileNode = filePositions.get(file);
-            if (fileNode) {
-              fileBox.position.x = fileNode.position.x;
-              fileBox.position.y = fileNode.position.y;
-              fileBox.position.z = fileNode.position.z;
+            if (!fileNode) {
+              console.warn(`⚠ File node not found in layout for file: ${file}`);
+              continue;
+            }
+            fileBox.position.x = fileNode.position.x;
+            fileBox.position.y = fileNode.position.y;
+            fileBox.position.z = fileNode.position.z;
               
               // Log first few iterations to debug positioning
               if (this.physicsIterationCount === 1 || this.physicsIterationCount === 10 || this.physicsIterationCount === 50) {
                 console.log(`  Frame ${this.physicsIterationCount}: ${file} at [${fileNode.position.x.toFixed(1)}, ${fileNode.position.y.toFixed(1)}, ${fileNode.position.z.toFixed(1)}]`);
               }
-            }
             
             // Update file box size to fit all its nodes
             const nodeIds = this.fileNodeIds.get(file);
@@ -1061,17 +1072,6 @@ export class VRSceneManager {
       
       // Store reference for updates
       this.fileBoxMeshes.set(file, boxMesh);
-      
-      // Parent all nodes for this file to the file box
-      const nodeIds = this.fileNodeIds.get(file);
-      if (nodeIds) {
-        for (const nodeId of nodeIds) {
-          const nodeMesh = this.nodeMeshMap.get(nodeId);
-          if (nodeMesh) {
-            nodeMesh.parent = boxMesh;
-          }
-        }
-      }
     }
   }
 
