@@ -28,8 +28,7 @@ export class VRSceneManager {
   // Level 1: File-level layout (files as nodes, cross-file references as edges)
   private fileLayout: ForceDirectedLayout | null = null;
   
-  // Level 2: File-internal layouts (functions within same file)
-  private fileInternalLayouts: Map<string, ForceDirectedLayout> = new Map();
+
   
   // Tracking for the hierarchical system
   private nodeMeshMap: Map<string, BABYLON.Mesh> = new Map();  // Map node IDs to their meshes
@@ -207,7 +206,7 @@ export class VRSceneManager {
   private setupPhysicsLoop(): void {
     if (this.scene.registerBeforeRender) {
       this.scene.registerBeforeRender(() => {
-        if (this.physicsActive && this.fileLayout && this.fileInternalLayouts.size > 0) {
+        if (this.physicsActive && this.fileLayout) {
           // Step 1: Update file-level layout (positions the file boxes)
           this.fileLayout.updateFrame();
           const filePositions = this.fileLayout.getNodes();
@@ -218,32 +217,21 @@ export class VRSceneManager {
             console.log(`  File boxes to update: ${Array.from(this.fileBoxMeshes.keys()).map(k => `"${k}"`).join(', ')}`);
           }
           
-          // Step 2: Update each file's internal layout (positions nodes within the file)
-          for (const [_file, internalLayout] of this.fileInternalLayouts.entries()) {
-            internalLayout.updateFrame();
-          }
-          
-          // Step 3: Position nodes based on composite positioning (file position + local position)
+          // Step 2: Position nodes at their file's position (nodes are centered in their file box)
           for (const [nodeId, mesh] of this.nodeMeshMap.entries()) {
             const file = this.nodeToFile.get(nodeId);
             if (!file) continue;
             
-            const internalLayout = this.fileInternalLayouts.get(file);
-            if (!internalLayout) continue;
-            
-            const internalNode = internalLayout.getNodes().get(nodeId);
-            if (!internalNode) continue;
-            
             const fileNode = filePositions.get(file);
             if (!fileNode) continue;
             
-            // Position is: file position + local position within file
-            mesh.position.x = fileNode.position.x + internalNode.position.x;
-            mesh.position.y = fileNode.position.y + internalNode.position.y;
-            mesh.position.z = fileNode.position.z + internalNode.position.z;
+            // Position at file center
+            mesh.position.x = fileNode.position.x;
+            mesh.position.y = fileNode.position.y;
+            mesh.position.z = fileNode.position.z;
           }
 
-          // Step 4: Update file box positions and sizes based on file-level layout
+          // Step 3: Update file box positions and sizes based on file-level layout
           for (const [file, fileBox] of this.fileBoxMeshes.entries()) {
             const fileNode = filePositions.get(file);
             if (!fileNode) {
@@ -273,13 +261,13 @@ export class VRSceneManager {
             }
           }
           
-          // Step 4b: Apply repulsive forces to prevent file box intersections
+          // Step 3b: Apply repulsive forces to prevent file box intersections
           this.applyFileBoxRepulsion(this.fileLayout);
           
-          // Step 5: Update edge cylinders to follow moving nodes
+          // Step 4: Update edge cylinders to follow moving nodes
           this.meshFactory.updateEdges();
           
-          // Step 6: Check convergence
+          // Step 5: Check convergence
           this.physicsIterationCount++;
           const maxIterations = 500;  // Reasonable limit for convergence
           if (this.physicsIterationCount > maxIterations) {
@@ -569,9 +557,8 @@ export class VRSceneManager {
       this.graphNodeMap.set(node.id, node);
     }
 
-    // Build file and exported maps for layout creation
+    // Build file map for layout creation
     const fileMap = new Map<string, string>();
-    const exportedMap = new Map<string, boolean>();
     for (const node of graph.nodes) {
       if (node.file) {
         fileMap.set(node.id, node.file);
@@ -580,9 +567,6 @@ export class VRSceneManager {
           this.fileNodeIds.set(node.file, new Set());
         }
         this.fileNodeIds.get(node.file)!.add(node.id);
-      }
-      if ('isExported' in node) {
-        exportedMap.set(node.id, (node as any).isExported);
       }
     }
 
@@ -595,32 +579,13 @@ export class VRSceneManager {
     console.log(`   Cross-file edges: ${crossFileEdges.map(e => `${e.source}->${e.target}`).join(', ')}`);
     this.fileLayout = new ForceDirectedLayout(files, crossFileEdges);
 
-    // Step 2: Create file-internal layouts for each file
-    const allEdges = this.buildEdgeList(graph.edges);
-    for (const [file, nodeIds] of this.fileNodeIds.entries()) {
-      const nodeArray = Array.from(nodeIds);
-      // Filter edges to only those within this file
-      const sameFileEdges = allEdges.filter(e => 
-        nodeIds.has(e.source) && nodeIds.has(e.target)
-      );
-      
-      const internalLayout = new ForceDirectedLayout(
-        nodeArray,
-        sameFileEdges,
-        fileMap,
-        exportedMap,
-        (edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target)
-      );
-      this.fileInternalLayouts.set(file, internalLayout);
-    }
-
-    // Step 3: Calculate indegree for visualization
+    // Step 2: Calculate indegree for visualization
     const indegreeMap = this.calculateIndegree(graph.edges);
 
-    // Step 4: Render nodes at initial positions from their file's internal layout
+    // Step 3: Render nodes (positioned at file center, will move with file box)
     this.renderNodes(graph.nodes, indegreeMap);
 
-    // Step 5: Populate edge list and create edges
+    // Step 4: Populate edge list and create edges
     this.currentEdges.clear();
     for (const edge of graph.edges) {
       this.currentEdges.add(`${edge.from}→${edge.to}`);
@@ -628,10 +593,10 @@ export class VRSceneManager {
     this.renderEdges();
     this.meshFactory.updateEdges();
 
-    // Step 5.5: Create file box outlines
+    // Step 4.5: Create file box outlines
     this.renderFileBoxes();
 
-    // Step 6: Start physics updates
+    // Step 5: Start physics updates
     this.physicsActive = true;
     this.physicsIterationCount = 0;
     this.setupPhysicsLoop();
@@ -670,14 +635,9 @@ export class VRSceneManager {
     this.fileBoxMeshes.clear();
     
     // Clear tracking maps
-    this.fileInternalLayouts.clear();
     this.fileNodeIds.clear();
     this.nodeToFile.clear();
     this.fileLayout = null;
-  }
-
-  private buildEdgeList(edges: Array<{ from: string; to: string }>): Array<{ source: string; target: string }> {
-    return edges.map(e => ({ source: e.from, target: e.to }));
   }
 
   /**
@@ -715,24 +675,9 @@ export class VRSceneManager {
   ): void {
     for (const node of nodes) {
       const file = node.file || 'external';
-      const fileLayout = this.fileInternalLayouts.get(file);
       
-      // Get position from file's internal layout
-      let position: BABYLON.Vector3;
-      if (fileLayout) {
-        const layoutNode = fileLayout.getNodes().get(node.id);
-        if (layoutNode) {
-          position = new BABYLON.Vector3(
-            layoutNode.position.x,
-            layoutNode.position.y,
-            layoutNode.position.z
-          );
-        } else {
-          position = BABYLON.Vector3.Zero();
-        }
-      } else {
-        position = BABYLON.Vector3.Zero();
-      }
+      // All nodes positioned at origin - will move with file box position during physics updates
+      const position = BABYLON.Vector3.Zero();
 
       // Get or generate color for this file
       const fileColor = file ? this.getFileColor(file) : null;
