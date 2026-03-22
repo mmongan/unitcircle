@@ -267,7 +267,10 @@ export class VRSceneManager {
               if (bounds) {
                 // Add padding to the bounds
                 const padding = 5.0;  // Extra space around nodes
-                const size = Math.max(bounds.width, bounds.height, bounds.depth) + padding * 2;
+                const calculatedSize = Math.max(bounds.width, bounds.height, bounds.depth) + padding * 2;
+                // Ensure minimum size so boxes never collapse to prevent proper repulsion
+                const minSize = 50.0;  // Minimum box size to ensure adequate separation
+                const size = Math.max(calculatedSize, minSize);
                 // Scale the 1x1x1 box to the desired size
                 fileBox.scaling = new BABYLON.Vector3(size, size, size);
               }
@@ -983,8 +986,8 @@ export class VRSceneManager {
 
     const files = Array.from(this.fileNodeIds.keys());
     const fileNodes = layout.getNodes();
-    const repulsionStrength = 150.0;  // Force strength for box separation (increased from 50 for stronger pushback)
-    const minSeparationPadding = 40.0;  // Minimum distance padding between boxes (increased from 15 for more space)
+    const repulsionStrength = 300.0;  // Force strength for box separation (increased from 150)
+    const minSeparationPadding = 60.0;  // Minimum distance padding between boxes (increased from 40)
 
     // Check all pairs of files for intersection
     for (let i = 0; i < files.length; i++) {
@@ -1013,23 +1016,25 @@ export class VRSceneManager {
         // Required distance to prevent intersection with padding
         const requiredDistance = radius1 + radius2 + minSeparationPadding;
 
-        // If boxes are intersecting or too close, push them apart
+        // If boxes are intersecting or too close, push them apart (hard constraint)
         if (distance < requiredDistance && distance > 0.01) {
           const direction = pos2.subtract(pos1).normalize();
-          const pushDistance = Math.max(0, requiredDistance - distance);
+          const separationNeeded = requiredDistance - distance;
 
-          // Apply force to both file nodes in the layout
-          const repulsionForce = pushDistance * repulsionStrength;
+          // Directly move the nodes apart (hard constraint, not forces)
+          // Move each node by half the separation needed
+          const moveDistance = separationNeeded / 2 + 1.0;  // Add extra buffer
           
-          // Push file1 away from file2
-          node1.velocity.x -= direction.x * repulsionForce;
-          node1.velocity.y -= direction.y * repulsionForce;
-          node1.velocity.z -= direction.z * repulsionForce;
+          // Move file1 away from file2
+          node1.position.x -= direction.x * moveDistance;
+          node1.position.y -= direction.y * moveDistance;
+          node1.position.z -= direction.z * moveDistance;
 
-          // Push file2 away from file1
-          node2.velocity.x += direction.x * repulsionForce;
-          node2.velocity.y += direction.y * repulsionForce;
-          node2.velocity.z += direction.z * repulsionForce;
+          // Move file2 away from file1
+          node2.position.x += direction.x * moveDistance;
+          node2.position.y += direction.y * moveDistance;
+          node2.position.z += direction.z * moveDistance;
+        }
         }
       }
     }

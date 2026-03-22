@@ -660,7 +660,7 @@
       "id": "getAdjacentFaceIfNearEdge@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "getAdjacentFaceIfNearEdge",
       "file": "VRSceneManager.ts",
-      "line": 295,
+      "line": 298,
       "isExported": false,
       "type": "function"
     },
@@ -668,7 +668,7 @@
       "id": "isFaceNormalEqual@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "isFaceNormalEqual",
       "file": "VRSceneManager.ts",
-      "line": 380,
+      "line": 383,
       "isExported": false,
       "type": "function"
     },
@@ -676,7 +676,7 @@
       "id": "initialize@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "initialize",
       "file": "VRSceneManager.ts",
-      "line": 393,
+      "line": 396,
       "isExported": false,
       "type": "function"
     },
@@ -684,7 +684,7 @@
       "id": "getFileColor@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "getFileColor",
       "file": "VRSceneManager.ts",
-      "line": 406,
+      "line": 409,
       "isExported": false,
       "type": "function"
     },
@@ -692,7 +692,7 @@
       "id": "generateColorFromString@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "generateColorFromString",
       "file": "VRSceneManager.ts",
-      "line": 421,
+      "line": 424,
       "isExported": false,
       "type": "function"
     },
@@ -700,7 +700,7 @@
       "id": "hsbToRgb@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "hsbToRgb",
       "file": "VRSceneManager.ts",
-      "line": 443,
+      "line": 446,
       "isExported": false,
       "type": "function"
     },
@@ -708,7 +708,7 @@
       "id": "setupLighting@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "setupLighting",
       "file": "VRSceneManager.ts",
-      "line": 475,
+      "line": 478,
       "isExported": false,
       "type": "function"
     },
@@ -716,7 +716,7 @@
       "id": "setupCamera@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "setupCamera",
       "file": "VRSceneManager.ts",
-      "line": 487,
+      "line": 490,
       "isExported": false,
       "type": "function"
     },
@@ -724,7 +724,7 @@
       "id": "createGround@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "createGround",
       "file": "VRSceneManager.ts",
-      "line": 503,
+      "line": 506,
       "isExported": false,
       "type": "function"
     },
@@ -732,7 +732,7 @@
       "id": "initializeCodeVisualization@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "initializeCodeVisualization",
       "file": "VRSceneManager.ts",
-      "line": 513,
+      "line": 516,
       "isExported": false,
       "type": "function"
     },
@@ -740,7 +740,7 @@
       "id": "validateGraphData@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "validateGraphData",
       "file": "VRSceneManager.ts",
-      "line": 536,
+      "line": 539,
       "isExported": false,
       "type": "function"
     },
@@ -748,7 +748,7 @@
       "id": "setupGraphPolling@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "setupGraphPolling",
       "file": "VRSceneManager.ts",
-      "line": 540,
+      "line": 543,
       "isExported": false,
       "type": "function"
     },
@@ -756,7 +756,7 @@
       "id": "renderCodeGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "renderCodeGraph",
       "file": "VRSceneManager.ts",
-      "line": 567,
+      "line": 570,
       "isExported": false,
       "type": "function"
     },
@@ -764,7 +764,7 @@
       "id": "updateCodeGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "updateCodeGraph",
       "file": "VRSceneManager.ts",
-      "line": 641,
+      "line": 644,
       "isExported": false,
       "type": "function"
     },
@@ -772,7 +772,7 @@
       "id": "clearScene@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "clearScene",
       "file": "VRSceneManager.ts",
-      "line": 648,
+      "line": 651,
       "isExported": false,
       "type": "function"
     },
@@ -780,7 +780,7 @@
       "id": "buildEdgeList@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "buildEdgeList",
       "file": "VRSceneManager.ts",
-      "line": 674,
+      "line": 677,
       "isExported": false,
       "type": "function"
     },
@@ -788,7 +788,7 @@
       "id": "buildCrossFileEdges@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "buildCrossFileEdges",
       "file": "VRSceneManager.ts",
-      "line": 682,
+      "line": 685,
       "isExported": false,
       "type": "function"
     },
@@ -796,7 +796,7 @@
       "id": "renderNodes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "renderNodes",
       "file": "VRSceneManager.ts",
-      "line": 707,
+      "line": 710,
       "isExported": false,
       "type": "function"
     },
@@ -804,7 +804,7 @@
       "id": "setupNodeInteraction@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "setupNodeInteraction",
       "file": "VRSceneManager.ts",
-      "line": 744,
+      "line": 747,
       "isExported": false,
       "type": "function"
     },
@@ -812,7 +812,7 @@
       "id": "sceneRootFlyTo@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "sceneRootFlyTo",
       "file": "VRSceneManager.ts",
-      "line": 769,
+      "line": 772,
       "isExported": false,
       "type": "function"
     },
@@ -820,7 +820,7 @@
       "id": "slideFaceView@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "slideFaceView",
       "file": "VRSceneManager.ts",
-      "line": 852,
+      "line": 855,
       "isExported": false,
       "type": "function"
     },
@@ -828,7 +828,7 @@
       "id": "calculateIndegree@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "calculateIndegree",
       "file": "VRSceneManager.ts",
-      "line": 928,
+      "line": 931,
       "isExported": false,
       "type": "function"
     },
@@ -836,7 +836,7 @@
       "id": "calculateNodeGroupBounds@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "calculateNodeGroupBounds",
       "file": "VRSceneManager.ts",
-      "line": 939,
+      "line": 942,
       "isExported": false,
       "type": "function"
     },
@@ -844,71 +844,31 @@
       "id": "applyFileBoxRepulsion@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "applyFileBoxRepulsion",
       "file": "VRSceneManager.ts",
-      "line": 981,
+      "line": 984,
       "isExported": false,
       "type": "function"
     },
     {
-      "id": "renderEdges@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "name": "renderEdges",
+      "id": "for@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "name": "for",
       "file": "VRSceneManager.ts",
-      "line": 1038,
+      "line": 1058,
       "isExported": false,
       "type": "function"
     },
     {
-      "id": "renderFileBoxes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "name": "renderFileBoxes",
+      "id": "if@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "name": "if",
       "file": "VRSceneManager.ts",
-      "line": 1052,
+      "line": 1177,
       "isExported": false,
       "type": "function"
     },
     {
-      "id": "showTooltip@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "name": "showTooltip",
-      "file": "VRSceneManager.ts",
-      "line": 1083,
-      "isExported": false,
-      "type": "function"
-    },
-    {
-      "id": "hideTooltip@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "name": "hideTooltip",
-      "file": "VRSceneManager.ts",
-      "line": 1113,
-      "isExported": false,
-      "type": "function"
-    },
-    {
-      "id": "setupWebXR@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "name": "setupWebXR",
-      "file": "VRSceneManager.ts",
-      "line": 1118,
-      "isExported": false,
-      "type": "function"
-    },
-    {
-      "id": "handleVRControllerClick@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "name": "handleVRControllerClick",
+      "id": "catch@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "name": "catch",
       "file": "VRSceneManager.ts",
       "line": 1154,
-      "isExported": false,
-      "type": "function"
-    },
-    {
-      "id": "run@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "name": "run",
-      "file": "VRSceneManager.ts",
-      "line": 1213,
-      "isExported": false,
-      "type": "function"
-    },
-    {
-      "id": "dispose@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "name": "dispose",
-      "file": "VRSceneManager.ts",
-      "line": 1221,
       "isExported": false,
       "type": "function"
     },
@@ -1273,15 +1233,7 @@
     },
     {
       "from": "renderCodeGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "to": "renderEdges@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
-    },
-    {
-      "from": "renderCodeGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "to": "updateEdges@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts"
-    },
-    {
-      "from": "renderCodeGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "to": "renderFileBoxes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
     },
     {
       "from": "renderCodeGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
@@ -1297,7 +1249,7 @@
     },
     {
       "from": "clearScene@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "to": "dispose@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
+      "to": "dispose@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts"
     },
     {
       "from": "renderNodes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
@@ -1316,57 +1268,13 @@
       "to": "setupNodeInteraction@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
     },
     {
-      "from": "setupNodeInteraction@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "to": "showTooltip@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
-    },
-    {
-      "from": "setupNodeInteraction@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "to": "hideTooltip@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
-    },
-    {
       "from": "calculateNodeGroupBounds@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "to": "getNodes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts"
     },
     {
       "from": "applyFileBoxRepulsion@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "to": "getNodes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts"
-    },
-    {
-      "from": "renderEdges@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "to": "createEdges@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts"
-    },
-    {
-      "from": "renderFileBoxes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "to": "getFileColor@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
-    },
-    {
-      "from": "setupWebXR@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "to": "handleVRControllerClick@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
-    },
-    {
-      "from": "handleVRControllerClick@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "to": "getAdjacentFaceIfNearEdge@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
-    },
-    {
-      "from": "handleVRControllerClick@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "to": "isFaceNormalEqual@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
-    },
-    {
-      "from": "handleVRControllerClick@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "to": "slideFaceView@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
-    },
-    {
-      "from": "handleVRControllerClick@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "to": "sceneRootFlyTo@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
-    },
-    {
-      "from": "run@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "to": "updateEdges@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts"
-    },
-    {
-      "from": "run@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "to": "render@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-22T20:02:35.001Z"
+  "lastUpdated": "2026-03-22T20:07:31.068Z"
 }
