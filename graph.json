@@ -124,95 +124,23 @@
       "id": "simulate@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "simulate",
       "file": "ForceDirectedLayout.ts",
-      "line": 63,
+      "line": 57,
       "isExported": false,
       "type": "function"
     },
     {
-      "id": "initializeNodeData@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
-      "name": "initializeNodeData",
+      "id": "step@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
+      "name": "step",
       "file": "ForceDirectedLayout.ts",
-      "line": 74,
+      "line": 68,
       "isExported": false,
       "type": "function"
     },
     {
-      "id": "constrainNodePositions@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
-      "name": "constrainNodePositions",
+      "id": "constrainBounds@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
+      "name": "constrainBounds",
       "file": "ForceDirectedLayout.ts",
-      "line": 83,
-      "isExported": false,
-      "type": "function"
-    },
-    {
-      "id": "simulationStep@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
-      "name": "simulationStep",
-      "file": "ForceDirectedLayout.ts",
-      "line": 93,
-      "isExported": false,
-      "type": "function"
-    },
-    {
-      "id": "calculateForces@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
-      "name": "calculateForces",
-      "file": "ForceDirectedLayout.ts",
-      "line": 98,
-      "isExported": false,
-      "type": "function"
-    },
-    {
-      "id": "applyRepulsiveForces@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
-      "name": "applyRepulsiveForces",
-      "file": "ForceDirectedLayout.ts",
-      "line": 110,
-      "isExported": false,
-      "type": "function"
-    },
-    {
-      "id": "applyXzPlaneRepulsion@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
-      "name": "applyXzPlaneRepulsion",
-      "file": "ForceDirectedLayout.ts",
-      "line": 169,
-      "isExported": false,
-      "type": "function"
-    },
-    {
-      "id": "applyAttractiveForces@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
-      "name": "applyAttractiveForces",
-      "file": "ForceDirectedLayout.ts",
-      "line": 204,
-      "isExported": false,
-      "type": "function"
-    },
-    {
-      "id": "applyForces@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
-      "name": "applyForces",
-      "file": "ForceDirectedLayout.ts",
-      "line": 238,
-      "isExported": false,
-      "type": "function"
-    },
-    {
-      "id": "updateNodeVelocity@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
-      "name": "updateNodeVelocity",
-      "file": "ForceDirectedLayout.ts",
-      "line": 248,
-      "isExported": false,
-      "type": "function"
-    },
-    {
-      "id": "updateNodePosition@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
-      "name": "updateNodePosition",
-      "file": "ForceDirectedLayout.ts",
-      "line": 254,
-      "isExported": false,
-      "type": "function"
-    },
-    {
-      "id": "postProcessNodeSeparation@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
-      "name": "postProcessNodeSeparation",
-      "file": "ForceDirectedLayout.ts",
-      "line": 264,
+      "line": 155,
       "isExported": false,
       "type": "function"
     },
@@ -220,15 +148,7 @@
       "id": "getNodes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "getNodes",
       "file": "ForceDirectedLayout.ts",
-      "line": 298,
-      "isExported": false,
-      "type": "function"
-    },
-    {
-      "id": "getEdges@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
-      "name": "getEdges",
-      "file": "ForceDirectedLayout.ts",
-      "line": 302,
+      "line": 164,
       "isExported": false,
       "type": "function"
     },
@@ -1049,47 +969,11 @@
     },
     {
       "from": "simulate@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
-      "to": "initializeNodeData@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts"
+      "to": "step@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts"
     },
     {
       "from": "simulate@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
-      "to": "simulationStep@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts"
-    },
-    {
-      "from": "simulate@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
-      "to": "postProcessNodeSeparation@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts"
-    },
-    {
-      "from": "simulate@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
-      "to": "constrainNodePositions@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts"
-    },
-    {
-      "from": "simulationStep@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
-      "to": "calculateForces@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts"
-    },
-    {
-      "from": "simulationStep@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
-      "to": "applyForces@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts"
-    },
-    {
-      "from": "calculateForces@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
-      "to": "applyRepulsiveForces@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts"
-    },
-    {
-      "from": "calculateForces@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
-      "to": "applyXzPlaneRepulsion@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts"
-    },
-    {
-      "from": "calculateForces@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
-      "to": "applyAttractiveForces@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts"
-    },
-    {
-      "from": "applyForces@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
-      "to": "updateNodeVelocity@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts"
-    },
-    {
-      "from": "applyForces@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
-      "to": "updateNodePosition@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts"
+      "to": "constrainBounds@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts"
     },
     {
       "from": "loadGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
@@ -1472,5 +1356,5 @@
       "to": "render@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-22T02:10:38.917Z"
+  "lastUpdated": "2026-03-22T02:23:46.454Z"
 }
