@@ -468,7 +468,7 @@
       "id": "createNodeMesh@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "createNodeMesh",
       "file": "MeshFactory.ts",
-      "line": 21,
+      "line": 23,
       "isExported": false,
       "type": "function"
     },
@@ -476,7 +476,7 @@
       "id": "createExternalModuleMesh@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "createExternalModuleMesh",
       "file": "MeshFactory.ts",
-      "line": 40,
+      "line": 42,
       "isExported": false,
       "type": "function"
     },
@@ -484,7 +484,7 @@
       "id": "createVariableMesh@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "createVariableMesh",
       "file": "MeshFactory.ts",
-      "line": 70,
+      "line": 72,
       "isExported": false,
       "type": "function"
     },
@@ -492,7 +492,7 @@
       "id": "createFunctionMesh@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "createFunctionMesh",
       "file": "MeshFactory.ts",
-      "line": 96,
+      "line": 98,
       "isExported": false,
       "type": "function"
     },
@@ -500,7 +500,7 @@
       "id": "createSignatureTexture@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "createSignatureTexture",
       "file": "MeshFactory.ts",
-      "line": 159,
+      "line": 161,
       "isExported": false,
       "type": "function"
     },
@@ -508,7 +508,7 @@
       "id": "createLabel@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "createLabel",
       "file": "MeshFactory.ts",
-      "line": 242,
+      "line": 244,
       "isExported": false,
       "type": "function"
     },
@@ -516,7 +516,7 @@
       "id": "createEdges@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "createEdges",
       "file": "MeshFactory.ts",
-      "line": 284,
+      "line": 286,
       "isExported": false,
       "type": "function"
     },
@@ -524,7 +524,7 @@
       "id": "createEdge@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "createEdge",
       "file": "MeshFactory.ts",
-      "line": 319,
+      "line": 324,
       "isExported": false,
       "type": "function"
     },
@@ -532,7 +532,7 @@
       "id": "createArrowhead@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "createArrowhead",
       "file": "MeshFactory.ts",
-      "line": 389,
+      "line": 402,
       "isExported": false,
       "type": "function"
     },
@@ -540,7 +540,15 @@
       "id": "removeMeshReference@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "removeMeshReference",
       "file": "MeshFactory.ts",
-      "line": 441,
+      "line": 456,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "updateEdges@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
+      "name": "updateEdges",
+      "file": "MeshFactory.ts",
+      "line": 464,
       "isExported": false,
       "type": "function"
     },
@@ -924,7 +932,7 @@
       "id": "dispose@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "dispose",
       "file": "VRSceneManager.ts",
-      "line": 877,
+      "line": 879,
       "isExported": false,
       "type": "function"
     },
@@ -1184,6 +1192,10 @@
       "to": "createArrowhead@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts"
     },
     {
+      "from": "updateEdges@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
+      "to": "dispose@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts"
+    },
+    {
       "from": "loadGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts",
       "to": "renderGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRGraphViewer.ts"
     },
@@ -1389,8 +1401,12 @@
     },
     {
       "from": "run@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "to": "updateEdges@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts"
+    },
+    {
+      "from": "run@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "to": "render@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-22T00:50:03.732Z"
+  "lastUpdated": "2026-03-22T00:54:56.008Z"
 }
