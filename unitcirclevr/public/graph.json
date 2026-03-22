@@ -532,7 +532,7 @@
       "id": "removeMeshReference@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "removeMeshReference",
       "file": "MeshFactory.ts",
-      "line": 423,
+      "line": 426,
       "isExported": false,
       "type": "function"
     },
@@ -1380,5 +1380,5 @@
       "to": "render@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-22T00:38:03.959Z"
+  "lastUpdated": "2026-03-22T00:40:00.135Z"
 }

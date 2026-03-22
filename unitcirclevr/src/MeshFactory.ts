@@ -392,19 +392,22 @@ export class MeshFactory {
     const lineRadius = SceneConfig.EDGE_RADIUS;
     const arrowheadBaseRadius = lineRadius * 1.5;
     const arrowheadBaseDiameter = arrowheadBaseRadius * 2;
+    const arrowheadHeight = arrowheadBaseDiameter * 1.5;
     
     // Create a cone-like shape using a cylinder with small top
     const arrowhead = BABYLON.MeshBuilder.CreateCylinder(`arrowhead_${index}`, {
       diameterTop: 0.05,
       diameterBottom: arrowheadBaseDiameter,
-      height: arrowheadBaseDiameter * 1.5,
+      height: arrowheadHeight,
     }, this.scene);
-
-    // Position at target node
-    arrowhead.position = targetPos.clone();
 
     // Calculate direction from source to target
     const direction = targetPos.subtract(sourcePos).normalize();
+
+    // Position arrowhead so its tip touches the surface at targetPos
+    // Offset back by half height so the tip is at the target surface
+    const arrowheadPosition = targetPos.subtract(direction.scale(arrowheadHeight / 2));
+    arrowhead.position = arrowheadPosition;
 
     // Create a rotation that points the cylinder along the direction vector
     // Default cylinder points up (0, 1, 0). We need to rotate it to point along direction
