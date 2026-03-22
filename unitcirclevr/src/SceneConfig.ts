@@ -36,7 +36,7 @@ export class SceneConfig {
   static readonly POINT_LIGHT_POSITION = new BABYLON.Vector3(5, 10, 5);
 
   // Camera
-  static readonly CAMERA_POSITION = new BABYLON.Vector3(0, 0, -800);  // Much further back to see full ±250 space
+  static readonly CAMERA_POSITION = new BABYLON.Vector3(0, 0, 0);  // Center of the scene
   static readonly CAMERA_INERTIA = 0.5;
   static readonly CAMERA_ANGULAR_SENSIBILITY = 1000;
 
