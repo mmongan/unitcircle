@@ -18,12 +18,13 @@ export class ForceDirectedLayout {
   private nodes: Map<string, Node>;
   private edges: Edge[];
   private k: number = 1; // Optimal distance
-  private repulsiveForce: number = 0.03; // Repulsive force strength (lower = stronger repulsion) - DOUBLED for aggressive spreading
-  private attractiveForce: number = 0.05; // Attractive force strength
-  private damping: number = 0.80; // Velocity damping - DECREASED significantly for faster movement
-  private minSeparation: number = 16; // Minimum distance between node centers (matches typical node size better)
-  private xzPlaneRepulsion: number = 0.15; // Additional repulsion in xz plane to prevent horizontal collisions - INCREASED
-  private velocityScale: number = 0.02; // Scale factor for velocity application (increased from 0.01)
+  private repulsiveForce: number = 0.015; // Repulsive force strength (lower = stronger) - QUADRUPLED for extreme repulsion
+  private attractiveForce: number = 0.02; // Attractive force strength - REDUCED to favor spreading
+  private damping: number = 0.70; // Velocity damping - DRASTICALLY REDUCED for maximum spreading speed
+  private minSeparation: number = 18; // Minimum distance between node centers
+  private xzPlaneRepulsion: number = 0.25; // Additional repulsion in xz plane - INCREASED
+  private velocityScale: number = 0.03; // Scale factor for velocity application - INCREASED
+  private postProcessIterations: number = 50; // Post-process iterations to enforce separation
 
   constructor(nodeIds: string[], edges: Edge[]) {
     this.nodes = new Map();
@@ -64,6 +65,8 @@ export class ForceDirectedLayout {
     for (let i = 0; i < iterations; i++) {
       this.simulationStep();
     }
+    // Post-process to ensure all nodes are properly separated
+    this.postProcessNodeSeparation();
     this.constrainNodePositions();
     return this.nodes;
   }
@@ -78,8 +81,8 @@ export class ForceDirectedLayout {
   }
 
   private constrainNodePositions(): void {
-    // Ensure nodes stay within bounds (±150 on each axis for better distribution with 122 nodes)
-    const BOUND = 150;
+    // Ensure nodes stay within bounds (±200 on each axis for maximum distribution)
+    const BOUND = 200;
     for (const node of this.nodes.values()) {
       node.position.x = Math.max(-BOUND, Math.min(BOUND, node.position.x));
       node.position.y = Math.max(-BOUND, Math.min(BOUND, node.position.y));
@@ -252,6 +255,44 @@ export class ForceDirectedLayout {
     node.position.x += node.velocity.x * this.velocityScale;
     node.position.y += node.velocity.y * this.velocityScale;
     node.position.z += node.velocity.z * this.velocityScale;
+  }
+
+  /**
+   * Post-process nodes to ensure they're separated
+   * Directly pushes overlapping nodes apart without velocity
+   */
+  private postProcessNodeSeparation(): void {
+    const nodeArray = Array.from(this.nodes.values());
+    
+    for (let iter = 0; iter < this.postProcessIterations; iter++) {
+      for (let i = 0; i < nodeArray.length; i++) {
+        for (let j = i + 1; j < nodeArray.length; j++) {
+          const n1 = nodeArray[i];
+          const n2 = nodeArray[j];
+
+          const dx = n2.position.x - n1.position.x;
+          const dy = n2.position.y - n1.position.y;
+          const dz = n2.position.z - n1.position.z;
+          const distance = Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.01;
+
+          // If nodes are too close, push them apart
+          if (distance < this.minSeparation) {
+            const overlap = this.minSeparation - distance;
+            const pushDistance = overlap / 2 + 0.5; // Push with buffer
+            const fx = (dx / distance) * pushDistance;
+            const fy = (dy / distance) * pushDistance;
+            const fz = (dz / distance) * pushDistance;
+
+            n1.position.x -= fx;
+            n1.position.y -= fy;
+            n1.position.z -= fz;
+            n2.position.x += fx;
+            n2.position.y += fy;
+            n2.position.z += fz;
+          }
+        }
+      }
+    }
   }
 
   public getNodes(): Map<string, Node> {
