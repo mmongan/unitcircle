@@ -833,8 +833,8 @@
       "type": "function"
     },
     {
-      "id": "createFileBoundingSpheres@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "name": "createFileBoundingSpheres",
+      "id": "createFileBoundingBoxes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "name": "createFileBoundingBoxes",
       "file": "VRSceneManager.ts",
       "line": 868,
       "isExported": false,
@@ -849,8 +849,8 @@
       "type": "function"
     },
     {
-      "id": "updateFileBoundingSpheres@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "name": "updateFileBoundingSpheres",
+      "id": "updateFileBoundingBoxes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "name": "updateFileBoundingBoxes",
       "file": "VRSceneManager.ts",
       "line": 1019,
       "isExported": false,
@@ -1281,7 +1281,7 @@
     },
     {
       "from": "setupPhysicsLoop@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "to": "updateFileBoundingSpheres@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
+      "to": "updateFileBoundingBoxes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
     },
     {
       "from": "setupPhysicsLoop@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
@@ -1377,7 +1377,7 @@
     },
     {
       "from": "renderCodeGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "to": "createFileBoundingSpheres@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
+      "to": "createFileBoundingBoxes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
     },
     {
       "from": "renderCodeGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
@@ -1421,7 +1421,7 @@
     },
     {
       "from": "updateCodeGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "to": "createFileBoundingSpheres@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
+      "to": "createFileBoundingBoxes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
     },
     {
       "from": "renderNodesWithAnimation@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
@@ -1460,19 +1460,19 @@
       "to": "renderNodesWithAnimation@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
     },
     {
-      "from": "createFileBoundingSpheres@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "from": "createFileBoundingBoxes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "to": "calculateBoundingSphere@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
     },
     {
-      "from": "createFileBoundingSpheres@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "from": "createFileBoundingBoxes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "to": "dispose@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
     },
     {
-      "from": "createFileBoundingSpheres@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "from": "createFileBoundingBoxes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "to": "getFileColor@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
     },
     {
-      "from": "updateFileBoundingSpheres@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "from": "updateFileBoundingBoxes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "to": "calculateBoundingSphere@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
     },
     {
@@ -1520,5 +1520,5 @@
       "to": "render@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-22T16:05:54.005Z"
+  "lastUpdated": "2026-03-22T16:27:32.639Z"
 }
