@@ -27,7 +27,7 @@ export class ForceDirectedLayout {
   private edges: Edge[];
   private readonly SPACE_SIZE = 250;
   private readonly C_REPULSIVE = 2.0;      // Repulsive force for same-file nodes
-  private readonly C_REPULSIVE_CROSS_FILE = 10.0;  // Much stronger repulsion for cross-file nodes (5x stronger)
+  private readonly C_REPULSIVE_CROSS_FILE = 20.0;  // Much stronger repulsion for cross-file nodes (10x stronger)
   private readonly C_ATTRACTIVE = 0.05;    // Attractive force strength for cross-file edges
   private readonly C_ATTRACTIVE_SAME_FILE = 0.15;  // 3x stronger attraction for same-file connected nodes
   private readonly DAMPING = 0.92;         // Velocity damping per iteration
