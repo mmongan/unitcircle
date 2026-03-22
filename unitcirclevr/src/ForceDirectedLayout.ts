@@ -29,7 +29,8 @@ export class ForceDirectedLayout {
   private readonly C_REPULSIVE_CROSS_FILE = 4.0;  // Stronger repulsion for cross-file nodes
   private readonly C_ATTRACTIVE = 0.05;    // Attractive force strength (edge pull)
   private readonly DAMPING = 0.92;         // Velocity damping per iteration
-  private readonly MIN_DISTANCE = 1.0;     // Minimum distance to prevent singularity
+  private readonly MIN_DISTANCE = 1.0;     // Minimum distance to prevent singularity in force calculations
+  private readonly MIN_EQUILIBRIUM_DISTANCE = 6.0;  // Minimum distance nodes must maintain (configurable)
   private readonly EQUILIBRIUM_THRESHOLD = 0.001;  // Converged when all velocities below this
 
   constructor(nodeIds: string[], edges: Edge[], nodeFileMap?: Map<string, string>) {
@@ -226,8 +227,61 @@ export class ForceDirectedLayout {
       maxVelocity = Math.max(maxVelocity, speed);
     }
 
+    // Enforce minimum distance constraint - push nodes apart if too close
+    this.enforceMinimumDistance(nodeArray);
+
     // Return true if still converging, false if settled
     return maxVelocity >= this.EQUILIBRIUM_THRESHOLD;
+  }
+
+  /**
+   * Enforce minimum distance constraint between all node pairs
+   * Push nodes apart if they get closer than MIN_EQUILIBRIUM_DISTANCE
+   */
+  private enforceMinimumDistance(nodeArray: Node[]): void {
+    const nodeCount = nodeArray.length;
+    const pushForce = this.C_REPULSIVE * 5;  // Strong push force to maintain distance
+
+    for (let i = 0; i < nodeCount; i++) {
+      for (let j = i + 1; j < nodeCount; j++) {
+        const nodeA = nodeArray[i];
+        const nodeB = nodeArray[j];
+
+        const dx = nodeB.position.x - nodeA.position.x;
+        const dy = nodeB.position.y - nodeA.position.y;
+        const dz = nodeB.position.z - nodeA.position.z;
+
+        const distance = Math.sqrt(dx * dx + dy * dy + dz * dz) || this.MIN_DISTANCE;
+
+        // If nodes are closer than minimum distance, push them apart
+        if (distance < this.MIN_EQUILIBRIUM_DISTANCE) {
+          const direction = distance > 0 
+            ? { x: dx / distance, y: dy / distance, z: dz / distance }
+            : { x: Math.random() - 0.5, y: Math.random() - 0.5, z: Math.random() - 0.5 };
+
+          // Calculate how much to push
+          const pushAmount = (this.MIN_EQUILIBRIUM_DISTANCE - distance) * pushForce;
+
+          // Push nodes apart
+          nodeA.position.x -= direction.x * pushAmount;
+          nodeA.position.y -= direction.y * pushAmount;
+          nodeA.position.z -= direction.z * pushAmount;
+
+          nodeB.position.x += direction.x * pushAmount;
+          nodeB.position.y += direction.y * pushAmount;
+          nodeB.position.z += direction.z * pushAmount;
+
+          // Re-constrain to bounds after pushing
+          nodeA.position.x = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeA.position.x));
+          nodeA.position.y = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeA.position.y));
+          nodeA.position.z = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeA.position.z));
+
+          nodeB.position.x = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeB.position.x));
+          nodeB.position.y = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeB.position.y));
+          nodeB.position.z = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeB.position.z));
+        }
+      }
+    }
   }
 
   public getNodes(): Map<string, Node> {
