@@ -915,13 +915,13 @@ export class VRSceneManager {
       // Position the sphere at the calculated center
       sphereMesh.position = center;
 
-      // Create semi-transparent material with file color
+      // Create wireframe material with file color
       const fileColor = this.getFileColor(file);
       const material = new BABYLON.StandardMaterial(`file_material_${file}`, this.scene);
-      material.emissiveColor = fileColor.scale(0.2);  // Subtle glow
+      material.emissiveColor = fileColor;  // Full color for wireframe visibility
       material.specularColor = fileColor.scale(0.5);
-      material.alpha = 0.08;  // Very transparent
-      material.wireframe = false;
+      material.alpha = 1.0;  // Fully opaque wireframe
+      material.wireframe = true;  // Display as wireframe
       material.backFaceCulling = false;
       sphereMesh.material = material;
 
