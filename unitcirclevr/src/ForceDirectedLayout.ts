@@ -155,6 +155,8 @@ export class ForceDirectedLayout {
 
   /**
    * Apply attractive force along edges (pull together)
+   * Only applies force if nodes are farther than minimum distance
+   * This allows connected nodes to attract until they reach their equilibrium distance
    */
   private applyAttractiveForce(nodeA: Node, nodeB: Node): void {
     const dx = nodeB.position.x - nodeA.position.x;
@@ -162,6 +164,16 @@ export class ForceDirectedLayout {
     const dz = nodeB.position.z - nodeA.position.z;
 
     const distance = Math.sqrt(dx * dx + dy * dy + dz * dz) || this.MIN_DISTANCE;
+
+    // Determine minimum distance based on whether either node is exported
+    const isExportedEdge = nodeA.isExported || nodeB.isExported;
+    const minDistance = isExportedEdge ? this.MIN_EDGE_EXPORT_DISTANCE : this.MIN_EQUILIBRIUM_DISTANCE;
+
+    // Only apply attractive force if nodes are farther apart than minimum distance
+    // This ensures connected nodes attract until reaching their equilibrium distance
+    if (distance <= minDistance) {
+      return;  // Nodes are at or below minimum distance, don't pull closer
+    }
 
     // Spring-like force: F = k * distance
     const force = this.C_ATTRACTIVE * distance;
