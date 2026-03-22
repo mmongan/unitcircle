@@ -460,7 +460,7 @@
       "id": "createEdges@src\\MeshFactory.ts",
       "name": "createEdges",
       "file": "MeshFactory.ts",
-      "line": 289,
+      "line": 290,
       "isExported": false,
       "type": "function"
     },
@@ -468,7 +468,7 @@
       "id": "removeMeshReference@src\\MeshFactory.ts",
       "name": "removeMeshReference",
       "file": "MeshFactory.ts",
-      "line": 348,
+      "line": 345,
       "isExported": false,
       "type": "function"
     },
@@ -476,15 +476,7 @@
       "id": "updateEdges@src\\MeshFactory.ts",
       "name": "updateEdges",
       "file": "MeshFactory.ts",
-      "line": 356,
-      "isExported": false,
-      "type": "function"
-    },
-    {
-      "id": "getDefaultEdgeMaterial@src\\MeshFactory.ts",
-      "name": "getDefaultEdgeMaterial",
-      "file": "MeshFactory.ts",
-      "line": 399,
+      "line": 354,
       "isExported": false,
       "type": "function"
     },
@@ -1140,14 +1132,6 @@
       "to": "createSignatureTexture@src\\MeshFactory.ts"
     },
     {
-      "from": "updateEdges@src\\MeshFactory.ts",
-      "to": "dispose@src\\VRGraphViewer.ts"
-    },
-    {
-      "from": "updateEdges@src\\MeshFactory.ts",
-      "to": "getDefaultEdgeMaterial@src\\MeshFactory.ts"
-    },
-    {
       "from": "loadGraph@src\\VRGraphViewer.ts",
       "to": "renderGraph@src\\VRGraphViewer.ts"
     },
@@ -1388,5 +1372,5 @@
       "to": "render@src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-22T04:43:15.625Z"
+  "lastUpdated": "2026-03-22T12:37:04.506Z"
 }

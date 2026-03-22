@@ -976,7 +976,7 @@ export class VRSceneManager {
     edges: Array<{ from: string; to: string }>,
     layoutNodes: Map<string, any>
   ): void {
-    this.meshFactory.createEdges(edges, layoutNodes, this.fileColorMap);
+    this.meshFactory.createEdges(edges, layoutNodes);
   }
 
   private showTooltip(node: { name: string; file?: string; line?: number }): void {

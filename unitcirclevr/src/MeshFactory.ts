@@ -284,7 +284,8 @@ export class MeshFactory {
   }
 
   /**
-   * Create edge (tube) meshes connecting nodes
+   * Create edge (cylinder) meshes connecting nodes
+   * Uses cylinders that can be reused and repositioned each frame for performance
    */
   createEdges(
     edges: Array<{ from: string; to: string }>,
@@ -298,7 +299,7 @@ export class MeshFactory {
     const crossFileEdgeMaterial = new BABYLON.StandardMaterial('crossFileEdgeMaterial', this.scene);
     crossFileEdgeMaterial.emissiveColor = new BABYLON.Color3(1.0, 0.84, 0.0);  // Golden
 
-    // Create simple tube for each edge
+    // Create cylinder for each edge that will be repositioned each frame
     let edgeIndex = 0;
     for (const edge of edges) {
       const sourceNode = layoutNodes.get(edge.from);
@@ -315,21 +316,17 @@ export class MeshFactory {
       const isCrossFile = fromFile !== toFile;
       const material = isCrossFile ? crossFileEdgeMaterial : samFileEdgeMaterial;
 
-      // Create tube from source to target node centers
-      const sourceCenterPos = new BABYLON.Vector3(sourceNode.position.x, sourceNode.position.y, sourceNode.position.z);
-      const targetCenterPos = new BABYLON.Vector3(targetNode.position.x, targetNode.position.y, targetNode.position.z);
-
-      const points = [sourceCenterPos, targetCenterPos];
-      const tube = BABYLON.MeshBuilder.CreateTube(`edge_${edgeIndex}`, {
-        path: points,
-        radius: SceneConfig.EDGE_RADIUS,
+      // Create a tall cylinder that will be scaled and rotated to connect the nodes
+      const cylinder = BABYLON.MeshBuilder.CreateCylinder(`edge_${edgeIndex}`, {
+        diameter: SceneConfig.EDGE_RADIUS * 2,
+        height: 1,  // Will be scaled based on distance
       }, this.scene);
       
-      tube.material = material;
-      tube.isPickable = false;
+      cylinder.material = material;
+      cylinder.isPickable = false;
 
-      // Store tube and metadata
-      this.edgeTubes.set(`${edgeIndex}`, tube);
+      // Store cylinder and metadata
+      this.edgeTubes.set(`${edgeIndex}`, cylinder);
       this.edgeMetadata.set(`${edgeIndex}`, {
         from: edge.from,
         to: edge.to,
@@ -350,7 +347,8 @@ export class MeshFactory {
   }
 
   /**
-   * Update edge positions and geometry to follow their connected nodes
+   * Update edge positions and rotations to follow their connected nodes
+   * Reuses cylinder meshes for performance - no recreation each frame
    * Called during render loop to keep edges attached to moving nodes
    */
   public updateEdges(): void {
@@ -358,7 +356,7 @@ export class MeshFactory {
       return;  // No edges to update
     }
 
-    for (const [edgeId, oldTube] of this.edgeTubes) {
+    for (const [edgeId, cylinder] of this.edgeTubes) {
       const metadata = this.edgeMetadata.get(edgeId);
       if (!metadata) continue;
 
@@ -370,40 +368,38 @@ export class MeshFactory {
         continue;  // Skip if nodes not found
       }
 
-      // Use mesh positions - these are always current after node movements
+      // Get current positions
       const sourceCenterPos = sourceMesh.position.clone();
       const targetCenterPos = targetMesh.position.clone();
 
-      // Create simple tube from source to target centers
-      const points = [sourceCenterPos, targetCenterPos];
+      // Calculate direction and distance
+      const direction = targetCenterPos.subtract(sourceCenterPos);
+      const distance = direction.length();
 
-      // Dispose old tube and create new one with updated path
-      oldTube.dispose();
-      const newTube = BABYLON.MeshBuilder.CreateTube(`edge_${edgeId}`, {
-        path: points,
-        radius: SceneConfig.EDGE_RADIUS,
-      }, this.scene);
+      if (distance < 0.001) {
+        cylinder.setEnabled(false);  // Hide edge if nodes are too close
+        continue;
+      }
 
-      // Apply material based on cross-file flag
-      newTube.material = this.getDefaultEdgeMaterial(metadata.isCrossFile);
-      newTube.isPickable = false;
-      
-      // Update stored tube
-      this.edgeTubes.set(edgeId, newTube);
+      // Position cylinder at midpoint between nodes
+      const midpoint = sourceCenterPos.add(direction.scale(0.5));
+      cylinder.position = midpoint;
+
+      // Scale cylinder to match distance
+      cylinder.scaling.y = distance;
+
+      // Rotate cylinder to point along the connection
+      const normalizedDir = direction.normalize();
+      const yAxis = BABYLON.Axis.Y;
+      const rotationQuaternion = BABYLON.Quaternion.Identity();
+      BABYLON.Quaternion.FromUnitVectorsToRef(yAxis, normalizedDir, rotationQuaternion);
+      cylinder.rotationQuaternion = rotationQuaternion;
+
+      // Ensure cylinder is visible
+      if (!cylinder.isEnabled) {
+        cylinder.setEnabled(true);
+      }
     }
   }
 
-  /**
-   * Get or create default edge material
-   */
-  private getDefaultEdgeMaterial(isCrossFile: boolean): BABYLON.StandardMaterial {
-    const material = new BABYLON.StandardMaterial(
-      isCrossFile ? 'crossFileEdgeMaterial' : 'sameFileEdgeMaterial',
-      this.scene
-    );
-    material.emissiveColor = isCrossFile
-      ? new BABYLON.Color3(1.0, 0.84, 0.0)  // Golden
-      : new BABYLON.Color3(0.8, 0.8, 0.8); // Gray
-    return material;
-  }
 }
