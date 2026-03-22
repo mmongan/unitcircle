@@ -98,6 +98,7 @@ export class ForceDirectedLayout {
     this.applyRepulsiveForces(forces);
     this.applyXzPlaneRepulsion(forces);
     this.applyAttractiveForces(forces);
+    this.applySameFileAttraction(forces);
     return forces;
   }
 
@@ -242,6 +243,49 @@ export class ForceDirectedLayout {
 
         forces.set(source.id, fs);
         forces.set(target.id, ft);
+      }
+    }
+  }
+
+  private applySameFileAttraction(forces: Map<string, { x: number; y: number; z: number }>): void {
+    // Apply attraction between nodes from the same file to create clustering
+    const nodeArray = Array.from(this.nodes.values());
+    for (let i = 0; i < nodeArray.length; i++) {
+      for (let j = i + 1; j < nodeArray.length; j++) {
+        const n1 = nodeArray[i];
+        const n2 = nodeArray[j];
+
+        // Extract file paths from node IDs
+        const file1 = n1.id.split('@')[1];
+        const file2 = n2.id.split('@')[1];
+        
+        // Only apply attraction between same-file nodes
+        if (file1 === file2) {
+          const dx = n2.position.x - n1.position.x;
+          const dy = n2.position.y - n1.position.y;
+          const dz = n2.position.z - n1.position.z;
+          const distance = Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.01;
+
+          // Same-file attraction is moderate to allow clustering without being too aggressive
+          // Use 0.7x of normal attractive force to create clustering while allowing other forces
+          const clusteringForce = (distance * distance) / this.k * this.attractiveForce * 0.7;
+          const fx = (dx / distance) * clusteringForce;
+          const fy = (dy / distance) * clusteringForce;
+          const fz = (dz / distance) * clusteringForce;
+
+          const f1 = forces.get(n1.id) || { x: 0, y: 0, z: 0 };
+          const f2 = forces.get(n2.id) || { x: 0, y: 0, z: 0 };
+
+          f1.x += fx;
+          f1.y += fy;
+          f1.z += fz;
+          f2.x -= fx;
+          f2.y -= fy;
+          f2.z -= fz;
+
+          forces.set(n1.id, f1);
+          forces.set(n2.id, f2);
+        }
       }
     }
   }
