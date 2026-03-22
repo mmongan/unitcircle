@@ -30,7 +30,8 @@ export class ForceDirectedLayout {
   private readonly C_ATTRACTIVE = 0.05;    // Attractive force strength (edge pull)
   private readonly DAMPING = 0.92;         // Velocity damping per iteration
   private readonly MIN_DISTANCE = 1.0;     // Minimum distance to prevent singularity in force calculations
-  private readonly MIN_EQUILIBRIUM_DISTANCE = 6.0;  // Minimum distance nodes must maintain (configurable)
+  private readonly MIN_EQUILIBRIUM_DISTANCE = 6.0;  // Minimum distance for connected nodes (configurable)
+  private readonly MIN_CROSS_FILE_DISTANCE = 12.0;  // Minimum distance between nodes from different files
   private readonly EQUILIBRIUM_THRESHOLD = 0.001;  // Converged when all velocities below this
 
   constructor(nodeIds: string[], edges: Edge[], nodeFileMap?: Map<string, string>) {
@@ -229,6 +230,9 @@ export class ForceDirectedLayout {
 
     // Enforce minimum distance constraint only for connected nodes
     this.enforceEdgeMinimumDistance();
+    
+    // Enforce minimum distance constraint between nodes from different files
+    this.enforceFileCrossConstraint();
 
     // Return true if still converging, false if settled
     return maxVelocity >= this.EQUILIBRIUM_THRESHOLD;
@@ -281,6 +285,62 @@ export class ForceDirectedLayout {
         nodeB.position.x = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeB.position.x));
         nodeB.position.y = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeB.position.y));
         nodeB.position.z = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeB.position.z));
+      }
+    }
+  }
+
+  /**
+   * Enforce minimum distance constraint between nodes from different source files
+   * Push nodes from different files apart if they get closer than MIN_CROSS_FILE_DISTANCE (12 units)
+   */
+  private enforceFileCrossConstraint(): void {
+    const nodeArray = Array.from(this.nodes.values());
+    const nodeCount = nodeArray.length;
+    const pushForce = this.C_REPULSIVE_CROSS_FILE * 3;  // Strong push for file boundary
+
+    for (let i = 0; i < nodeCount; i++) {
+      for (let j = i + 1; j < nodeCount; j++) {
+        const nodeA = nodeArray[i];
+        const nodeB = nodeArray[j];
+
+        // Only enforce constraint for nodes from different files
+        if (!nodeA.file || !nodeB.file || nodeA.file === nodeB.file) {
+          continue;  // Skip if same file or no file info
+        }
+
+        const dx = nodeB.position.x - nodeA.position.x;
+        const dy = nodeB.position.y - nodeA.position.y;
+        const dz = nodeB.position.z - nodeA.position.z;
+
+        const distance = Math.sqrt(dx * dx + dy * dy + dz * dz) || this.MIN_DISTANCE;
+
+        // If nodes from different files are closer than minimum distance, push them apart
+        if (distance < this.MIN_CROSS_FILE_DISTANCE) {
+          const direction = distance > 0 
+            ? { x: dx / distance, y: dy / distance, z: dz / distance }
+            : { x: Math.random() - 0.5, y: Math.random() - 0.5, z: Math.random() - 0.5 };
+
+          // Calculate how much to push
+          const pushAmount = (this.MIN_CROSS_FILE_DISTANCE - distance) * pushForce;
+
+          // Push nodes apart
+          nodeA.position.x -= direction.x * pushAmount;
+          nodeA.position.y -= direction.y * pushAmount;
+          nodeA.position.z -= direction.z * pushAmount;
+
+          nodeB.position.x += direction.x * pushAmount;
+          nodeB.position.y += direction.y * pushAmount;
+          nodeB.position.z += direction.z * pushAmount;
+
+          // Re-constrain to bounds after pushing
+          nodeA.position.x = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeA.position.x));
+          nodeA.position.y = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeA.position.y));
+          nodeA.position.z = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeA.position.z));
+
+          nodeB.position.x = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeB.position.x));
+          nodeB.position.y = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeB.position.y));
+          nodeB.position.z = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeB.position.z));
+        }
       }
     }
   }
