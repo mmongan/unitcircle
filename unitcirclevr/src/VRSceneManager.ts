@@ -994,7 +994,7 @@ export class VRSceneManager {
 
     const files = Array.from(this.fileNodeIds.keys());
     const fileNodes = layout.getNodes();
-    const minSeparationPadding = 40.0;  // Minimum distance padding between boxes
+    const minSeparationPadding = 80.0;  // Large padding to keep boxes well separated
 
     // Check all pairs of files for intersection
     for (let i = 0; i < files.length; i++) {
@@ -1022,29 +1022,43 @@ export class VRSceneManager {
         // Required distance to prevent intersection with padding
         const requiredDistance = radius1 + radius2 + minSeparationPadding;
 
-        // If boxes are intersecting or too close, apply strong repulsive force through velocity
-        if (distance < requiredDistance && distance > 0.01) {
+        // If boxes are too close, apply HARD constraint to push them apart immediately
+        // This overrides physics forces to guarantee separation
+        if (distance < requiredDistance && distance > 0.1) {
           const direction = pos2.subtract(pos1).normalize();
           const separationNeeded = requiredDistance - distance;
 
-          // Debug collision detection on first few frames
+          // Debug collision detection
           if (this.physicsIterationCount < 10 || this.physicsIterationCount % 50 === 0) {
             console.log(`🔄 Collision: ${file1} ↔ ${file2}: distance=${distance.toFixed(1)}, required=${requiredDistance.toFixed(1)}, separation=${separationNeeded.toFixed(1)}`);
           }
 
-          // Apply strong repulsion to overcome attractive forces and damping
-          const repulsionStrength = 1200.0;  // Strong velocity impulse to enforce separation
+          // Hard constraint: directly move nodes apart by half the separation needed
+          // This guarantees they will separate regardless of other forces
+          const moveAmount = (separationNeeded / 2) + 5.0;  // Add small buffer
           
-          // Apply repulsive forces to velocities
-          const repulsionVelocity = direction.scale(-separationNeeded * repulsionStrength);
-          node1.velocity.x += repulsionVelocity.x;
-          node1.velocity.y += repulsionVelocity.y;
-          node1.velocity.z += repulsionVelocity.z;
+          node1.position.x -= direction.x * moveAmount;
+          node1.position.y -= direction.y * moveAmount;
+          node1.position.z -= direction.z * moveAmount;
           
-          const repulsionVelocity2 = direction.scale(separationNeeded * repulsionStrength);
-          node2.velocity.x += repulsionVelocity2.x;
-          node2.velocity.y += repulsionVelocity2.y;
-          node2.velocity.z += repulsionVelocity2.z;
+          node2.position.x += direction.x * moveAmount;
+          node2.position.y += direction.y * moveAmount;
+          node2.position.z += direction.z * moveAmount;
+          
+          // Clear velocities in the separation direction to prevent immediate recollision
+          const vel1Component = node1.velocity.x * direction.x + node1.velocity.y * direction.y + node1.velocity.z * direction.z;
+          if (vel1Component > 0) {  // If moving toward the other box
+            node1.velocity.x -= direction.x * vel1Component;
+            node1.velocity.y -= direction.y * vel1Component;
+            node1.velocity.z -= direction.z * vel1Component;
+          }
+          
+          const vel2Component = node2.velocity.x * direction.x + node2.velocity.y * direction.y + node2.velocity.z * direction.z;
+          if (vel2Component < 0) {  // If moving toward the other box
+            node2.velocity.x -= direction.x * vel2Component;
+            node2.velocity.y -= direction.y * vel2Component;
+            node2.velocity.z -= direction.z * vel2Component;
+          }
         }
       }
     }
