@@ -217,7 +217,7 @@ export class VRSceneManager {
             internalLayout.updateFrame();
           }
           
-          // Step 3: Position nodes based on file-internal layout + file position
+          // Step 3: Position nodes based on file-internal layout (local to file box parent)
           for (const [nodeId, mesh] of this.nodeMeshMap.entries()) {
             const file = this.nodeToFile.get(nodeId);
             if (!file) continue;
@@ -228,13 +228,10 @@ export class VRSceneManager {
             const internalNode = internalLayout.getNodes().get(nodeId);
             if (!internalNode) continue;
             
-            const fileNode = filePositions.get(file);
-            if (!fileNode) continue;
-            
-            // Position is: file position + local position within file
-            mesh.position.x = fileNode.position.x + internalNode.position.x;
-            mesh.position.y = fileNode.position.y + internalNode.position.y;
-            mesh.position.z = fileNode.position.z + internalNode.position.z;
+            // Position is local to file box parent (no need to add file position)
+            mesh.position.x = internalNode.position.x;
+            mesh.position.y = internalNode.position.y;
+            mesh.position.z = internalNode.position.z;
           }
 
           // Step 4: Update file box positions and sizes based on file-level layout
@@ -1056,6 +1053,17 @@ export class VRSceneManager {
       
       // Store reference for updates
       this.fileBoxMeshes.set(file, boxMesh);
+      
+      // Parent all nodes for this file to the file box
+      const nodeIds = this.fileNodeIds.get(file);
+      if (nodeIds) {
+        for (const nodeId of nodeIds) {
+          const nodeMesh = this.nodeMeshMap.get(nodeId);
+          if (nodeMesh) {
+            nodeMesh.parent = boxMesh;
+          }
+        }
+      }
     }
   }
 
