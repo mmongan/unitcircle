@@ -32,7 +32,7 @@ export class VRSceneManager {
     this.sceneRoot = new BABYLON.TransformNode('sceneRoot', this.scene);
 
     // Initialize services
-    this.meshFactory = new MeshFactory(this.scene, this.sceneRoot);
+    this.meshFactory = new MeshFactory(this.scene);
     this.graphLoader = new GraphLoader(SceneConfig.GRAPH_POLL_INTERVAL_MS);
 
     // Setup lighting

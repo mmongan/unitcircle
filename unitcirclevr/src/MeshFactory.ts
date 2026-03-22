@@ -7,13 +7,11 @@ import { SceneConfig } from './SceneConfig';
 
 export class MeshFactory {
   private scene: BABYLON.Scene;
-  private sceneRoot: BABYLON.TransformNode;
   private nodeMeshes: Map<string, BABYLON.Mesh> = new Map();  // Track meshes for raycasting
   private edgeMeshes: Map<string, { tube: BABYLON.Mesh; arrowhead: BABYLON.Mesh; from: string; to: string; material: BABYLON.StandardMaterial }> = new Map();
 
-  constructor(scene: BABYLON.Scene, sceneRoot: BABYLON.TransformNode) {
+  constructor(scene: BABYLON.Scene) {
     this.scene = scene;
-    this.sceneRoot = sceneRoot;
   }
 
   /**
@@ -53,7 +51,6 @@ export class MeshFactory {
       this.scene
     );
     cylinder.position = position;
-    cylinder.parent = this.sceneRoot;
     cylinder.isPickable = true;
 
     const material = new BABYLON.StandardMaterial(`extMat_${node.id}`, this.scene);
@@ -82,7 +79,6 @@ export class MeshFactory {
       this.scene
     );
     sphere.position = position;
-    sphere.parent = this.sceneRoot;
     sphere.isPickable = true;
 
     const material = new BABYLON.StandardMaterial(`varMat_${node.id}`, this.scene);
@@ -116,7 +112,6 @@ export class MeshFactory {
 
     const box = BABYLON.MeshBuilder.CreateBox(`func_${node.id}`, { size: boxSize }, this.scene);
     box.position = position;
-    box.parent = this.sceneRoot;
     box.isPickable = true;
 
     const material = new BABYLON.StandardMaterial(`mat_${node.id}`, this.scene);
@@ -401,7 +396,6 @@ export class MeshFactory {
         path: points,
         radius: SceneConfig.EDGE_RADIUS,
       }, this.scene);
-      tube.parent = this.sceneRoot;
       tube.material = material;
       tube.isPickable = false;  // Edges should not be clickable
 
@@ -456,8 +450,6 @@ export class MeshFactory {
     const rotationQuaternion = BABYLON.Quaternion.Identity();
     BABYLON.Quaternion.FromUnitVectorsToRef(BABYLON.Axis.Y, direction, rotationQuaternion);
     arrowhead.rotationQuaternion = rotationQuaternion;
-
-    arrowhead.parent = this.sceneRoot;
     
     // Use target file color for arrowhead if available, otherwise use edge material
     if (targetFileColor) {
@@ -527,7 +519,6 @@ export class MeshFactory {
         path: points,
         radius: SceneConfig.EDGE_RADIUS,
       }, this.scene);
-      newTube.parent = this.sceneRoot;
       newTube.material = edgeData.material;
       newTube.isPickable = false;
       edgeData.tube = newTube;
