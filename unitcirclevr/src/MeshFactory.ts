@@ -315,6 +315,35 @@ export class MeshFactory {
   }
 
   /**
+   * Calculate surface connection point based on mesh bounding box
+   * Moves from mesh center toward target along direction until it hits the surface
+   */
+  private getSurfaceConnectionPoint(
+    meshCenter: BABYLON.Vector3,
+    direction: BABYLON.Vector3,
+    mesh: BABYLON.Mesh
+  ): BABYLON.Vector3 {
+    const boundingInfo = mesh.getBoundingInfo();
+    if (!boundingInfo) {
+      return meshCenter.clone();
+    }
+
+    // Get the extents (half-sizes) of the bounding box
+    const extents = boundingInfo.boundingBox.extendSize;
+
+    // Calculate how far along the direction we need to go to hit the surface
+    // by finding which axis component is largest relative to the mesh extents
+    const scaleFactor = Math.max(
+      Math.abs(direction.x) > 0 ? extents.x / Math.abs(direction.x) : 0,
+      Math.abs(direction.y) > 0 ? extents.y / Math.abs(direction.y) : 0,
+      Math.abs(direction.z) > 0 ? extents.z / Math.abs(direction.z) : 0
+    );
+
+    // Move from center along direction to hit the surface
+    return meshCenter.add(direction.scale(scaleFactor));
+  }
+
+  /**
    * Create a single edge between two nodes
    */
   private createEdge(
@@ -331,41 +360,26 @@ export class MeshFactory {
       const sourceCenterPos = new BABYLON.Vector3(sourceNode.position.x, sourceNode.position.y, sourceNode.position.z);
       const targetCenterPos = new BABYLON.Vector3(targetNode.position.x, targetNode.position.y, targetNode.position.z);
       
-      let sourcePos = sourceCenterPos.clone();
-      let targetPos = targetCenterPos.clone();
-      
       // Calculate direction from source to target
       const direction = targetCenterPos.subtract(sourceCenterPos).normalize();
-      const distance = BABYLON.Vector3.Distance(sourceCenterPos, targetCenterPos);
+      const reverseDirection = direction.scale(-1);
       
-      // Find source surface intersection point via raycast
+      // Get source and target meshes
       const sourceMesh = this.nodeMeshes.get(edge.from);
-      if (sourceMesh) {
-        // Ray length must extend beyond the mesh to guarantee intersection
-        const rayLength = distance * 1.5;
-        const sourceRay = new BABYLON.Ray(sourceCenterPos, direction, rayLength);
-        const sourceHit = this.scene.pickWithRay(sourceRay, (mesh) => mesh === sourceMesh);
-        if (sourceHit && sourceHit.hit && sourceHit.pickedPoint) {
-          sourcePos = sourceHit.pickedPoint.clone();
-        }
-      }
-      
-      // Find target surface intersection point via raycast
       const targetMesh = this.nodeMeshes.get(edge.to);
-      if (targetMesh) {
-        const reverseDirection = direction.scale(-1);
-        // Ray length must extend beyond the mesh to guarantee intersection
-        const rayLength = distance * 1.5;
-        const targetRay = new BABYLON.Ray(targetCenterPos, reverseDirection, rayLength);
-        const targetHit = this.scene.pickWithRay(targetRay, (mesh) => mesh === targetMesh);
-        if (targetHit && targetHit.hit && targetHit.pickedPoint) {
-          targetPos = targetHit.pickedPoint.clone();
-        }
-      }
+      
+      // Find surface connection points using bounding boxes
+      const sourcePos = sourceMesh 
+        ? this.getSurfaceConnectionPoint(sourceCenterPos, direction, sourceMesh)
+        : sourceCenterPos.clone();
+      
+      const targetPos = targetMesh
+        ? this.getSurfaceConnectionPoint(targetCenterPos, reverseDirection, targetMesh)
+        : targetCenterPos.clone();
       
       // Calculate arrowhead height to position tube endpoint at base of arrowhead
       const lineRadius = SceneConfig.EDGE_RADIUS;
-      const arrowheadBaseRadius = lineRadius * 2.0;  // Changed from 1.5 to 2.0
+      const arrowheadBaseRadius = lineRadius * 2.0;
       const arrowheadBaseDiameter = arrowheadBaseRadius * 2;
       const arrowheadHeight = arrowheadBaseDiameter * 1.5;
       const arrowheadBaseOffset = arrowheadHeight / 2;
@@ -479,30 +493,13 @@ export class MeshFactory {
       const sourceCenterPos = sourceMesh.position.clone();
       const targetCenterPos = targetMesh.position.clone();
 
-      let sourcePos = sourceCenterPos.clone();
-      let targetPos = targetCenterPos.clone();
-
       // Calculate direction from source to target
       const direction = targetCenterPos.subtract(sourceCenterPos).normalize();
-      const distance = BABYLON.Vector3.Distance(sourceCenterPos, targetCenterPos);
-
-      // Find source surface intersection point via raycast
-      // Ray length must extend beyond the mesh to guarantee intersection
-      const sourceRayLength = distance * 1.5;
-      const sourceRay = new BABYLON.Ray(sourceCenterPos, direction, sourceRayLength);
-      const sourceHit = this.scene.pickWithRay(sourceRay, (mesh) => mesh === sourceMesh);
-      if (sourceHit && sourceHit.hit && sourceHit.pickedPoint) {
-        sourcePos = sourceHit.pickedPoint.clone();
-      }
-
-      // Find target surface intersection point via raycast
       const reverseDirection = direction.scale(-1);
-      const targetRayLength = distance * 1.5;
-      const targetRay = new BABYLON.Ray(targetCenterPos, reverseDirection, targetRayLength);
-      const targetHit = this.scene.pickWithRay(targetRay, (mesh) => mesh === targetMesh);
-      if (targetHit && targetHit.hit && targetHit.pickedPoint) {
-        targetPos = targetHit.pickedPoint.clone();
-      }
+
+      // Find surface connection points using bounding boxes
+      const sourcePos = this.getSurfaceConnectionPoint(sourceCenterPos, direction, sourceMesh);
+      const targetPos = this.getSurfaceConnectionPoint(targetCenterPos, reverseDirection, targetMesh);
 
       // Calculate arrowhead dimensions
       const lineRadius = SceneConfig.EDGE_RADIUS;
