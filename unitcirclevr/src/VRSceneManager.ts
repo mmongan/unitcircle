@@ -587,7 +587,7 @@ export class VRSceneManager {
     // Calculate indegree (incoming connections) for each node
     const indegreeMap = this.calculateIndegree(graph.edges);
 
-    // Render nodes at their random initial positions around 100 units from center
+    // Render nodes at their random initial positions around 100 units from cfilenter
     const initialNodes = this.layout.getNodes();
     this.renderNodes(graph.nodes, initialNodes, indegreeMap);
     this.renderEdges();  // Create edge cylinders
@@ -1091,8 +1091,8 @@ export class VRSceneManager {
   private applySphereRepulsion(layoutNodes: Map<string, any>): void {
     if (!this.layout) return;
 
-    const repulsionStrength = 0.8;  // Force magnitude for sphere repulsion
-    const minDistanceOutside = 2.0;  // Nodes should stay at least this far outside their sphere
+    const repulsionStrength = 2.0;  // Increased repulsion for stronger node exclusion
+    const minDistanceOutside = 3.0;  // Nodes should stay further outside their sphere
 
     // For each node, check if it's inside any file sphere it doesn't belong to
     for (const [nodeId, layoutNode] of layoutNodes.entries()) {
@@ -1108,17 +1108,18 @@ export class VRSceneManager {
         if (file === nodeFile) continue;
 
         const spherePos = sphereData.mesh.position;
-        const sphereRadius = sphereData.mesh.getBoundingInfo().boundingBox.extendSize.length() / Math.sqrt(3);
+        // Calculate actual radius from mesh scaling (base radius is 50, diameter 100)
+        const sphereRadius = 50 * sphereData.mesh.scaling.x;
         const distanceToCenter = BABYLON.Vector3.Distance(nodePos, spherePos);
 
-        // If node is inside this sphere, push it out
-        if (distanceToCenter < sphereRadius) {
+        // If node is inside or near this sphere, push it out strongly
+        if (distanceToCenter < sphereRadius + minDistanceOutside) {
           const direction = nodePos.subtract(spherePos).normalize();
           const desiredDistance = sphereRadius + minDistanceOutside;
           const pushDistance = desiredDistance - distanceToCenter;
 
           if (direction.length() > 0.01) {
-            // Apply repulsive velocity
+            // Apply strong repulsive velocity
             layoutNode.velocity.x += direction.x * pushDistance * repulsionStrength;
             layoutNode.velocity.y += direction.y * pushDistance * repulsionStrength;
             layoutNode.velocity.z += direction.z * pushDistance * repulsionStrength;
@@ -1174,8 +1175,8 @@ export class VRSceneManager {
    */
   private applySphereSeparation(layoutNodes: Map<string, any>): void {
     const spheres = Array.from(this.fileBoundingSpheres.entries());
-    const separationStrength = 2.5;  // Increased for more aggressive sphere separation
-    const minSphereDistance = 18.0;  // Increased minimum distance between sphere centers
+    const separationStrength = 4.0;  // Maximum separation force between spheres
+    const minSphereDistance = 20.0;  // Increased minimum distance between sphere centers
 
     // Apply pairwise repulsion between all spheres
     for (let i = 0; i < spheres.length; i++) {
