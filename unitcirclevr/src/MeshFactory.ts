@@ -353,7 +353,15 @@ export class MeshFactory {
         }
       }
       
-      const points = [sourcePos, targetPos];
+      // Calculate arrowhead height to position tube endpoint at base of arrowhead
+      const arrowheadSize = 0.4;
+      const arrowheadHeight = arrowheadSize * 1.5;
+      const arrowheadBaseOffset = arrowheadHeight / 2;
+      
+      // Shorten tube endpoint to end at the base of the arrowhead
+      const tubeEndPos = targetPos.subtract(direction.scale(arrowheadBaseOffset));
+      
+      const points = [sourcePos, tubeEndPos];
 
       const tube = BABYLON.MeshBuilder.CreateTube(`edge_${index}`, {
         path: points,
