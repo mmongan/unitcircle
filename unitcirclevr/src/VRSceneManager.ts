@@ -1023,26 +1023,29 @@ export class VRSceneManager {
         // Required distance to prevent intersection with padding
         const requiredDistance = radius1 + radius2 + minSeparationPadding;
 
-        // If boxes are intersecting or too close, apply gentle repulsive force through velocity
+        // If boxes are intersecting or too close, apply strong repulsive force through velocity
         if (distance < requiredDistance && distance > 0.01) {
           const direction = pos2.subtract(pos1).normalize();
           const separationNeeded = requiredDistance - distance;
 
-          // Apply repulsion through velocity (gentle damped approach)
-          // This prevents jitter by slowly pushing apart instead of snapping
-          const repulsionStrength = 100.0;  // Units per second of repulsion
-          const damping = 0.8;  // Velocity damping factor
+          // Debug collision detection on first few frames
+          if (this.physicsIterationCount < 10 || this.physicsIterationCount % 50 === 0) {
+            console.log(`🔄 Collision: ${file1} ↔ ${file2}: distance=${distance.toFixed(1)}, required=${requiredDistance.toFixed(1)}, separation=${separationNeeded.toFixed(1)}`);
+          }
+
+          // Apply strong repulsion to overcome attractive forces and damping
+          const repulsionStrength = 1200.0;  // Strong velocity impulse to enforce separation
           
           // Apply repulsive forces to velocities
           const repulsionVelocity = direction.scale(-separationNeeded * repulsionStrength);
-          node1.velocity.x += repulsionVelocity.x * damping;
-          node1.velocity.y += repulsionVelocity.y * damping;
-          node1.velocity.z += repulsionVelocity.z * damping;
+          node1.velocity.x += repulsionVelocity.x;
+          node1.velocity.y += repulsionVelocity.y;
+          node1.velocity.z += repulsionVelocity.z;
           
           const repulsionVelocity2 = direction.scale(separationNeeded * repulsionStrength);
-          node2.velocity.x += repulsionVelocity2.x * damping;
-          node2.velocity.y += repulsionVelocity2.y * damping;
-          node2.velocity.z += repulsionVelocity2.z * damping;
+          node2.velocity.x += repulsionVelocity2.x;
+          node2.velocity.y += repulsionVelocity2.y;
+          node2.velocity.z += repulsionVelocity2.z;
         }
       }
     }

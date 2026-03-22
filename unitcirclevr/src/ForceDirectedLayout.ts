@@ -31,7 +31,7 @@ export class ForceDirectedLayout {
   private readonly C_REPULSIVE_CROSS_FILE = 20.0;  // Much stronger repulsion for cross-file nodes (10x stronger)
   private readonly C_ATTRACTIVE = 0.05;    // Attractive force strength for cross-file edges
   private readonly C_ATTRACTIVE_SAME_FILE = 0.30;  // 6x stronger attraction for same-file connected nodes
-  private readonly DAMPING = 0.92;         // Velocity damping per iteration
+  private readonly DAMPING = 0.88;         // Velocity damping per iteration (increased for slower motion)
   private readonly MIN_DISTANCE = 1.0;     // Minimum distance to prevent singularity in force calculations
   private readonly MIN_NODE_SEPARATION = 25.0;    // Minimum distance between unconnected same-file nodes
   private readonly MIN_CROSS_FILE_SEPARATION = 35.0;  // Stronger separation for cross-file nodes
