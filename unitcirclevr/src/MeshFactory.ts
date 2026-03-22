@@ -354,8 +354,10 @@ export class MeshFactory {
       }
       
       // Calculate arrowhead height to position tube endpoint at base of arrowhead
-      const arrowheadSize = 0.4;
-      const arrowheadHeight = arrowheadSize * 1.5;
+      const lineRadius = SceneConfig.EDGE_RADIUS;
+      const arrowheadBaseRadius = lineRadius * 1.5;
+      const arrowheadBaseDiameter = arrowheadBaseRadius * 2;
+      const arrowheadHeight = arrowheadBaseDiameter * 1.5;
       const arrowheadBaseOffset = arrowheadHeight / 2;
       
       // Shorten tube endpoint to end at the base of the arrowhead
@@ -385,12 +387,17 @@ export class MeshFactory {
     material: BABYLON.StandardMaterial,
     index: number
   ): void {
-    const arrowheadSize = 0.4;
+    // Scale arrowhead based on line radius
+    // Base radius = 1.5 * line radius
+    const lineRadius = SceneConfig.EDGE_RADIUS;
+    const arrowheadBaseRadius = lineRadius * 1.5;
+    const arrowheadBaseDiameter = arrowheadBaseRadius * 2;
+    
     // Create a cone-like shape using a cylinder with small top
     const arrowhead = BABYLON.MeshBuilder.CreateCylinder(`arrowhead_${index}`, {
       diameterTop: 0.05,
-      diameterBottom: arrowheadSize,
-      height: arrowheadSize * 1.5,
+      diameterBottom: arrowheadBaseDiameter,
+      height: arrowheadBaseDiameter * 1.5,
     }, this.scene);
 
     // Position at target node
