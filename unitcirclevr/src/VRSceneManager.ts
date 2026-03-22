@@ -239,7 +239,7 @@ export class VRSceneManager {
           // Continue indefinitely if file spheres overlap - they MUST separate
           this.physicsIterationCount++;
           const spheresOverlapping = this.checkSpheresOverlapping();
-          const hardMaxIterations = 3000;  // Absolute hard limit to prevent infinite loops
+          const hardMaxIterations = 10000;  // Absolute hard limit to prevent infinite loops
           
           // Keep running as long as spheres overlap OR until hard max
           if (this.physicsIterationCount > hardMaxIterations || (!spheresOverlapping && !stillConverging)) {
@@ -1025,13 +1025,13 @@ export class VRSceneManager {
       // Update sphere mesh position and scale
       sphereData.mesh.position = center;
 
-      // Update radius with padding
-      const visualRadius = Math.max(radius * 1.15, radius + 3.0);
+      // Minimal padding to fit node contents tightly
+      const visualRadius = radius + 1.5;  // Only 1.5 unit padding for tight fit
 
-      // Smoothly interpolate toward target radius for visual stability
-      const targetScale = visualRadius / radius;
+      // Aggressively interpolate toward target radius for tight fitting
+      const targetScale = visualRadius / 50;  // Base radius is 50 (diameter 100)
       const currentScale = sphereData.mesh.scaling.x;
-      const smoothedScale = currentScale + (targetScale - currentScale) * 0.1;  // 10% lerp
+      const smoothedScale = currentScale + (targetScale - currentScale) * 0.25;  // 25% lerp for faster convergence
 
       sphereData.mesh.scaling = new BABYLON.Vector3(smoothedScale, smoothedScale, smoothedScale);
     }
