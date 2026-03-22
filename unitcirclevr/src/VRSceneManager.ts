@@ -528,8 +528,7 @@ export class VRSceneManager {
     // Render nodes at their initial positions (all at center)
     const initialNodes = this.layout.getNodes();
     this.renderNodes(graph.nodes, initialNodes, indegreeMap);
-    this.renderEdges();  // Create edge cylinders
-    this.meshFactory.updateEdges();  // Position edges immediately
+    this.renderEdges();  // Create edge cylinders (will be positioned by render loop as nodes separate)
 
     // Enable physics updates to push nodes apart
     this.physicsActive = true;

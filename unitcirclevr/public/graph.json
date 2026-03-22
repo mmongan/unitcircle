@@ -772,7 +772,7 @@
       "id": "updateCodeGraph@src\\VRSceneManager.ts",
       "name": "updateCodeGraph",
       "file": "VRSceneManager.ts",
-      "line": 546,
+      "line": 545,
       "isExported": false,
       "type": "function"
     },
@@ -780,7 +780,7 @@
       "id": "renderNodesWithAnimation@src\\VRSceneManager.ts",
       "name": "renderNodesWithAnimation",
       "file": "VRSceneManager.ts",
-      "line": 622,
+      "line": 621,
       "isExported": false,
       "type": "function"
     },
@@ -788,7 +788,7 @@
       "id": "removeMeshesForNode@src\\VRSceneManager.ts",
       "name": "removeMeshesForNode",
       "file": "VRSceneManager.ts",
-      "line": 687,
+      "line": 686,
       "isExported": false,
       "type": "function"
     },
@@ -796,7 +796,7 @@
       "id": "removeMeshesForEdge@src\\VRSceneManager.ts",
       "name": "removeMeshesForEdge",
       "file": "VRSceneManager.ts",
-      "line": 721,
+      "line": 720,
       "isExported": false,
       "type": "function"
     },
@@ -804,7 +804,7 @@
       "id": "buildEdgeList@src\\VRSceneManager.ts",
       "name": "buildEdgeList",
       "file": "VRSceneManager.ts",
-      "line": 729,
+      "line": 728,
       "isExported": false,
       "type": "function"
     },
@@ -812,7 +812,7 @@
       "id": "animateNodeToPosition@src\\VRSceneManager.ts",
       "name": "animateNodeToPosition",
       "file": "VRSceneManager.ts",
-      "line": 736,
+      "line": 735,
       "isExported": false,
       "type": "function"
     },
@@ -820,7 +820,7 @@
       "id": "renderNodes@src\\VRSceneManager.ts",
       "name": "renderNodes",
       "file": "VRSceneManager.ts",
-      "line": 778,
+      "line": 777,
       "isExported": false,
       "type": "function"
     },
@@ -828,7 +828,7 @@
       "id": "setupNodeInteraction@src\\VRSceneManager.ts",
       "name": "setupNodeInteraction",
       "file": "VRSceneManager.ts",
-      "line": 797,
+      "line": 796,
       "isExported": false,
       "type": "function"
     },
@@ -836,7 +836,7 @@
       "id": "sceneRootFlyTo@src\\VRSceneManager.ts",
       "name": "sceneRootFlyTo",
       "file": "VRSceneManager.ts",
-      "line": 822,
+      "line": 821,
       "isExported": false,
       "type": "function"
     },
@@ -844,7 +844,7 @@
       "id": "slideFaceView@src\\VRSceneManager.ts",
       "name": "slideFaceView",
       "file": "VRSceneManager.ts",
-      "line": 905,
+      "line": 904,
       "isExported": false,
       "type": "function"
     },
@@ -852,7 +852,7 @@
       "id": "calculateIndegree@src\\VRSceneManager.ts",
       "name": "calculateIndegree",
       "file": "VRSceneManager.ts",
-      "line": 981,
+      "line": 980,
       "isExported": false,
       "type": "function"
     },
@@ -860,7 +860,7 @@
       "id": "renderEdges@src\\VRSceneManager.ts",
       "name": "renderEdges",
       "file": "VRSceneManager.ts",
-      "line": 989,
+      "line": 988,
       "isExported": false,
       "type": "function"
     },
@@ -868,7 +868,7 @@
       "id": "showTooltip@src\\VRSceneManager.ts",
       "name": "showTooltip",
       "file": "VRSceneManager.ts",
-      "line": 1002,
+      "line": 1001,
       "isExported": false,
       "type": "function"
     },
@@ -876,7 +876,7 @@
       "id": "hideTooltip@src\\VRSceneManager.ts",
       "name": "hideTooltip",
       "file": "VRSceneManager.ts",
-      "line": 1032,
+      "line": 1031,
       "isExported": false,
       "type": "function"
     },
@@ -884,7 +884,7 @@
       "id": "setupWebXR@src\\VRSceneManager.ts",
       "name": "setupWebXR",
       "file": "VRSceneManager.ts",
-      "line": 1037,
+      "line": 1036,
       "isExported": false,
       "type": "function"
     },
@@ -892,7 +892,7 @@
       "id": "handleVRControllerClick@src\\VRSceneManager.ts",
       "name": "handleVRControllerClick",
       "file": "VRSceneManager.ts",
-      "line": 1073,
+      "line": 1072,
       "isExported": false,
       "type": "function"
     },
@@ -900,7 +900,7 @@
       "id": "getPerpendicularVector@src\\VRSceneManager.ts",
       "name": "getPerpendicularVector",
       "file": "VRSceneManager.ts",
-      "line": 1136,
+      "line": 1135,
       "isExported": false,
       "type": "function"
     },
@@ -908,7 +908,7 @@
       "id": "run@src\\VRSceneManager.ts",
       "name": "run",
       "file": "VRSceneManager.ts",
-      "line": 1151,
+      "line": 1150,
       "isExported": false,
       "type": "function"
     },
@@ -916,7 +916,7 @@
       "id": "dispose@src\\VRSceneManager.ts",
       "name": "dispose",
       "file": "VRSceneManager.ts",
-      "line": 1159,
+      "line": 1158,
       "isExported": false,
       "type": "function"
     },
@@ -1289,10 +1289,6 @@
     },
     {
       "from": "renderCodeGraph@src\\VRSceneManager.ts",
-      "to": "updateEdges@src\\MeshFactory.ts"
-    },
-    {
-      "from": "renderCodeGraph@src\\VRSceneManager.ts",
       "to": "setupPhysicsLoop@src\\VRSceneManager.ts"
     },
     {
@@ -1412,5 +1408,5 @@
       "to": "render@src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-22T13:35:52.037Z"
+  "lastUpdated": "2026-03-22T13:38:27.650Z"
 }
