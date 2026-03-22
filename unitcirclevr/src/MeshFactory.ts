@@ -9,7 +9,7 @@ export class MeshFactory {
   private scene: BABYLON.Scene;
   private sceneRoot: BABYLON.TransformNode;
   private nodeMeshes: Map<string, BABYLON.Mesh> = new Map();  // Track meshes for raycasting
-  private edgeMeshes: Map<string, { tube: BABYLON.Mesh; arrowhead: BABYLON.Mesh; from: string; to: string }> = new Map();
+  private edgeMeshes: Map<string, { tube: BABYLON.Mesh; arrowhead: BABYLON.Mesh; from: string; to: string; material: BABYLON.StandardMaterial }> = new Map();
 
   constructor(scene: BABYLON.Scene, sceneRoot: BABYLON.TransformNode) {
     this.scene = scene;
@@ -413,7 +413,8 @@ export class MeshFactory {
         tube,
         arrowhead,
         from: edge.from,
-        to: edge.to
+        to: edge.to,
+        material
       });
     }
   }
@@ -527,7 +528,7 @@ export class MeshFactory {
         radius: SceneConfig.EDGE_RADIUS,
       }, this.scene);
       newTube.parent = this.sceneRoot;
-      newTube.material = edgeData.tube.material;
+      newTube.material = edgeData.material;
       newTube.isPickable = false;
       edgeData.tube = newTube;
 
