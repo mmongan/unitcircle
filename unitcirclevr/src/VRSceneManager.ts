@@ -1064,13 +1064,14 @@ export class VRSceneManager {
         this.scene
       );
       
-      // Get file color and create wireframe material
+      // Get file color and create glass material
       const fileColor = this.getFileColor(file);
       const material = new BABYLON.StandardMaterial(`fileboxmat_${file}`, this.scene);
       material.emissiveColor = fileColor;
-      material.wireframe = true;
+      material.specularColor = new BABYLON.Color3(1, 1, 1);
+      material.specularPower = 64;
       material.backFaceCulling = false;
-      material.alpha = 0.8;
+      material.alpha = 0.15;
       
       boxMesh.material = material;
       boxMesh.parent = this.sceneRoot;
