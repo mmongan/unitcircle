@@ -525,12 +525,13 @@ export class VRSceneManager {
     // Calculate indegree (incoming connections) for each node
     const indegreeMap = this.calculateIndegree(graph.edges);
 
-    // Render nodes at their initial positions (all at center)
+    // Render nodes at their random initial positions around 100 units from center
     const initialNodes = this.layout.getNodes();
     this.renderNodes(graph.nodes, initialNodes, indegreeMap);
-    this.renderEdges();  // Create edge cylinders (will be positioned by render loop as nodes separate)
+    this.renderEdges();  // Create edge cylinders
+    this.meshFactory.updateEdges();  // Position edges at initial node positions
 
-    // Enable physics updates to push nodes apart
+    // Enable physics updates to pull connected nodes together and push others apart
     this.physicsActive = true;
     this.physicsIterationCount = 0;
     this.setupPhysicsLoop();

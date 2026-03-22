@@ -41,17 +41,23 @@ export class ForceDirectedLayout {
     this.edges = edges;
     this.nodes = new Map();
 
-    // Initialize nodes with random positions (will be spread by forces)
+    // Initialize nodes with random positions on a sphere ~100 units from center
+    // Connected nodes will attract toward each other, creating visible connections
     for (const id of nodeIds) {
+      // Generate random position on sphere at radius ~100 units
+      const radius = 100 + (Math.random() - 0.5) * 40;  // 80-120 units from center
+      const theta = Math.random() * Math.PI * 2;  // azimuth angle: 0-2π
+      const phi = Math.acos(Math.random() * 2 - 1);  // polar angle: uniform distribution on sphere
+
       this.nodes.set(id, {
         id,
         label: id.split('@')[0],
         file: nodeFileMap?.get(id),
         isExported: nodeExportedMap?.get(id),
         position: {
-          x: (Math.random() - 0.5) * 2 * this.SPACE_SIZE,
-          y: (Math.random() - 0.5) * 2 * this.SPACE_SIZE,
-          z: (Math.random() - 0.5) * 2 * this.SPACE_SIZE
+          x: radius * Math.sin(phi) * Math.cos(theta),
+          y: radius * Math.sin(phi) * Math.sin(theta),
+          z: radius * Math.cos(phi)
         },
         velocity: { x: 0, y: 0, z: 0 }
       });
