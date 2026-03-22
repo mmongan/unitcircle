@@ -34,7 +34,7 @@ export class ForceDirectedLayout {
   private readonly MIN_DISTANCE = 1.0;     // Minimum distance to prevent singularity in force calculations
   private readonly MIN_NODE_SEPARATION = 25.0;    // Minimum distance between unconnected same-file nodes
   private readonly MIN_CROSS_FILE_SEPARATION = 35.0;  // Stronger separation for cross-file nodes
-  private readonly MIN_SAME_FILE_DISTANCE = 5.0;     // Optimized distance for same-file connected edges
+  private readonly MIN_SAME_FILE_DISTANCE = 2.5;     // Minimum distance for tight same-file clustering
   private readonly MIN_EQUILIBRIUM_DISTANCE = 8.0;  // Optimized distance for cross-file connected edges
   private readonly MIN_EDGE_EXPORT_DISTANCE = 15.0;  // Optimized distance for edges connected to exported functions
   private readonly EQUILIBRIUM_THRESHOLD = 0.001;  // Converged when all velocities below this
