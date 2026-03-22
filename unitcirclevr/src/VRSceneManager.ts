@@ -214,8 +214,8 @@ export class VRSceneManager {
           this.fileLayout.updateFrame();
           const filePositions = this.fileLayout.getNodes();
           
-          // Debug: log available file positions on first frame
-          if (this.physicsIterationCount === 0) {
+          // Debug: log available file positions on first frame (disabled)
+          if (false && this.physicsIterationCount === 0) {
             console.log(`  Available file positions: ${Array.from(filePositions.keys()).map(k => `"${k}"`).join(', ')}`);
             console.log(`  File boxes to update: ${Array.from(this.fileBoxMeshes.keys()).map(k => `"${k}"`).join(', ')}`);
           }
@@ -249,15 +249,15 @@ export class VRSceneManager {
           for (const [file, fileBox] of this.fileBoxMeshes.entries()) {
             const fileNode = filePositions.get(file);
             if (!fileNode) {
-              console.warn(`⚠ File node not found in layout for file: ${file}`);
+              // Skip if file node not found (shouldn't happen)
               continue;
             }
             fileBox.position.x = fileNode.position.x;
             fileBox.position.y = fileNode.position.y;
             fileBox.position.z = fileNode.position.z;
               
-              // Log first few iterations to debug positioning
-              if (this.physicsIterationCount === 1 || this.physicsIterationCount === 10 || this.physicsIterationCount === 50) {
+              // Log first few iterations to debug positioning (disabled)
+              if (false && (this.physicsIterationCount === 1 || this.physicsIterationCount === 10 || this.physicsIterationCount === 50)) {
                 console.log(`  Frame ${this.physicsIterationCount}: ${file} at [${fileNode.position.x.toFixed(1)}, ${fileNode.position.y.toFixed(1)}, ${fileNode.position.z.toFixed(1)}]`);
               }
             
@@ -274,8 +274,8 @@ export class VRSceneManager {
                 const size = Math.max(calculatedSize, 10.0);  // Tiny minimum to prevent zero-size boxes
                 fileBox.scaling = new BABYLON.Vector3(size, size, size);
                 
-                // Debug logging for bounds calculation
-                if (this.physicsIterationCount === 1 || this.physicsIterationCount === 50 || this.physicsIterationCount === 100) {
+                // Debug logging for bounds calculation (disabled)
+                if (false && (this.physicsIterationCount === 1 || this.physicsIterationCount === 50 || this.physicsIterationCount === 100)) {
                   console.log(`  ${file}: nodes=${nodeIds.size}, bounds=[w:${bounds.width.toFixed(1)}, h:${bounds.height.toFixed(1)}, d:${bounds.depth.toFixed(1)}], calcSize=${calculatedSize.toFixed(1)}, finalSize=${size.toFixed(1)}`);
                 }
               }
@@ -994,7 +994,7 @@ export class VRSceneManager {
 
     const files = Array.from(this.fileNodeIds.keys());
     const fileNodes = layout.getNodes();
-    const minSeparationPadding = 80.0;  // Large padding to keep boxes well separated
+    const minSeparationPadding = 150.0;  // Large padding to keep boxes well separated (increased from 80)
 
     // Check all pairs of files for intersection
     for (let i = 0; i < files.length; i++) {
@@ -1022,20 +1022,22 @@ export class VRSceneManager {
         // Required distance to prevent intersection with padding
         const requiredDistance = radius1 + radius2 + minSeparationPadding;
 
-        // If boxes are too close, apply HARD constraint to push them apart immediately
-        // This overrides physics forces to guarantee separation
-        if (distance < requiredDistance && distance > 0.1) {
+        // Only apply hard constraint when boxes are ACTUALLY overlapping (not just close)
+        // This prevents jitter from being applied every frame when boxes hover near the boundary
+        const actualOverlap = distance < (radius1 + radius2);
+        
+        if (actualOverlap && distance > 0.1) {
           const direction = pos2.subtract(pos1).normalize();
-          const separationNeeded = requiredDistance - distance;
+          const separationNeeded = (radius1 + radius2 + minSeparationPadding) - distance;
 
-          // Debug collision detection
-          if (this.physicsIterationCount < 10 || this.physicsIterationCount % 50 === 0) {
-            console.log(`🔄 Collision: ${file1} ↔ ${file2}: distance=${distance.toFixed(1)}, required=${requiredDistance.toFixed(1)}, separation=${separationNeeded.toFixed(1)}`);
+          // Debug collision detection (disabled to reduce console spam)
+          if (false && (this.physicsIterationCount < 10 || this.physicsIterationCount % 50 === 0)) {
+            console.log(`⚠️ OVERLAP: ${file1} ↔ ${file2}: distance=${distance.toFixed(1)}, overlap=${(radius1 + radius2 - distance).toFixed(1)}`);
           }
 
-          // Hard constraint: directly move nodes apart by half the separation needed
-          // This guarantees they will separate regardless of other forces
-          const moveAmount = (separationNeeded / 2) + 5.0;  // Add small buffer
+          // Gentle constraint: move apart just enough to separate, with hysteresis
+          // Only push by the actual overlap amount plus small buffer
+          const moveAmount = (radius1 + radius2 - distance) * 0.6 + 2.0;  // Gentle, damped separation
           
           node1.position.x -= direction.x * moveAmount;
           node1.position.y -= direction.y * moveAmount;
@@ -1045,19 +1047,23 @@ export class VRSceneManager {
           node2.position.y += direction.y * moveAmount;
           node2.position.z += direction.z * moveAmount;
           
-          // Clear velocities in the separation direction to prevent immediate recollision
-          const vel1Component = node1.velocity.x * direction.x + node1.velocity.y * direction.y + node1.velocity.z * direction.z;
-          if (vel1Component > 0) {  // If moving toward the other box
-            node1.velocity.x -= direction.x * vel1Component;
-            node1.velocity.y -= direction.y * vel1Component;
-            node1.velocity.z -= direction.z * vel1Component;
-          }
+          // Only clear velocities pointing directly toward each other (reduce oscillation)
+          const rel_vel = (node2.velocity.x - node1.velocity.x) * direction.x +
+                          (node2.velocity.y - node1.velocity.y) * direction.y +
+                          (node2.velocity.z - node1.velocity.z) * direction.z;
           
-          const vel2Component = node2.velocity.x * direction.x + node2.velocity.y * direction.y + node2.velocity.z * direction.z;
-          if (vel2Component < 0) {  // If moving toward the other box
-            node2.velocity.x -= direction.x * vel2Component;
-            node2.velocity.y -= direction.y * vel2Component;
-            node2.velocity.z -= direction.z * vel2Component;
+          if (rel_vel < 0) {  // Relative velocity is toward each other
+            // Reduce closing velocity by damping factor
+            const dampFactor = 0.3;  // Reduce closing velocity by 30%
+            const velReduction = rel_vel * dampFactor;
+            
+            node1.velocity.x += direction.x * velReduction;
+            node1.velocity.y += direction.y * velReduction;
+            node1.velocity.z += direction.z * velReduction;
+            
+            node2.velocity.x -= direction.x * velReduction;
+            node2.velocity.y -= direction.y * velReduction;
+            node2.velocity.z -= direction.z * velReduction;
           }
         }
       }
