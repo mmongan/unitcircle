@@ -214,11 +214,8 @@ export class VRSceneManager {
           this.fileLayout.updateFrame();
           const filePositions = this.fileLayout.getNodes();
           
-          // Debug: log available file positions on first frame (disabled)
-          if (false && this.physicsIterationCount === 0) {
-            console.log(`  Available file positions: ${Array.from(filePositions.keys()).map(k => `"${k}"`).join(', ')}`);
-            console.log(`  File boxes to update: ${Array.from(this.fileBoxMeshes.keys()).map(k => `"${k}"`).join(', ')}`);
-          }
+          // Debug: log available file positions on first frame
+          // (disabled - positions change every iteration)
           
           // Step 2: Update each file's internal layout (positions nodes within the file)
           for (const [_file, internalLayout] of this.fileInternalLayouts.entries()) {
@@ -255,11 +252,6 @@ export class VRSceneManager {
             fileBox.position.x = fileNode.position.x;
             fileBox.position.y = fileNode.position.y;
             fileBox.position.z = fileNode.position.z;
-              
-              // Log first few iterations to debug positioning (disabled)
-              if (false && (this.physicsIterationCount === 1 || this.physicsIterationCount === 10 || this.physicsIterationCount === 50)) {
-                console.log(`  Frame ${this.physicsIterationCount}: ${file} at [${fileNode.position.x.toFixed(1)}, ${fileNode.position.y.toFixed(1)}, ${fileNode.position.z.toFixed(1)}]`);
-              }
             
             // Update file box size to fit all its nodes
             const nodeIds = this.fileNodeIds.get(file);
@@ -273,11 +265,6 @@ export class VRSceneManager {
                 // Small files get small boxes, large files get large boxes
                 const size = Math.max(calculatedSize, 10.0);  // Tiny minimum to prevent zero-size boxes
                 fileBox.scaling = new BABYLON.Vector3(size, size, size);
-                
-                // Debug logging for bounds calculation (disabled)
-                if (false && (this.physicsIterationCount === 1 || this.physicsIterationCount === 50 || this.physicsIterationCount === 100)) {
-                  console.log(`  ${file}: nodes=${nodeIds.size}, bounds=[w:${bounds.width.toFixed(1)}, h:${bounds.height.toFixed(1)}, d:${bounds.depth.toFixed(1)}], calcSize=${calculatedSize.toFixed(1)}, finalSize=${size.toFixed(1)}`);
-                }
               }
             }
           }
@@ -994,7 +981,7 @@ export class VRSceneManager {
 
     const files = Array.from(this.fileNodeIds.keys());
     const fileNodes = layout.getNodes();
-    const minSeparationPadding = 150.0;  // Large padding to keep boxes well separated (increased from 80)
+    const minSeparationPadding = 150.0;  // Large padding to keep boxes well separated
 
     // Check all pairs of files for intersection
     for (let i = 0; i < files.length; i++) {
@@ -1022,49 +1009,24 @@ export class VRSceneManager {
         // Required distance to prevent intersection with padding
         const requiredDistance = radius1 + radius2 + minSeparationPadding;
 
-        // Only apply hard constraint when boxes are ACTUALLY overlapping (not just close)
-        // This prevents jitter from being applied every frame when boxes hover near the boundary
-        const actualOverlap = distance < (radius1 + radius2);
-        
-        if (actualOverlap && distance > 0.1) {
+        // Apply repulsive velocity BEFORE boxes get too close (proactive, not reactive)
+        // This prevents jitter by gently pushing apart rather than snapping apart
+        if (distance < requiredDistance && distance > 0.1) {
           const direction = pos2.subtract(pos1).normalize();
-          const separationNeeded = (radius1 + radius2 + minSeparationPadding) - distance;
-
-          // Debug collision detection (disabled to reduce console spam)
-          if (false && (this.physicsIterationCount < 10 || this.physicsIterationCount % 50 === 0)) {
-            console.log(`⚠️ OVERLAP: ${file1} ↔ ${file2}: distance=${distance.toFixed(1)}, overlap=${(radius1 + radius2 - distance).toFixed(1)}`);
-          }
-
-          // Gentle constraint: move apart just enough to separate, with hysteresis
-          // Only push by the actual overlap amount plus small buffer
-          const moveAmount = (radius1 + radius2 - distance) * 0.6 + 2.0;  // Gentle, damped separation
+          const tooCloseFactor = 1.0 - (distance / requiredDistance);  // 0 when at required distance, 1 when touching
           
-          node1.position.x -= direction.x * moveAmount;
-          node1.position.y -= direction.y * moveAmount;
-          node1.position.z -= direction.z * moveAmount;
+          // Proactive velocity-based repulsion that increases as boxes get closer
+          const repulsionStrength = 600.0 * tooCloseFactor;  // Increases as boxes approach
           
-          node2.position.x += direction.x * moveAmount;
-          node2.position.y += direction.y * moveAmount;
-          node2.position.z += direction.z * moveAmount;
+          const repulsionVelocity1 = direction.scale(-repulsionStrength);
+          node1.velocity.x += repulsionVelocity1.x;
+          node1.velocity.y += repulsionVelocity1.y;
+          node1.velocity.z += repulsionVelocity1.z;
           
-          // Only clear velocities pointing directly toward each other (reduce oscillation)
-          const rel_vel = (node2.velocity.x - node1.velocity.x) * direction.x +
-                          (node2.velocity.y - node1.velocity.y) * direction.y +
-                          (node2.velocity.z - node1.velocity.z) * direction.z;
-          
-          if (rel_vel < 0) {  // Relative velocity is toward each other
-            // Reduce closing velocity by damping factor
-            const dampFactor = 0.3;  // Reduce closing velocity by 30%
-            const velReduction = rel_vel * dampFactor;
-            
-            node1.velocity.x += direction.x * velReduction;
-            node1.velocity.y += direction.y * velReduction;
-            node1.velocity.z += direction.z * velReduction;
-            
-            node2.velocity.x -= direction.x * velReduction;
-            node2.velocity.y -= direction.y * velReduction;
-            node2.velocity.z -= direction.z * velReduction;
-          }
+          const repulsionVelocity2 = direction.scale(repulsionStrength);
+          node2.velocity.x += repulsionVelocity2.x;
+          node2.velocity.y += repulsionVelocity2.y;
+          node2.velocity.z += repulsionVelocity2.z;
         }
       }
     }
