@@ -986,7 +986,6 @@ export class VRSceneManager {
 
     const files = Array.from(this.fileNodeIds.keys());
     const fileNodes = layout.getNodes();
-    const repulsionStrength = 300.0;  // Force strength for box separation (increased from 150)
     const minSeparationPadding = 60.0;  // Minimum distance padding between boxes (increased from 40)
 
     // Check all pairs of files for intersection
@@ -1034,7 +1033,6 @@ export class VRSceneManager {
           node2.position.x += direction.x * moveDistance;
           node2.position.y += direction.y * moveDistance;
           node2.position.z += direction.z * moveDistance;
-        }
         }
       }
     }
