@@ -352,8 +352,6 @@ export class MeshFactory {
    * Called during render loop to keep edges attached to moving nodes
    */
   public updateEdges(): void {
-    const MIN_EDGE_LENGTH = 6.0;  // Minimum visual length for edges
-    
     if (this.edgeTubes.size === 0 || this.nodeMeshes.size === 0) {
       return;  // No edges to update
     }
@@ -387,9 +385,8 @@ export class MeshFactory {
       const midpoint = sourceCenterPos.add(direction.scale(0.5));
       cylinder.position = midpoint;
 
-      // Scale cylinder with minimum edge length constraint
-      const displayDistance = Math.max(distance, MIN_EDGE_LENGTH);
-      cylinder.scaling.y = displayDistance;
+      // Scale cylinder to distance (physics constraint ensures minimum 6 units)
+      cylinder.scaling.y = distance;
 
       // Rotate cylinder to point along the connection
       const normalizedDir = direction.normalize();

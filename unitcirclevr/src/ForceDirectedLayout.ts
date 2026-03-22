@@ -227,59 +227,60 @@ export class ForceDirectedLayout {
       maxVelocity = Math.max(maxVelocity, speed);
     }
 
-    // Enforce minimum distance constraint - push nodes apart if too close
-    this.enforceMinimumDistance(nodeArray);
+    // Enforce minimum distance constraint only for connected nodes
+    this.enforceEdgeMinimumDistance();
 
     // Return true if still converging, false if settled
     return maxVelocity >= this.EQUILIBRIUM_THRESHOLD;
   }
 
   /**
-   * Enforce minimum distance constraint between all node pairs
-   * Push nodes apart if they get closer than MIN_EQUILIBRIUM_DISTANCE
+   * Enforce minimum distance constraint between nodes connected by edges
+   * Push connected nodes apart if they get closer than MIN_EQUILIBRIUM_DISTANCE
+   * Does NOT constrain unconnected nodes - they can get arbitrarily close
    */
-  private enforceMinimumDistance(nodeArray: Node[]): void {
-    const nodeCount = nodeArray.length;
-    const pushForce = this.C_REPULSIVE * 5;  // Strong push force to maintain distance
+  private enforceEdgeMinimumDistance(): void {
+    const pushForce = this.C_REPULSIVE * 5;  // Strong push force to maintain edge distance
 
-    for (let i = 0; i < nodeCount; i++) {
-      for (let j = i + 1; j < nodeCount; j++) {
-        const nodeA = nodeArray[i];
-        const nodeB = nodeArray[j];
+    // Only enforce distance for nodes that are connected by edges
+    for (const edge of this.edges) {
+      const nodeA = this.nodes.get(edge.source);
+      const nodeB = this.nodes.get(edge.target);
 
-        const dx = nodeB.position.x - nodeA.position.x;
-        const dy = nodeB.position.y - nodeA.position.y;
-        const dz = nodeB.position.z - nodeA.position.z;
+      if (!nodeA || !nodeB) continue;
 
-        const distance = Math.sqrt(dx * dx + dy * dy + dz * dz) || this.MIN_DISTANCE;
+      const dx = nodeB.position.x - nodeA.position.x;
+      const dy = nodeB.position.y - nodeA.position.y;
+      const dz = nodeB.position.z - nodeA.position.z;
 
-        // If nodes are closer than minimum distance, push them apart
-        if (distance < this.MIN_EQUILIBRIUM_DISTANCE) {
-          const direction = distance > 0 
-            ? { x: dx / distance, y: dy / distance, z: dz / distance }
-            : { x: Math.random() - 0.5, y: Math.random() - 0.5, z: Math.random() - 0.5 };
+      const distance = Math.sqrt(dx * dx + dy * dy + dz * dz) || this.MIN_DISTANCE;
 
-          // Calculate how much to push
-          const pushAmount = (this.MIN_EQUILIBRIUM_DISTANCE - distance) * pushForce;
+      // If connected nodes are closer than minimum distance, push them apart
+      if (distance < this.MIN_EQUILIBRIUM_DISTANCE) {
+        const direction = distance > 0 
+          ? { x: dx / distance, y: dy / distance, z: dz / distance }
+          : { x: Math.random() - 0.5, y: Math.random() - 0.5, z: Math.random() - 0.5 };
 
-          // Push nodes apart
-          nodeA.position.x -= direction.x * pushAmount;
-          nodeA.position.y -= direction.y * pushAmount;
-          nodeA.position.z -= direction.z * pushAmount;
+        // Calculate how much to push
+        const pushAmount = (this.MIN_EQUILIBRIUM_DISTANCE - distance) * pushForce;
 
-          nodeB.position.x += direction.x * pushAmount;
-          nodeB.position.y += direction.y * pushAmount;
-          nodeB.position.z += direction.z * pushAmount;
+        // Push nodes apart
+        nodeA.position.x -= direction.x * pushAmount;
+        nodeA.position.y -= direction.y * pushAmount;
+        nodeA.position.z -= direction.z * pushAmount;
 
-          // Re-constrain to bounds after pushing
-          nodeA.position.x = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeA.position.x));
-          nodeA.position.y = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeA.position.y));
-          nodeA.position.z = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeA.position.z));
+        nodeB.position.x += direction.x * pushAmount;
+        nodeB.position.y += direction.y * pushAmount;
+        nodeB.position.z += direction.z * pushAmount;
 
-          nodeB.position.x = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeB.position.x));
-          nodeB.position.y = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeB.position.y));
-          nodeB.position.z = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeB.position.z));
-        }
+        // Re-constrain to bounds after pushing
+        nodeA.position.x = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeA.position.x));
+        nodeA.position.y = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeA.position.y));
+        nodeA.position.z = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeA.position.z));
+
+        nodeB.position.x = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeB.position.x));
+        nodeB.position.y = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeB.position.y));
+        nodeB.position.z = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeB.position.z));
       }
     }
   }
