@@ -1008,12 +1008,17 @@ export class VRSceneManager {
   private updateFileBoundingSpheres(): void {
     for (const sphereData of this.fileBoundingSpheres.values()) {
       const positions: BABYLON.Vector3[] = [];
+      let maxNodeRadius = 0;
 
-      // Collect current positions of all nodes in this file
+      // Collect current positions of all nodes in this file and find max node size
       for (const nodeId of sphereData.nodeIds) {
         const mesh = this.nodeMeshMap.get(nodeId);
         if (mesh) {
           positions.push(mesh.position.clone());
+          // Account for node mesh visual size (sphere radius scales)
+          const nodeScale = mesh.scaling?.x || 1.0;
+          const nodeVisualRadius = nodeScale * 0.5;  // Node sphere has 1.0 unit radius
+          maxNodeRadius = Math.max(maxNodeRadius, nodeVisualRadius);
         }
       }
 
@@ -1025,15 +1030,13 @@ export class VRSceneManager {
       // Update sphere mesh position and scale
       sphereData.mesh.position = center;
 
-      // Minimal padding to fit node contents tightly
-      const visualRadius = radius + 1.5;  // Only 1.5 unit padding for tight fit
+      // Auto-size to encompass node contents: bounding sphere radius + node size + small margin
+      const visualRadius = radius + maxNodeRadius + 0.5;  // Small margin for breathing room
 
-      // Aggressively interpolate toward target radius for tight fitting
+      // Directly apply target scale (no lerp) for immediate auto-sizing
       const targetScale = visualRadius / 50;  // Base radius is 50 (diameter 100)
-      const currentScale = sphereData.mesh.scaling.x;
-      const smoothedScale = currentScale + (targetScale - currentScale) * 0.25;  // 25% lerp for faster convergence
 
-      sphereData.mesh.scaling = new BABYLON.Vector3(smoothedScale, smoothedScale, smoothedScale);
+      sphereData.mesh.scaling = new BABYLON.Vector3(targetScale, targetScale, targetScale);
     }
 
     // Resolve overlapping spheres by reducing their radii or pushing them apart
