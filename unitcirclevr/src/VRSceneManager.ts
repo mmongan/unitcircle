@@ -260,6 +260,9 @@ export class VRSceneManager {
             }
           }
           
+          // Step 4b: Apply repulsive forces to prevent file box intersections
+          this.applyFileBoxRepulsion(this.fileLayout);
+          
           // Step 5: Update edge cylinders to follow moving nodes
           this.meshFactory.updateEdges();
           
@@ -949,6 +952,66 @@ export class VRSceneManager {
       height: maxY - minY,
       depth: maxZ - minZ
     };
+  }
+
+  /**
+   * Apply repulsive forces between file boxes to prevent intersections
+   */
+  private applyFileBoxRepulsion(layout: ForceDirectedLayout | null): void {
+    if (!layout) return;
+
+    const files = Array.from(this.fileNodeIds.keys());
+    const fileNodes = layout.getNodes();
+    const repulsionStrength = 50.0;  // Force strength for box separation
+    const minSeparationPadding = 15.0;  // Minimum distance padding between boxes
+
+    // Check all pairs of files for intersection
+    for (let i = 0; i < files.length; i++) {
+      for (let j = i + 1; j < files.length; j++) {
+        const file1 = files[i];
+        const file2 = files[j];
+
+        const node1 = fileNodes.get(file1);
+        const node2 = fileNodes.get(file2);
+        if (!node1 || !node2) continue;
+
+        const box1 = this.fileBoxMeshes.get(file1);
+        const box2 = this.fileBoxMeshes.get(file2);
+        if (!box1 || !box2) continue;
+
+        // Calculate bounding sphere radii (half of max dimension of scaled box)
+        const maxDim1 = Math.max(box1.scaling.x, box1.scaling.y, box1.scaling.z) / 2;
+        const maxDim2 = Math.max(box2.scaling.x, box2.scaling.y, box2.scaling.z) / 2;
+        const radius1 = maxDim1;
+        const radius2 = maxDim2;
+
+        const pos1 = new BABYLON.Vector3(node1.position.x, node1.position.y, node1.position.z);
+        const pos2 = new BABYLON.Vector3(node2.position.x, node2.position.y, node2.position.z);
+        const distance = BABYLON.Vector3.Distance(pos1, pos2);
+
+        // Required distance to prevent intersection with padding
+        const requiredDistance = radius1 + radius2 + minSeparationPadding;
+
+        // If boxes are intersecting or too close, push them apart
+        if (distance < requiredDistance && distance > 0.01) {
+          const direction = pos2.subtract(pos1).normalize();
+          const pushDistance = Math.max(0, requiredDistance - distance);
+
+          // Apply force to both file nodes in the layout
+          const repulsionForce = pushDistance * repulsionStrength;
+          
+          // Push file1 away from file2
+          node1.velocity.x -= direction.x * repulsionForce;
+          node1.velocity.y -= direction.y * repulsionForce;
+          node1.velocity.z -= direction.z * repulsionForce;
+
+          // Push file2 away from file1
+          node2.velocity.x += direction.x * repulsionForce;
+          node2.velocity.y += direction.y * repulsionForce;
+          node2.velocity.z += direction.z * repulsionForce;
+        }
+      }
+    }
   }
 
   private renderEdges(): void {
