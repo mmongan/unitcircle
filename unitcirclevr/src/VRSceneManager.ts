@@ -236,12 +236,13 @@ export class VRSceneManager {
           this.updateFileBoundingSpheres();
 
           // Continue iterating until equilibrium is reached or max iterations exceeded
-          // Continue longer if file spheres still overlap
+          // Continue indefinitely if file spheres overlap - they MUST separate
           this.physicsIterationCount++;
           const spheresOverlapping = this.checkSpheresOverlapping();
-          const maxIterations = spheresOverlapping ? 2000 : 1200;  // Extend to 2000 if overlaps detected
+          const hardMaxIterations = 3000;  // Absolute hard limit to prevent infinite loops
           
-          if (this.physicsIterationCount > maxIterations || (!stillConverging && !spheresOverlapping)) {
+          // Keep running as long as spheres overlap OR until hard max
+          if (this.physicsIterationCount > hardMaxIterations || (!spheresOverlapping && !stillConverging)) {
             this.physicsActive = false;
           }
         }
