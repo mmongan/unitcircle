@@ -436,7 +436,7 @@
       "id": "createVariableMesh@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "createVariableMesh",
       "file": "MeshFactory.ts",
-      "line": 72,
+      "line": 75,
       "isExported": false,
       "type": "function"
     },
@@ -444,7 +444,7 @@
       "id": "createFunctionMesh@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "createFunctionMesh",
       "file": "MeshFactory.ts",
-      "line": 100,
+      "line": 104,
       "isExported": false,
       "type": "function"
     },
@@ -452,7 +452,7 @@
       "id": "createSignatureTexture@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "createSignatureTexture",
       "file": "MeshFactory.ts",
-      "line": 162,
+      "line": 169,
       "isExported": false,
       "type": "function"
     },
@@ -460,7 +460,7 @@
       "id": "createLabel@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "createLabel",
       "file": "MeshFactory.ts",
-      "line": 245,
+      "line": 252,
       "isExported": false,
       "type": "function"
     },
@@ -468,7 +468,7 @@
       "id": "createEdges@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "createEdges",
       "file": "MeshFactory.ts",
-      "line": 291,
+      "line": 298,
       "isExported": false,
       "type": "function"
     },
@@ -476,7 +476,7 @@
       "id": "removeMeshReference@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "removeMeshReference",
       "file": "MeshFactory.ts",
-      "line": 371,
+      "line": 381,
       "isExported": false,
       "type": "function"
     },
@@ -484,7 +484,7 @@
       "id": "updateEdges@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "updateEdges",
       "file": "MeshFactory.ts",
-      "line": 380,
+      "line": 390,
       "isExported": false,
       "type": "function"
     },
@@ -1364,5 +1364,5 @@
       "to": "render@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-22T22:42:54.002Z"
+  "lastUpdated": "2026-03-22T22:53:16.012Z"
 }
