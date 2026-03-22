@@ -28,16 +28,22 @@ export class ForceDirectedLayout {
     this.nodes = new Map();
     this.edges = edges;
 
-    // Initialize all nodes near the center with tiny random perturbations
-    // This breaks symmetry so repulsive forces can push them apart
+    // Initialize all nodes 1 unit away from center in random directions
+    // This gives them initial spread before force layout takes over
     for (const id of nodeIds) {
+      // Generate random direction vector
+      const theta = Math.random() * Math.PI * 2;  // Random angle in xy plane
+      const phi = Math.random() * Math.PI;         // Random angle from z axis
+      
+      // Convert spherical to cartesian coordinates with radius = 1.0
+      const radius = 1.0;
+      const x = radius * Math.sin(phi) * Math.cos(theta);
+      const y = radius * Math.sin(phi) * Math.sin(theta);
+      const z = radius * Math.cos(phi);
+      
       this.nodes.set(id, {
         id,
-        position: {
-          x: (Math.random() - 0.5) * 0.01,  // Tiny random offset to break symmetry
-          y: (Math.random() - 0.5) * 0.01,
-          z: (Math.random() - 0.5) * 0.01
-        },
+        position: { x, y, z },
         velocity: { x: 0, y: 0, z: 0 },
         label: id.split('@')[0]
       });
