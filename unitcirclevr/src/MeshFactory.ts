@@ -10,7 +10,6 @@ export class MeshFactory {
   private sceneRoot: BABYLON.TransformNode;
   private nodeMeshes: Map<string, BABYLON.Mesh> = new Map();  // Track meshes for raycasting
   private edgeMeshes: Map<string, { tube: BABYLON.Mesh; arrowhead: BABYLON.Mesh; from: string; to: string }> = new Map();
-  private layoutNodes: Map<string, any> = new Map();  // Store latest layout positions for edge updates
 
   constructor(scene: BABYLON.Scene, sceneRoot: BABYLON.TransformNode) {
     this.scene = scene;
@@ -288,9 +287,6 @@ export class MeshFactory {
     layoutNodes: Map<string, any>,
     fileColorMap: Map<string, BABYLON.Color3> = new Map()
   ): void {
-    // Store layout nodes for edge updates during render loop
-    this.layoutNodes = new Map(layoutNodes);
-    
     // Create material for normal edges (same-file calls)
     const edgeMaterial = new BABYLON.StandardMaterial('edgeMaterial', this.scene);
     edgeMaterial.emissiveColor = new BABYLON.Color3(0.8, 0.8, 0.8);  // Bright gray
@@ -462,20 +458,22 @@ export class MeshFactory {
    * Called during render loop to keep edges attached to moving nodes
    */
   public updateEdges(): void {
-    if (this.edgeMeshes.size === 0 || this.layoutNodes.size === 0) {
+    if (this.edgeMeshes.size === 0 || this.nodeMeshes.size === 0) {
       return;  // No edges to update
     }
 
     for (const [edgeId, edgeData] of this.edgeMeshes) {
-      const sourceNode = this.layoutNodes.get(edgeData.from);
-      const targetNode = this.layoutNodes.get(edgeData.to);
+      // Get current node positions directly from meshes (always up-to-date after layout/repulsion)
+      const sourceMesh = this.nodeMeshes.get(edgeData.from);
+      const targetMesh = this.nodeMeshes.get(edgeData.to);
 
-      if (!sourceNode || !targetNode) {
+      if (!sourceMesh || !targetMesh) {
         continue;  // Skip if nodes not found
       }
 
-      const sourceCenterPos = new BABYLON.Vector3(sourceNode.position.x, sourceNode.position.y, sourceNode.position.z);
-      const targetCenterPos = new BABYLON.Vector3(targetNode.position.x, targetNode.position.y, targetNode.position.z);
+      // Use mesh positions - these are always current after node movements
+      const sourceCenterPos = sourceMesh.position.clone();
+      const targetCenterPos = targetMesh.position.clone();
 
       let sourcePos = sourceCenterPos.clone();
       let targetPos = targetCenterPos.clone();
@@ -485,24 +483,18 @@ export class MeshFactory {
       const distance = BABYLON.Vector3.Distance(sourceCenterPos, targetCenterPos);
 
       // Find source surface intersection point via raycast
-      const sourceMesh = this.nodeMeshes.get(edgeData.from);
-      if (sourceMesh) {
-        const sourceRay = new BABYLON.Ray(sourceCenterPos, direction, distance);
-        const sourceHit = this.scene.pickWithRay(sourceRay, (mesh) => mesh === sourceMesh);
-        if (sourceHit && sourceHit.hit && sourceHit.pickedPoint) {
-          sourcePos = sourceHit.pickedPoint.clone();
-        }
+      const sourceRay = new BABYLON.Ray(sourceCenterPos, direction, distance);
+      const sourceHit = this.scene.pickWithRay(sourceRay, (mesh) => mesh === sourceMesh);
+      if (sourceHit && sourceHit.hit && sourceHit.pickedPoint) {
+        sourcePos = sourceHit.pickedPoint.clone();
       }
 
       // Find target surface intersection point via raycast
-      const targetMesh = this.nodeMeshes.get(edgeData.to);
-      if (targetMesh) {
-        const reverseDirection = direction.scale(-1);
-        const targetRay = new BABYLON.Ray(targetCenterPos, reverseDirection, distance);
-        const targetHit = this.scene.pickWithRay(targetRay, (mesh) => mesh === targetMesh);
-        if (targetHit && targetHit.hit && targetHit.pickedPoint) {
-          targetPos = targetHit.pickedPoint.clone();
-        }
+      const reverseDirection = direction.scale(-1);
+      const targetRay = new BABYLON.Ray(targetCenterPos, reverseDirection, distance);
+      const targetHit = this.scene.pickWithRay(targetRay, (mesh) => mesh === targetMesh);
+      if (targetHit && targetHit.hit && targetHit.pickedPoint) {
+        targetPos = targetHit.pickedPoint.clone();
       }
 
       // Calculate arrowhead dimensions
