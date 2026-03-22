@@ -236,14 +236,47 @@ export class VRSceneManager {
           this.updateFileBoundingSpheres();
 
           // Continue iterating until equilibrium is reached or max iterations exceeded
-          // With stronger forces, system needs more time to fully settle
+          // Continue longer if file spheres still overlap
           this.physicsIterationCount++;
-          if (this.physicsIterationCount > 1200 || !stillConverging) {
+          const spheresOverlapping = this.checkSpheresOverlapping();
+          const maxIterations = spheresOverlapping ? 2000 : 1200;  // Extend to 2000 if overlaps detected
+          
+          if (this.physicsIterationCount > maxIterations || (!stillConverging && !spheresOverlapping)) {
             this.physicsActive = false;
           }
         }
       });
     }
+  }
+
+  /**
+   * Check if any file spheres are currently overlapping
+   */
+  private checkSpheresOverlapping(): boolean {
+    const spheres = Array.from(this.fileBoundingSpheres.entries());
+    const minGap = 2.0;  // Spheres should have at least this gap
+
+    for (let i = 0; i < spheres.length; i++) {
+      for (let j = i + 1; j < spheres.length; j++) {
+        const [, sphere1Data] = spheres[i];
+        const [, sphere2Data] = spheres[j];
+
+        const pos1 = sphere1Data.mesh.position;
+        const pos2 = sphere2Data.mesh.position;
+        const distance = BABYLON.Vector3.Distance(pos1, pos2);
+
+        const radius1 = 50 * sphere1Data.mesh.scaling.x;
+        const radius2 = 50 * sphere2Data.mesh.scaling.x;
+        const minDistance = radius1 + radius2 + minGap;
+
+        // If any pair overlaps, return true
+        if (distance < minDistance) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   private getAdjacentFaceIfNearEdge(pickedPoint: BABYLON.Vector3, cubePosition: BABYLON.Vector3, faceNormal: BABYLON.Vector3): BABYLON.Vector3 | null {
@@ -1137,8 +1170,8 @@ export class VRSceneManager {
    */
   private applySphereSeparation(layoutNodes: Map<string, any>): void {
     const spheres = Array.from(this.fileBoundingSpheres.entries());
-    const separationStrength = 1.2;  // Force magnitude for sphere-to-sphere repulsion
-    const minSphereDistance = 15.0;  // Minimum distance between sphere centers
+    const separationStrength = 2.5;  // Increased for more aggressive sphere separation
+    const minSphereDistance = 18.0;  // Increased minimum distance between sphere centers
 
     // Apply pairwise repulsion between all spheres
     for (let i = 0; i < spheres.length; i++) {
