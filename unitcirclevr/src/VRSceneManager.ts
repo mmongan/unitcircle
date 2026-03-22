@@ -504,6 +504,51 @@ export class VRSceneManager {
     return layout.simulate(SceneConfig.LAYOUT_ITERATIONS);
   }
 
+  /**
+   * Animate a node mesh to a target position
+   */
+  private animateNodeToPosition(
+    mesh: BABYLON.Mesh,
+    targetPosition: BABYLON.Vector3,
+    duration: number = 1000  // 1 second animation
+  ): void {
+    const currentPosition = mesh.position.clone();
+    
+    // Create position animation
+    const animationName = `nodeMove_${mesh.id}`;
+    const animation = new BABYLON.Animation(
+      animationName,
+      'position',
+      60,  // 60 fps
+      BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
+      BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+    );
+
+    // Create keyframes for smooth easing
+    const frameRate = 60;
+    const totalFrames = Math.floor((duration / 1000) * frameRate);
+    
+    const keys = [
+      { frame: 0, value: currentPosition },
+      { frame: totalFrames, value: targetPosition }
+    ];
+
+    animation.setKeys(keys);
+    
+    // Use ease function for smooth animation
+    const easingFunction = new BABYLON.CubicEase();
+    easingFunction.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEOUT);
+    animation.setEasingFunction(easingFunction);
+
+    // Remove any existing animation on this mesh
+    this.scene.stopAnimation(mesh);
+
+    // Add and play the animation
+    mesh.animations = [];
+    mesh.animations.push(animation);
+    this.scene.beginAnimation(mesh, 0, totalFrames, false);
+  }
+
   private renderNodes(
     nodes: GraphNode[],
     layoutNodes: Map<string, any>,
@@ -513,19 +558,24 @@ export class VRSceneManager {
       const layoutNode = layoutNodes.get(node.id);
       if (!layoutNode) continue;
 
-      const position = new BABYLON.Vector3(
+      const targetPosition = new BABYLON.Vector3(
         layoutNode.position.x,
         layoutNode.position.y,
         layoutNode.position.z
       );
 
+      // Start nodes at center - will be animated to target position
+      const centerPosition = new BABYLON.Vector3(0, 0, 0);
+
       // Get or generate color for this file
       const fileColor = node.file ? this.getFileColor(node.file) : null;
       const indegree = indegreeMap.get(node.id) || 0;
 
-      this.meshFactory.createNodeMesh(node, position, fileColor, indegree, (mesh, material, n) =>
-        this.setupNodeInteraction(mesh, material, n)
-      );
+      this.meshFactory.createNodeMesh(node, centerPosition, fileColor, indegree, (mesh, material, n) => {
+        this.setupNodeInteraction(mesh, material, n);
+        // Animate the node to its target position
+        this.animateNodeToPosition(mesh, targetPosition, 4000);  // 4 second animation
+      });
     }
   }
 

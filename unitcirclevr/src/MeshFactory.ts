@@ -61,7 +61,10 @@ export class MeshFactory {
     material.wireframe = false;
     cylinder.material = material;
 
-    this.createLabel(node.name, cylinder.position, node.id);
+    // Store reference to this mesh for raycasting during edge creation
+    this.nodeMeshes.set(node.id, cylinder);
+
+    this.createLabel(node.name, cylinder as BABYLON.Mesh);
     onNodeInteraction(cylinder as BABYLON.Mesh, material, node);
   }
 
@@ -87,7 +90,10 @@ export class MeshFactory {
     material.wireframe = false;
     sphere.material = material;
 
-    this.createLabel(node.name, sphere.position, node.id);
+    // Store reference to this mesh for raycasting during edge creation
+    this.nodeMeshes.set(node.id, sphere);
+
+    this.createLabel(node.name, sphere as BABYLON.Mesh);
     onNodeInteraction(sphere as BABYLON.Mesh, material, node);
   }
 
@@ -240,9 +246,9 @@ export class MeshFactory {
   /**
    * Create a billboard label above a mesh
    */
-  private createLabel(text: string, position: BABYLON.Vector3, nodeId: string): void {
+  private createLabel(text: string, parentMesh: BABYLON.Mesh): void {
     const dynamicTexture = new BABYLON.DynamicTexture(
-      `labelTexture_${nodeId}`,
+      `labelTexture_${parentMesh.id}`,
       SceneConfig.LABEL_TEXTURE_SIZE,
       this.scene
     );
@@ -265,15 +271,17 @@ export class MeshFactory {
 
     // Create plane for label
     const labelPlane = BABYLON.MeshBuilder.CreatePlane(
-      `label_${nodeId}`,
+      `label_${parentMesh.id}`,
       { width: SceneConfig.LABEL_WIDTH, height: SceneConfig.LABEL_HEIGHT },
       this.scene
     );
-    labelPlane.position = position.add(SceneConfig.LABEL_OFFSET);
-    labelPlane.parent = this.sceneRoot;
+    // Position label offset from the mesh center
+    labelPlane.position = SceneConfig.LABEL_OFFSET;
+    // Parent to the node mesh so it moves with the node
+    labelPlane.parent = parentMesh;
     labelPlane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
 
-    const labelMaterial = new BABYLON.StandardMaterial(`labelMat_${nodeId}`, this.scene);
+    const labelMaterial = new BABYLON.StandardMaterial(`labelMat_${parentMesh.id}`, this.scene);
     labelMaterial.emissiveTexture = dynamicTexture;
     labelMaterial.backFaceCulling = false;
     labelPlane.material = labelMaterial;
