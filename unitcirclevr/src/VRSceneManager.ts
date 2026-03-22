@@ -12,7 +12,6 @@ export class VRSceneManager {
   private sceneRoot!: BABYLON.TransformNode;
   private meshFactory!: MeshFactory;
   private graphLoader: GraphLoader;
-  private currentNodeIds: Set<string> = new Set();
   private currentEdges: Set<string> = new Set();
   private isAnimating: boolean = false;
   private fileColorMap: Map<string, BABYLON.Color3> = new Map();
@@ -25,15 +24,21 @@ export class VRSceneManager {
   private keysPressed: Map<string, boolean> = new Map();
   private isFlying = false;
 
-  // Real-time physics
-  private layout: ForceDirectedLayout | null = null;
+  // Real-time physics - Two-level hierarchical layout system
+  // Level 1: File-level layout (files as nodes, cross-file references as edges)
+  private fileLayout: ForceDirectedLayout | null = null;
+  
+  // Level 2: File-internal layouts (functions within same file)
+  private fileInternalLayouts: Map<string, ForceDirectedLayout> = new Map();
+  
+  // Tracking for the hierarchical system
   private nodeMeshMap: Map<string, BABYLON.Mesh> = new Map();  // Map node IDs to their meshes
+  private nodeToFile: Map<string, string> = new Map();  // Map node IDs to file names
+  private fileNodeIds: Map<string, Set<string>> = new Map();  // Map file names to their node IDs
+  private graphNodeMap: Map<string, GraphNode> = new Map();  // Map node IDs to GraphNode data
+  
   private physicsActive = false;
   private physicsIterationCount = 0;
-
-  // File bounding spheres for visual grouping
-  private fileBoundingSpheres: Map<string, { mesh: BABYLON.Mesh; nodeIds: Set<string> }> = new Map();
-  private graphNodeMap: Map<string, GraphNode> = new Map();  // Map node IDs to GraphNode data
 
   constructor(canvas: HTMLCanvasElement) {
     this.engine = new BABYLON.Engine(canvas, true);
@@ -194,90 +199,56 @@ export class VRSceneManager {
   }
 
   /**
-   * Set up per-frame physics updates for force-directed layout
-   */
-  /**
-   * Update mesh positions and bounding spheres from layout
+   * Set up per-frame physics updates for two-level hierarchical layout
+   * Level 1: File-level layout positions file boxes
+   * Level 2: File-internal layouts position nodes within their boxes
    */
   private setupPhysicsLoop(): void {
     if (this.scene.registerBeforeRender) {
       this.scene.registerBeforeRender(() => {
-        if (this.physicsActive && this.layout) {
-          // Apply one iteration of forces
-          const stillConverging = this.layout.updateFrame();
+        if (this.physicsActive && this.fileLayout && this.fileInternalLayouts.size > 0) {
+          // Step 1: Update file-level layout (positions the file boxes)
+          this.fileLayout.updateFrame();
+          const filePositions = this.fileLayout.getNodes();
           
-          // Update mesh positions from layout
-          const layoutNodes = this.layout.getNodes();
-          for (const [nodeId, mesh] of this.nodeMeshMap.entries()) {
-            const layoutNode = layoutNodes.get(nodeId);
-            if (layoutNode && mesh.position) {
-              mesh.position.x = layoutNode.position.x;
-              mesh.position.y = layoutNode.position.y;
-              mesh.position.z = layoutNode.position.z;
-            }
+          // Step 2: Update each file's internal layout (positions nodes within the file)
+          for (const [_file, internalLayout] of this.fileInternalLayouts.entries()) {
+            internalLayout.updateFrame();
           }
-
-          // Apply repulsion to push nodes out of file spheres they don't belong to
-          this.applySphereRepulsion(layoutNodes);
-
-          // Apply attraction to pull exported nodes to sphere surface
-          this.applySphereAttraction(layoutNodes);
-
-          // Apply sphere-to-sphere repulsion to separate file groups
-          this.applySphereSeparation(layoutNodes);
-
-          // Apply attraction to keep nodes clustered with their file sphere
-          this.applySphereGravity(layoutNodes);
-
-          // Update edge cylinders to follow moving nodes
-          this.meshFactory.updateEdges();
-
-          // Update file bounding spheres to follow their nodes
-          this.updateFileBoundingSpheres();
-
-          // Continue iterating until equilibrium is reached or max iterations exceeded
-          // Continue indefinitely if file spheres overlap - they MUST separate
-          this.physicsIterationCount++;
-          const spheresOverlapping = this.checkSpheresOverlapping();
-          const hardMaxIterations = 10000;  // Absolute hard limit to prevent infinite loops
           
-          // Keep running as long as spheres overlap OR until hard max
-          if (this.physicsIterationCount > hardMaxIterations || (!spheresOverlapping && !stillConverging)) {
+          // Step 3: Position nodes based on file-internal layout + file position
+          for (const [nodeId, mesh] of this.nodeMeshMap.entries()) {
+            const file = this.nodeToFile.get(nodeId);
+            if (!file) continue;
+            
+            const internalLayout = this.fileInternalLayouts.get(file);
+            if (!internalLayout) continue;
+            
+            const internalNode = internalLayout.getNodes().get(nodeId);
+            if (!internalNode) continue;
+            
+            const fileNode = filePositions.get(file);
+            if (!fileNode) continue;
+            
+            // Position is: file position + local position within file
+            mesh.position.x = fileNode.position.x + internalNode.position.x;
+            mesh.position.y = fileNode.position.y + internalNode.position.y;
+            mesh.position.z = fileNode.position.z + internalNode.position.z;
+          }
+          
+          // Step 5: Update edge cylinders to follow moving nodes
+          this.meshFactory.updateEdges();
+          
+          // Step 6: Check convergence
+          this.physicsIterationCount++;
+          const maxIterations = 500;  // Reasonable limit for convergence
+          if (this.physicsIterationCount > maxIterations) {
             this.physicsActive = false;
+            console.log(`✓ Physics converged after ${this.physicsIterationCount} iterations`);
           }
         }
       });
     }
-  }
-
-  /**
-   * Check if any file spheres are currently overlapping
-   */
-  private checkSpheresOverlapping(): boolean {
-    const spheres = Array.from(this.fileBoundingSpheres.entries());
-    const minGap = 2.0;  // Spheres should have at least this gap
-
-    for (let i = 0; i < spheres.length; i++) {
-      for (let j = i + 1; j < spheres.length; j++) {
-        const [, sphere1Data] = spheres[i];
-        const [, sphere2Data] = spheres[j];
-
-        const pos1 = sphere1Data.mesh.position;
-        const pos2 = sphere2Data.mesh.position;
-        const distance = BABYLON.Vector3.Distance(pos1, pos2);
-
-        const radius1 = 50 * sphere1Data.mesh.scaling.x;
-        const radius2 = 50 * sphere2Data.mesh.scaling.x;
-        const minDistance = radius1 + radius2 + minGap;
-
-        // If any pair overlaps, return true
-        if (distance < minDistance) {
-          return true;
-        }
-      }
-    }
-
-    return false;
   }
 
   private getAdjacentFaceIfNearEdge(pickedPoint: BABYLON.Vector3, cubePosition: BABYLON.Vector3, faceNormal: BABYLON.Vector3): BABYLON.Vector3 | null {
@@ -516,10 +487,6 @@ export class VRSceneManager {
       console.log(`✓ Graph loaded: ${graph.nodes.length} nodes, ${graph.edges?.length || 0} edges`);
       this.validateGraphData(graph);
       this.renderCodeGraph(graph);
-      
-      // Track initial state for incremental updates
-      this.currentNodeIds = new Set(graph.nodes.map(n => n.id));
-      this.currentEdges = new Set(graph.edges.map(e => `${e.from}→${e.to}`));
     } catch (error) {
       console.error('❌ Error initializing code visualization:', error);
     }
@@ -557,51 +524,69 @@ export class VRSceneManager {
 
 
   public renderCodeGraph(graph: GraphData): void {
-    // Store all graph nodes for sphere repulsion system
+    // Store all graph nodes
     for (const node of graph.nodes) {
       this.graphNodeMap.set(node.id, node);
     }
 
-    // Create force-directed layout - nodes start at center
-    const edges = this.buildEdgeList(graph.edges);
-    
-    // Build file and exported maps
+    // Build file and exported maps for layout creation
     const fileMap = new Map<string, string>();
     const exportedMap = new Map<string, boolean>();
     for (const node of graph.nodes) {
       if (node.file) {
         fileMap.set(node.id, node.file);
+        this.nodeToFile.set(node.id, node.file);
+        if (!this.fileNodeIds.has(node.file)) {
+          this.fileNodeIds.set(node.file, new Set());
+        }
+        this.fileNodeIds.get(node.file)!.add(node.id);
       }
       if ('isExported' in node) {
         exportedMap.set(node.id, (node as any).isExported);
       }
     }
-    
-    this.layout = new ForceDirectedLayout(
-      graph.nodes.map(n => n.id),
-      edges,
-      fileMap,
-      exportedMap
-    );
 
-    // Calculate indegree (incoming connections) for each node
+    // Step 1: Create file-level layout
+    // Files are "nodes" positioned by cross-file reference edges
+    const files = Array.from(this.fileNodeIds.keys());
+    const crossFileEdges = this.buildCrossFileEdges(graph.edges, fileMap);
+    this.fileLayout = new ForceDirectedLayout(files, crossFileEdges);
+
+    // Step 2: Create file-internal layouts for each file
+    const allEdges = this.buildEdgeList(graph.edges);
+    for (const [file, nodeIds] of this.fileNodeIds.entries()) {
+      const nodeArray = Array.from(nodeIds);
+      // Filter edges to only those within this file
+      const sameFileEdges = allEdges.filter(e => 
+        nodeIds.has(e.source) && nodeIds.has(e.target)
+      );
+      
+      const internalLayout = new ForceDirectedLayout(
+        nodeArray,
+        sameFileEdges,
+        fileMap,
+        exportedMap,
+        (edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target)
+      );
+      this.fileInternalLayouts.set(file, internalLayout);
+    }
+
+    // Step 3: Calculate indegree for visualization
     const indegreeMap = this.calculateIndegree(graph.edges);
 
-    // Render nodes at their random initial positions around 100 units from cfilenter
-    const initialNodes = this.layout.getNodes();
-    this.renderNodes(graph.nodes, initialNodes, indegreeMap);
-    this.renderEdges();  // Create edge cylinders
-    this.meshFactory.updateEdges();  // Position edges at initial node positions
+    // Step 4: Render nodes at initial positions from their file's internal layout
+    this.renderNodes(graph.nodes, indegreeMap);
 
-    // Create file bounding spheres to contain nodes from the same file
-    this.createFileBoundingSpheres(graph.nodes);
+    // Step 5: Create edges
+    this.renderEdges();
+    this.meshFactory.updateEdges();
 
-    // Enable physics updates to pull connected nodes together and push others apart
+    // Step 6: Start physics updates
     this.physicsActive = true;
     this.physicsIterationCount = 0;
     this.setupPhysicsLoop();
 
-    console.log(`✓ Rendered code graph with ${graph.nodes.length} functions and ${graph.edges.length} calls`);
+    console.log(`✓ Rendered code graph with ${graph.nodes.length} functions in ${files.length} files and ${graph.edges.length} calls`);
   }
 
   /**
@@ -609,195 +594,30 @@ export class VRSceneManager {
    * New nodes are added and physics pushes them apart
    */
   private updateCodeGraph(graph: GraphData): void {
-    this.validateGraphData(graph);
-
-    // Update node map for sphere repulsion system
-    for (const node of graph.nodes) {
-      this.graphNodeMap.set(node.id, node);
-    }
-
-    // Rebuild layout with all nodes for proper physics
-    const edges = this.buildEdgeList(graph.edges);
-    
-    // Build file and exported maps
-    const fileMap = new Map<string, string>();
-    const exportedMap = new Map<string, boolean>();
-    for (const node of graph.nodes) {
-      if (node.file) {
-        fileMap.set(node.id, node.file);
-      }
-      if ('isExported' in node) {
-        exportedMap.set(node.id, (node as any).isExported);
-      }
-    }
-    
-    this.layout = new ForceDirectedLayout(
-      graph.nodes.map(n => n.id),
-      edges,
-      fileMap,
-      exportedMap
-    );
-
-    // Calculate indegree (incoming connections) for each node
-    const indegreeMap = this.calculateIndegree(graph.edges);
-    const layoutNodes = this.layout.getNodes();
-
-    // Track new node IDs and edge pairs
-    const newNodeIds = new Set(graph.nodes.map(n => n.id));
-    const newEdgePairs = new Set(
-      graph.edges.map(e => `${e.from}→${e.to}`)
-    );
-
-    // Remove deleted nodes
-    const removedNodeIds = Array.from(this.currentNodeIds).filter(id => !newNodeIds.has(id));
-    for (const nodeId of removedNodeIds) {
-      this.removeMeshesForNode(nodeId);
-      this.currentNodeIds.delete(nodeId);
-      this.nodeMeshMap.delete(nodeId);
-      this.graphNodeMap.delete(nodeId);
-    }
-
-    // Remove deleted edges
-    const removedEdges = Array.from(this.currentEdges).filter(edge => !newEdgePairs.has(edge));
-    for (const edgePair of removedEdges) {
-      this.removeMeshesForEdge(edgePair);
-      this.currentEdges.delete(edgePair);
-    }
-
-    // Create only new nodes - just place them, physics will spread them
-    const newNodes = graph.nodes.filter(n => !this.currentNodeIds.has(n.id));
-    this.renderNodesWithAnimation(newNodes, layoutNodes, indegreeMap, false);  // animated=false - physics will move them
-    newNodes.forEach(n => this.currentNodeIds.add(n.id));
-
-    // Create only new edges
-    const newEdges = graph.edges.filter(
-      e => !this.currentEdges.has(`${e.from}→${e.to}`)
-    );
-    this.renderEdges();  // Create new edge cylinders
-    this.meshFactory.updateEdges();  // Position edges immediately
-    newEdges.forEach(e => this.currentEdges.add(`${e.from}→${e.to}`));
-
-    // Recreate file bounding spheres with updated nodes
-    this.createFileBoundingSpheres(graph.nodes);
-
-    // Restart physics to spread updated graph
-    this.physicsActive = true;
-    this.physicsIterationCount = 0;
-
-    console.log(
-      `✓ Updated code graph: ${removedNodeIds.length} removed, ${newNodes.length} created, ` +
-      `${removedEdges.length} edges removed, ${newEdges.length} edges created`
-    );
+    // For now, just re-render the entire graph when it updates
+    // TODO: Implement incremental updates for better performance
+    this.clearScene();
+    this.renderCodeGraph(graph);
   }
 
-  /**
-   * Render nodes with optional animation control
-   */
-  private renderNodesWithAnimation(
-    nodes: GraphNode[],
-    layoutNodes: Map<string, any>,
-    indegreeMap: Map<string, number> = new Map(),
-    animateFromCenter: boolean = false
-  ): void {
-    for (const node of nodes) {
-      const layoutNode = layoutNodes.get(node.id);
-      if (!layoutNode) continue;
-
-      const targetPosition = new BABYLON.Vector3(
-        layoutNode.position.x,
-        layoutNode.position.y,
-        layoutNode.position.z
-      );
-
-      // If animating from center (new nodes), add perpendicular jitter to target
-      if (animateFromCenter) {
-        const radiusDistance = BABYLON.Vector3.Distance(new BABYLON.Vector3(0, 0, 0), targetPosition);
-        if (radiusDistance > 0.1) {
-          // Calculate the radial direction (center to target)
-          const radialDirection = targetPosition.normalize();
-          
-          // Generate a random perpendicular vector
-          const perpendicular1 = this.getPerpendicularVector(radialDirection);
-          const perpendicular2 = BABYLON.Vector3.Cross(radialDirection, perpendicular1).normalize();
-          
-          // Random blend of the two perpendicular directions
-          const angle = Math.random() * Math.PI * 2;
-          const randomPerpendicular = perpendicular1
-            .scale(Math.cos(angle))
-            .add(perpendicular2.scale(Math.sin(angle)));
-          
-          // Add small jitter (about 5-15% of radius distance, max 2 units)
-          const jitterAmount = Math.min(2.0, radiusDistance * (0.05 + Math.random() * 0.1));
-          const jitterVector = randomPerpendicular.scale(jitterAmount);
-          
-          targetPosition.addInPlace(jitterVector);
-        }
-      }
-
-      // Get or generate color for this file
-      const fileColor = node.file ? this.getFileColor(node.file) : null;
-      const indegree = indegreeMap.get(node.id) || 0;
-
-      // Start position: center for new nodes, or target for existing nodes
-      const startPosition = animateFromCenter 
-        ? new BABYLON.Vector3(0, 0, 0) 
-        : targetPosition;
-
-      this.meshFactory.createNodeMesh(node, startPosition, fileColor, indegree, (mesh, material, n) => {
-        this.setupNodeInteraction(mesh, material, n);
-        // Track mesh for physics updates
-        this.nodeMeshMap.set(node.id, mesh);
-        // Only animate if starting from center (new nodes)
-        if (animateFromCenter) {
-          this.animateNodeToPosition(mesh, targetPosition, 7000);  // 7 second animation for dramatic effect
-        }
-      });
+  private clearScene(): void {
+    // Dispose all node meshes
+    for (const mesh of this.nodeMeshMap.values()) {
+      mesh.dispose();
     }
-  }
-
-  /**
-   * Remove all meshes associated with a node
-   */
-  private removeMeshesForNode(nodeId: string): void {
-    // Remove all meshes with this node's prefix (handles func_, var_, ext_ prefixes)
-    const nodeMeshes = this.scene.meshes.filter(m => 
-      m.name.includes(nodeId) && m.name.includes('_')
-    );
-    for (const mesh of nodeMeshes) {
+    this.nodeMeshMap.clear();
+    
+    // Dispose all edges
+    const edgeMeshes = this.scene.meshes.filter(m => m.name.startsWith('edge_'));
+    for (const mesh of edgeMeshes) {
       mesh.dispose();
     }
     
-    // Remove label mesh
-    const labelMesh = this.scene.meshes.find(m => m.name === `label_${nodeId}`);
-    if (labelMesh) {
-      labelMesh.dispose();
-    }
-    
-    // Remove label textures
-    const labelTexture = this.scene.textures.find(t => t.name === `labelTexture_${nodeId}`);
-    if (labelTexture) {
-      labelTexture.dispose();
-    }
-    
-    // Remove signature texture
-    const sigTexture = this.scene.textures.find(t => t.name === `signatureTexture_${nodeId}`);
-    if (sigTexture) {
-      sigTexture.dispose();
-    }
-    
-    // Remove mesh reference from factory
-    this.meshFactory.removeMeshReference(nodeId);
-  }
-
-  /**
-   * Remove meshes associated with an edge
-   */
-  private removeMeshesForEdge(edgePair: string): void {
-    const edgeId = `edge_${edgePair.replace('→', '_to_')}`;
-    const meshes = this.scene.meshes.filter(m => m.name.startsWith(edgeId));
-    for (const mesh of meshes) {
-      mesh.dispose();
-    }
+    // Clear tracking maps
+    this.fileInternalLayouts.clear();
+    this.fileNodeIds.clear();
+    this.nodeToFile.clear();
+    this.fileLayout = null;
   }
 
   private buildEdgeList(edges: Array<{ from: string; to: string }>): Array<{ source: string; target: string }> {
@@ -805,467 +625,70 @@ export class VRSceneManager {
   }
 
   /**
-   * Animate a node mesh to a target position
+   * Build edges between file nodes for file-level layout
+   * Creates edges between files when there are references crossing file boundaries
    */
-  private animateNodeToPosition(
-    mesh: BABYLON.Mesh,
-    targetPosition: BABYLON.Vector3,
-    duration: number = 2500  // 2.5 second animation for dramatic effect
-  ): void {
-    const currentPosition = mesh.position.clone();
+  private buildCrossFileEdges(
+    edges: Array<{ from: string; to: string }>,
+    fileMap: Map<string, string>
+  ): Array<{ source: string; target: string }> {
+    const fileEdges = new Set<string>();
     
-    // Create position animation
-    const animationName = `nodeMove_${mesh.id}`;
-    const animation = new BABYLON.Animation(
-      animationName,
-      'position',
-      60,  // 60 fps
-      BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
-      BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
-    );
-
-    // Create keyframes for smooth easing
-    const frameRate = 60;
-    const totalFrames = Math.floor((duration / 1000) * frameRate);
+    for (const edge of edges) {
+      const sourceFile = fileMap.get(edge.from);
+      const targetFile = fileMap.get(edge.to);
+      
+      // Only create file edge if it's between different files
+      if (sourceFile && targetFile && sourceFile !== targetFile) {
+        // Create a unique key to avoid duplicate file edges
+        const edgeKey = `${sourceFile}->${targetFile}`;
+        fileEdges.add(edgeKey);
+      }
+    }
     
-    const keys = [
-      { frame: 0, value: currentPosition },
-      { frame: totalFrames, value: targetPosition }
-    ];
-
-    animation.setKeys(keys);
-    
-    // Use ease function for smooth animation
-    const easingFunction = new BABYLON.CubicEase();
-    easingFunction.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEOUT);
-    animation.setEasingFunction(easingFunction);
-
-    // Remove any existing animation on this mesh
-    this.scene.stopAnimation(mesh);
-
-    // Add and play the animation
-    mesh.animations = [];
-    mesh.animations.push(animation);
-    this.scene.beginAnimation(mesh, 0, totalFrames, false);
+    // Convert edge keys to edge objects
+    return Array.from(fileEdges).map(key => {
+      const [source, target] = key.split('->');
+      return { source, target };
+    });
   }
 
   private renderNodes(
     nodes: GraphNode[],
-    layoutNodes: Map<string, any>,
     indegreeMap: Map<string, number> = new Map()
   ): void {
-    // Just place nodes at current positions - physics will move them
-    this.renderNodesWithAnimation(nodes, layoutNodes, indegreeMap, false);  // animated=false - no animation
-  }
-
-  /**
-   * Create transparent sphere containers for each file to visually group functions
-   */
-  private createFileBoundingSpheres(graphNodes: GraphNode[]): void {
-    // Group nodes by file
-    const nodesByFile = new Map<string, Set<string>>();
-    for (const node of graphNodes) {
+    for (const node of nodes) {
       const file = node.file || 'external';
-      if (!nodesByFile.has(file)) {
-        nodesByFile.set(file, new Set());
-      }
-      nodesByFile.get(file)!.add(node.id);
-    }
-
-    // For each file with multiple nodes, create a bounding sphere
-    for (const [file, nodeIds] of nodesByFile.entries()) {
-      // Skip external modules and files with only 1 node
-      if (file === 'external' || nodeIds.size < 2) {
-        continue;
-      }
-
-      // Collect initial positions of all nodes in this file
-      const positions: BABYLON.Vector3[] = [];
-      for (const nodeId of nodeIds) {
-        const mesh = this.nodeMeshMap.get(nodeId);
-        if (mesh) {
-          positions.push(mesh.position.clone());
+      const fileLayout = this.fileInternalLayouts.get(file);
+      
+      // Get position from file's internal layout
+      let position: BABYLON.Vector3;
+      if (fileLayout) {
+        const layoutNode = fileLayout.getNodes().get(node.id);
+        if (layoutNode) {
+          position = new BABYLON.Vector3(
+            layoutNode.position.x,
+            layoutNode.position.y,
+            layoutNode.position.z
+          );
+        } else {
+          position = BABYLON.Vector3.Zero();
         }
+      } else {
+        position = BABYLON.Vector3.Zero();
       }
 
-      if (positions.length < 2) continue;
+      // Get or generate color for this file
+      const fileColor = file ? this.getFileColor(file) : null;
+      const indegree = indegreeMap.get(node.id) || 0;
 
-      // Calculate bounding sphere for this file's nodes
-      const { center, radius } = this.calculateBoundingSphere(positions);
-
-      // Remove old sphere if it exists
-      const oldEntry = this.fileBoundingSpheres.get(file);
-      if (oldEntry) {
-        oldEntry.mesh.dispose();
-      }
-
-      // Add padding to radius for visualization
-      const visualRadius = Math.max(radius * 1.15, radius + 3.0);
-
-      // Create transparent sphere mesh for this file
-      const sphereMesh = BABYLON.MeshBuilder.CreateSphere(
-        `file_sphere_${file}`,
-        {
-          segments: 16,  // Segments for performance
-          diameter: visualRadius * 2
-        },
-        this.scene
-      );
-
-      // Position the sphere at the calculated center
-      sphereMesh.position = center;
-
-      // Create wireframe material with file color
-      const fileColor = this.getFileColor(file);
-      const material = new BABYLON.StandardMaterial(`file_material_${file}`, this.scene);
-      material.emissiveColor = fileColor;  // Full color for wireframe visibility
-      material.specularColor = fileColor.scale(0.5);
-      material.alpha = 1.0;  // Fully opaque wireframe
-      material.wireframe = true;  // Display as wireframe
-      material.backFaceCulling = false;
-      sphereMesh.material = material;
-
-      // Disable casting/receiving shadows for performance
-      sphereMesh.receiveShadows = false;
-
-      // Parent to scene root
-      sphereMesh.parent = this.sceneRoot;
-
-      // Store sphere reference
-      this.fileBoundingSpheres.set(file, {
-        mesh: sphereMesh,
-        nodeIds: nodeIds
+      this.meshFactory.createNodeMesh(node, position, fileColor, indegree, (mesh, material, n) => {
+        this.setupNodeInteraction(mesh, material, n);
+        // Track mesh for physics updates
+        this.nodeMeshMap.set(node.id, mesh);
       });
     }
   }
-
-  /**
-   * Calculate the minimal bounding sphere for a set of 3D positions
-   * Uses a simple yet effective algorithm that finds the sphere containing all points
-   */
-  private calculateBoundingSphere(
-    positions: BABYLON.Vector3[]
-  ): { center: BABYLON.Vector3; radius: number } {
-    if (positions.length === 0) {
-      return { center: new BABYLON.Vector3(0, 0, 0), radius: 0 };
-    }
-
-    if (positions.length === 1) {
-      return { center: positions[0].clone(), radius: 0.1 };
-    }
-
-    // Start with center as average of all points
-    let center = BABYLON.Vector3.Zero();
-    for (const pos of positions) {
-      center = center.add(pos);
-    }
-    center = center.scale(1 / positions.length);
-
-    // Find the maximum distance from center to any point
-    let maxRadius = 0;
-    for (const pos of positions) {
-      const distance = BABYLON.Vector3.Distance(center, pos);
-      maxRadius = Math.max(maxRadius, distance);
-    }
-
-    // Iteratively improve the sphere by moving center toward farthest point
-    let improved = true;
-    let iterations = 0;
-    const maxIterations = 10;
-
-    while (improved && iterations < maxIterations) {
-      improved = false;
-      iterations++;
-
-      // Find point farthest from current center
-      let farthestPoint = positions[0];
-      let farthestDistance = 0;
-
-      for (const pos of positions) {
-        const distance = BABYLON.Vector3.Distance(center, pos);
-        if (distance > farthestDistance) {
-          farthestDistance = distance;
-          farthestPoint = pos;
-        }
-      }
-
-      // If farthest point is still outside sphere, adjust center toward it
-      if (farthestDistance > maxRadius) {
-        // Move center 10% toward the farthest point
-        const direction = farthestPoint.subtract(center).normalize();
-        center = center.add(direction.scale(farthestDistance * 0.05));
-        maxRadius = farthestDistance;
-        improved = true;
-      }
-    }
-
-    return { center, radius: maxRadius };
-  }
-
-  /**
-   * Update bounding spheres to follow their file's nodes as they move
-   */
-  private updateFileBoundingSpheres(): void {
-    for (const sphereData of this.fileBoundingSpheres.values()) {
-      const positions: BABYLON.Vector3[] = [];
-      let maxNodeRadius = 0;
-
-      // Collect current positions of all nodes in this file and find max node size
-      for (const nodeId of sphereData.nodeIds) {
-        const mesh = this.nodeMeshMap.get(nodeId);
-        if (mesh) {
-          positions.push(mesh.position.clone());
-          // Account for node mesh visual size (sphere radius scales)
-          const nodeScale = mesh.scaling?.x || 1.0;
-          const nodeVisualRadius = nodeScale * 0.5;  // Node sphere has 1.0 unit radius
-          maxNodeRadius = Math.max(maxNodeRadius, nodeVisualRadius);
-        }
-      }
-
-      if (positions.length < 2) continue;
-
-      // Recalculate bounding sphere with updated positions
-      const { center, radius } = this.calculateBoundingSphere(positions);
-
-      // Update sphere mesh position and scale
-      sphereData.mesh.position = center;
-
-      // Auto-size to encompass node contents: bounding sphere radius + node size + small margin
-      const visualRadius = radius + maxNodeRadius + 0.5;  // Small margin for breathing room
-
-      // Directly apply target scale (no lerp) for immediate auto-sizing
-      const targetScale = visualRadius / 50;  // Base radius is 50 (diameter 100)
-
-      sphereData.mesh.scaling = new BABYLON.Vector3(targetScale, targetScale, targetScale);
-    }
-
-    // Resolve overlapping spheres by reducing their radii or pushing them apart
-    this.resolveSpherOverlaps();
-  }
-
-  /**
-   * Prevent sphere overlaps by adjusting radii and applying additional separation forces
-   */
-  private resolveSpherOverlaps(): void {
-    const spheres = Array.from(this.fileBoundingSpheres.entries());
-    const minOverlapMargin = 2.0;  // Minimum gap between sphere surfaces
-
-    // Check each pair of spheres for overlaps
-    for (let i = 0; i < spheres.length; i++) {
-      for (let j = i + 1; j < spheres.length; j++) {
-        const [, sphere1Data] = spheres[i];
-        const [, sphere2Data] = spheres[j];
-
-        const pos1 = sphere1Data.mesh.position;
-        const pos2 = sphere2Data.mesh.position;
-        const distance = BABYLON.Vector3.Distance(pos1, pos2);
-
-        // Get current radii (estimate from scaling * base radius)
-        const radius1 = 50 * sphere1Data.mesh.scaling.x;  // Base sphere diameter is 100
-        const radius2 = 50 * sphere2Data.mesh.scaling.x;
-        const minDistance = radius1 + radius2 + minOverlapMargin;
-
-        // If spheres are overlapping, reduce the smaller one's radius
-        if (distance < minDistance) {
-          const overlap = minDistance - distance;
-          const totalRadius = radius1 + radius2;
-
-          // Distribute reduction proportionally to both spheres
-          const reduction1 = (radius1 / totalRadius) * overlap * 0.6;  // Reduce by 60% of overlap
-          const reduction2 = (radius2 / totalRadius) * overlap * 0.6;
-
-          // Apply radius reductions (maintain minimum radius of 5 units)
-          const newScale1 = Math.max(0.1, sphere1Data.mesh.scaling.x - (reduction1 / radius1) * 0.1);
-          const newScale2 = Math.max(0.1, sphere2Data.mesh.scaling.x - (reduction2 / radius2) * 0.1);
-
-          sphere1Data.mesh.scaling = new BABYLON.Vector3(newScale1, newScale1, newScale1);
-          sphere2Data.mesh.scaling = new BABYLON.Vector3(newScale2, newScale2, newScale2);
-        }
-      }
-    }
-  }
-
-  /**
-   * Apply repulsive forces to push nodes out of file spheres they don't belong to
-   */
-  private applySphereRepulsion(layoutNodes: Map<string, any>): void {
-    if (!this.layout) return;
-
-    const repulsionStrength = 2.0;  // Increased repulsion for stronger node exclusion
-    const minDistanceOutside = 3.0;  // Nodes should stay further outside their sphere
-
-    // For each node, check if it's inside any file sphere it doesn't belong to
-    for (const [nodeId, layoutNode] of layoutNodes.entries()) {
-      const graphNode = this.graphNodeMap.get(nodeId);
-      if (!graphNode) continue;
-
-      const nodeFile = graphNode.file || 'external';
-      const nodePos = new BABYLON.Vector3(layoutNode.position.x, layoutNode.position.y, layoutNode.position.z);
-
-      // Check against each file sphere
-      for (const [file, sphereData] of this.fileBoundingSpheres.entries()) {
-        // Skip if this node belongs to this file
-        if (file === nodeFile) continue;
-
-        const spherePos = sphereData.mesh.position;
-        // Calculate actual radius from mesh scaling (base radius is 50, diameter 100)
-        const sphereRadius = 50 * sphereData.mesh.scaling.x;
-        const distanceToCenter = BABYLON.Vector3.Distance(nodePos, spherePos);
-
-        // If node is inside or near this sphere, push it out strongly
-        if (distanceToCenter < sphereRadius + minDistanceOutside) {
-          const direction = nodePos.subtract(spherePos).normalize();
-          const desiredDistance = sphereRadius + minDistanceOutside;
-          const pushDistance = desiredDistance - distanceToCenter;
-
-          if (direction.length() > 0.01) {
-            // Apply strong repulsive velocity
-            layoutNode.velocity.x += direction.x * pushDistance * repulsionStrength;
-            layoutNode.velocity.y += direction.y * pushDistance * repulsionStrength;
-            layoutNode.velocity.z += direction.z * pushDistance * repulsionStrength;
-          }
-        }
-      }
-    }
-  }
-
-  /**
-   * Apply attractive forces to pull exported nodes toward the surface of their file sphere
-   */
-  private applySphereAttraction(layoutNodes: Map<string, any>): void {
-    if (!this.layout) return;
-
-    const attractionStrength = 0.5;  // Force magnitude for sphere surface attraction
-    const surfaceMargin = 1.5;  // Distance from sphere surface where exported nodes should be
-
-    // For each node, if it's exported and in a file with a sphere, pull it toward sphere surface
-    for (const [nodeId, layoutNode] of layoutNodes.entries()) {
-      const graphNode = this.graphNodeMap.get(nodeId);
-      if (!graphNode || !graphNode.isExported) continue;
-
-      const nodeFile = graphNode.file || 'external';
-      const nodeSphere = this.fileBoundingSpheres.get(nodeFile);
-      if (!nodeSphere) continue;  // No sphere for this file
-
-      const nodePos = new BABYLON.Vector3(layoutNode.position.x, layoutNode.position.y, layoutNode.position.z);
-      const spherePos = nodeSphere.mesh.position;
-      const sphereRadius = nodeSphere.mesh.getBoundingInfo().boundingBox.extendSize.length() / Math.sqrt(3);
-      const distanceToCenter = BABYLON.Vector3.Distance(nodePos, spherePos);
-
-      if (distanceToCenter < 0.1) continue;  // Too close to center, avoid singularity
-
-      // Direction from sphere center toward node
-      const direction = nodePos.subtract(spherePos).normalize();
-
-      // Target distance: sphere surface + margin
-      const targetDistance = sphereRadius + surfaceMargin;
-      const distanceToTarget = targetDistance - distanceToCenter;
-
-      if (Math.abs(distanceToTarget) > 0.1) {
-        // Apply attractive velocity toward target distance
-        layoutNode.velocity.x += direction.x * distanceToTarget * attractionStrength;
-        layoutNode.velocity.y += direction.y * distanceToTarget * attractionStrength;
-        layoutNode.velocity.z += direction.z * distanceToTarget * attractionStrength;
-      }
-    }
-  }
-
-  /**
-   * Apply repulsive forces between file spheres to separate file groups
-   */
-  private applySphereSeparation(layoutNodes: Map<string, any>): void {
-    const spheres = Array.from(this.fileBoundingSpheres.entries());
-    const separationStrength = 4.0;  // Maximum separation force between spheres
-    const minSphereDistance = 20.0;  // Increased minimum distance between sphere centers
-
-    // Apply pairwise repulsion between all spheres
-    for (let i = 0; i < spheres.length; i++) {
-      for (let j = i + 1; j < spheres.length; j++) {
-        const [, sphere1Data] = spheres[i];
-        const [, sphere2Data] = spheres[j];
-
-        const pos1 = sphere1Data.mesh.position;
-        const pos2 = sphere2Data.mesh.position;
-        const distance = BABYLON.Vector3.Distance(pos1, pos2);
-
-        if (distance < 0.1) continue;  // Avoid singularity
-
-        // Direction from sphere 1 to sphere 2
-        const direction = pos2.subtract(pos1).normalize();
-
-        // Calculate repulsive force based on how close they are
-        const desiredDistance = minSphereDistance;
-        const pushDistance = Math.max(0, desiredDistance - distance);
-
-        // Apply forces to move spheres apart
-        // Note: We push nodes by applying forces to them, not directly moving spheres
-        // Nodes in sphere 1 get pushed away from sphere 2
-        const repulsionPerNode1 = pushDistance * separationStrength / Math.max(1, sphere1Data.nodeIds.size);
-        for (const nodeId of sphere1Data.nodeIds) {
-          const layoutNode = layoutNodes.get(nodeId);
-          if (layoutNode) {
-            // Push away from sphere 2
-            layoutNode.velocity.x -= direction.x * repulsionPerNode1;
-            layoutNode.velocity.y -= direction.y * repulsionPerNode1;
-            layoutNode.velocity.z -= direction.z * repulsionPerNode1;
-          }
-        }
-
-        // Nodes in sphere 2 get pushed away from sphere 1
-        const repulsionPerNode2 = pushDistance * separationStrength / Math.max(1, sphere2Data.nodeIds.size);
-        for (const nodeId of sphere2Data.nodeIds) {
-          const layoutNode = layoutNodes.get(nodeId);
-          if (layoutNode) {
-            // Push away from sphere 1
-            layoutNode.velocity.x += direction.x * repulsionPerNode2;
-            layoutNode.velocity.y += direction.y * repulsionPerNode2;
-            layoutNode.velocity.z += direction.z * repulsionPerNode2;
-          }
-        }
-      }
-    }
-  }
-
-  /**
-   * Apply attractive forces to keep nodes gravitating toward their file sphere center
-   * This drags nodes along when their sphere moves away from other files
-   */
-  private applySphereGravity(layoutNodes: Map<string, any>): void {
-    if (!this.layout) return;
-
-    const gravityStrength = 0.3;  // Force magnitude for center of mass attraction
-    const maxGravityDistance = 40.0;  // Only apply gravity within this range of sphere center
-
-    // For each node, attract it toward its own file sphere center
-    for (const [nodeId, layoutNode] of layoutNodes.entries()) {
-      const graphNode = this.graphNodeMap.get(nodeId);
-      if (!graphNode) continue;
-
-      const nodeFile = graphNode.file || 'external';
-      const nodeSphere = this.fileBoundingSpheres.get(nodeFile);
-      if (!nodeSphere) continue;  // No sphere for this file
-
-      const nodePos = new BABYLON.Vector3(layoutNode.position.x, layoutNode.position.y, layoutNode.position.z);
-      const sphereCenter = nodeSphere.mesh.position;
-      const distanceToCenter = BABYLON.Vector3.Distance(nodePos, sphereCenter);
-
-      // Only apply gravity if not exported and within range
-      if (!graphNode.isExported && distanceToCenter < maxGravityDistance && distanceToCenter > 0.1) {
-        // Direction from node toward sphere center
-        const direction = sphereCenter.subtract(nodePos).normalize();
-
-        // Apply attractive force toward center
-        layoutNode.velocity.x += direction.x * gravityStrength;
-        layoutNode.velocity.y += direction.y * gravityStrength;
-        layoutNode.velocity.z += direction.z * gravityStrength;
-      }
-    }
-  }
-
-  /**
-   * Resolve overlapping spheres by reducing radii while maintaining minimum bounds
-   */
-
 
   private setupNodeInteraction(
     mesh: BABYLON.Mesh,
@@ -1460,16 +883,14 @@ export class VRSceneManager {
   }
 
   private renderEdges(): void {
-    if (!this.layout) return;
-    
     // Get the current graph edges in correct format for MeshFactory
     const graphEdges = Array.from(this.currentEdges).map(edgeId => {
       const [from, to] = edgeId.split('→');
       return { from, to };
     });
     
-    const layoutNodes = this.layout.getNodes();
-    this.meshFactory.createEdges(graphEdges, layoutNodes, this.sceneRoot);
+    // Create edges - they'll be positioned by updateEdges() in the physics loop
+    this.meshFactory.createEdges(graphEdges, new Map(), this.sceneRoot);
   }
 
   private showTooltip(node: { name: string; file?: string; line?: number }): void {
@@ -1600,25 +1021,6 @@ export class VRSceneManager {
         }
       }
     }
-  }
-
-  /**
-   * Generate a perpendicular vector to the given direction
-   * Used to create random jitter perpendicular to the radial direction
-   */
-  private getPerpendicularVector(direction: BABYLON.Vector3): BABYLON.Vector3 {
-    const upVector = new BABYLON.Vector3(0, 1, 0);
-    const normalizedDir = direction.normalize();
-    
-    // If direction is parallel to up vector, use a different reference
-    const dotProduct = BABYLON.Vector3.Dot(normalizedDir, upVector);
-    const refVector = Math.abs(dotProduct) > 0.9 
-      ? new BABYLON.Vector3(1, 0, 0)  // Use X axis if nearly parallel to Y
-      : upVector;
-    
-    // Cross product gives a perpendicular vector
-    const perpendicular = BABYLON.Vector3.Cross(normalizedDir, refVector);
-    return perpendicular.normalize();
   }
 
   public run(): void {

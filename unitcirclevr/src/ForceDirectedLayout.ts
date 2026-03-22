@@ -25,6 +25,7 @@ export interface Edge {
 export class ForceDirectedLayout {
   private nodes: Map<string, Node>;
   private edges: Edge[];
+  private edgeFilter?: (edge: Edge) => boolean;  // Optional filter for which edges to use
   private readonly SPACE_SIZE = 250;
   private readonly C_REPULSIVE = 2.0;      // Repulsive force for same-file nodes
   private readonly C_REPULSIVE_CROSS_FILE = 20.0;  // Much stronger repulsion for cross-file nodes (10x stronger)
@@ -34,20 +35,18 @@ export class ForceDirectedLayout {
   private readonly MIN_DISTANCE = 1.0;     // Minimum distance to prevent singularity in force calculations
   private readonly MIN_NODE_SEPARATION = 25.0;    // Minimum distance between unconnected same-file nodes
   private readonly MIN_CROSS_FILE_SEPARATION = 35.0;  // Stronger separation for cross-file nodes
-  private readonly MIN_SAME_FILE_DISTANCE = 2.5;     // Minimum distance for tight same-file clustering
-  private readonly MIN_EQUILIBRIUM_DISTANCE = 8.0;  // Optimized distance for cross-file connected edges
-  private readonly MIN_EDGE_EXPORT_DISTANCE = 15.0;  // Optimized distance for edges connected to exported functions
   private readonly EQUILIBRIUM_THRESHOLD = 0.001;  // Converged when all velocities below this
 
-  constructor(nodeIds: string[], edges: Edge[], nodeFileMap?: Map<string, string>, nodeExportedMap?: Map<string, boolean>) {
+  constructor(nodeIds: string[], edges: Edge[], nodeFileMap?: Map<string, string>, nodeExportedMap?: Map<string, boolean>, edgeFilter?: (edge: Edge) => boolean) {
     this.edges = edges;
+    this.edgeFilter = edgeFilter;
     this.nodes = new Map();
 
-    // Initialize nodes with random positions on a sphere ~100 units from center
-    // Connected nodes will attract toward each other, creating visible connections
+    // Initialize nodes with random positions close to center
+    // Nodes will spread apart due to sphere repulsion forces
     for (const id of nodeIds) {
-      // Generate random position on sphere at radius ~100 units
-      const radius = 100 + (Math.random() - 0.5) * 40;  // 80-120 units from center
+      // Generate random position near center at radius ~5-15 units
+      const radius = 5 + Math.random() * 10;  // 5-15 units from center
       const theta = Math.random() * Math.PI * 2;  // azimuth angle: 0-2π
       const phi = Math.acos(Math.random() * 2 - 1);  // polar angle: uniform distribution on sphere
 
@@ -67,35 +66,13 @@ export class ForceDirectedLayout {
   }
 
   /**
-   * Check if two nodes should repel based on:
-   * 1. Both are in the same file, OR
-   * 2. They are connected by an edge
-   * Nodes from different files with no edge connection do not interact
-   */
-  private shouldNodesRepel(nodeA: Node, nodeB: Node): boolean {
-    // Same file: nodes repel
-    if (nodeA.file && nodeB.file && nodeA.file === nodeB.file) {
-      return true;
-    }
-
-    // Check if connected by edge
-    const isConnected = this.edges.some(edge =>
-      (edge.source === nodeA.id && edge.target === nodeB.id) ||
-      (edge.source === nodeB.id && edge.target === nodeA.id)
-    );
-
-    return isConnected;
-  }
-
-  /**
    * Run force-directed layout simulation
-   * Applies physics forces and updates node positions iteratively
+   * All node-node and edge forces are disabled - only sphere repulsion forces apply
    */
   public simulate(iterations: number = 300): Map<string, Node> {
     const nodeArray = Array.from(this.nodes.values());
-    const nodeCount = nodeArray.length;
 
-    // Run simulation iterations
+    // Run simulation iterations - all forces disabled (handled by file sphere physics)
     for (let iter = 0; iter < iterations; iter++) {
       let maxVelocity = 0;
 
@@ -104,42 +81,10 @@ export class ForceDirectedLayout {
         node.velocity = { x: 0, y: 0, z: 0 };
       }
 
-      // Apply repulsive forces between nodes that should interact:
-      // - Same-file nodes, OR
-      // - Nodes connected by edges
-      // Cross-file nodes with no edge connection will NOT repel
-      for (let i = 0; i < nodeCount; i++) {
-        for (let j = i + 1; j < nodeCount; j++) {
-          if (this.shouldNodesRepel(nodeArray[i], nodeArray[j])) {
-            this.applyRepulsiveForce(nodeArray[i], nodeArray[j]);
-          }
-        }
-      }
-
-      // Apply attractive forces along edges
-      for (const edge of this.edges) {
-        const sourceNode = this.nodes.get(edge.source);
-        const targetNode = this.nodes.get(edge.target);
-        if (sourceNode && targetNode) {
-          this.applyAttractiveForce(sourceNode, targetNode);
-        }
-      }
-
-      // Apply repulsive forces from edges to nodes not connected to them
-      // This prevents nodes from crossing through edges
-      for (const edge of this.edges) {
-        const sourceNode = this.nodes.get(edge.source);
-        const targetNode = this.nodes.get(edge.target);
-        if (sourceNode && targetNode) {
-          for (const node of nodeArray) {
-            // Skip if this node is one of the edge endpoints
-            if (node.id === sourceNode.id || node.id === targetNode.id) {
-              continue;
-            }
-            this.applyEdgeRepulsion(node, sourceNode, targetNode);
-          }
-        }
-      }
+      // No node-node repulsion forces
+      // No edge attractive forces
+      // No edge repulsion forces
+      // All layout forces disabled - only sphere repulsion applies via VRSceneManager
 
       // Update positions and apply damping
       for (const node of nodeArray) {
@@ -172,12 +117,8 @@ export class ForceDirectedLayout {
     return this.nodes;
   }
 
-  /**
-   * Apply repulsive force between two nodes (push apart)
-   * Called only for nodes that should interact:
-   * - Both in same file, OR
-   * - Connected by edge
-   */
+  // Force methods disabled - all physics handled by file spheres in VRSceneManager
+
   private applyRepulsiveForce(nodeA: Node, nodeB: Node): void {
     const dx = nodeB.position.x - nodeA.position.x;
     const dy = nodeB.position.y - nodeA.position.y;
@@ -206,9 +147,7 @@ export class ForceDirectedLayout {
 
   /**
    * Apply attractive force along edges (pull together)
-   * Strongest attraction for same-file connected nodes with smallest minimum distance
-   * Only applies force if nodes are farther than minimum distance
-   * This allows connected nodes to attract until they reach their equilibrium distance
+   * No minimum distance constraints - edges can be any length
    */
   private applyAttractiveForce(nodeA: Node, nodeB: Node): void {
     const dx = nodeB.position.x - nodeA.position.x;
@@ -219,25 +158,6 @@ export class ForceDirectedLayout {
 
     // Check if same file connection
     const isSameFile = nodeA.file && nodeB.file && nodeA.file === nodeB.file;
-    
-    // Determine minimum distance based on file and export status
-    let minDistance: number;
-    if (isSameFile) {
-      // Same-file connections can get closest (3 units)
-      minDistance = this.MIN_SAME_FILE_DISTANCE;
-    } else if (nodeA.isExported || nodeB.isExported) {
-      // Exported connections: 12 units (cross-file or exported)
-      minDistance = this.MIN_EDGE_EXPORT_DISTANCE;
-    } else {
-      // Regular cross-file connections: 6 units
-      minDistance = this.MIN_EQUILIBRIUM_DISTANCE;
-    }
-
-    // Only apply attractive force if nodes are farther apart than minimum distance
-    // This ensures connected nodes attract until reaching their equilibrium distance
-    if (distance <= minDistance) {
-      return;  // Nodes are at or below minimum distance, don't pull closer
-    }
 
     // Use strongest attraction for same-file connected nodes (6x stronger)
     const attractionConstant = isSameFile ? this.C_ATTRACTIVE_SAME_FILE : this.C_ATTRACTIVE;
@@ -259,52 +179,6 @@ export class ForceDirectedLayout {
     nodeB.velocity.z -= fz;
   }
 
-  /**
-   * Apply repulsive force from an edge to a node not connected to that edge
-   * Prevents nodes from crossing through edges by pushing them away
-   */
-  private applyEdgeRepulsion(node: Node, edgeStart: Node, edgeEnd: Node): void {
-    // Calculate closest point on line segment to the node
-    const dx = edgeEnd.position.x - edgeStart.position.x;
-    const dy = edgeEnd.position.y - edgeStart.position.y;
-    const dz = edgeEnd.position.z - edgeStart.position.z;
-
-    const edgeLengthSq = dx * dx + dy * dy + dz * dz;
-    if (edgeLengthSq < 0.001) return;  // Edge is too small
-
-    // Calculate parameter t for closest point on edge
-    const nodeTx = node.position.x - edgeStart.position.x;
-    const nodeTy = node.position.y - edgeStart.position.y;
-    const nodeTz = node.position.z - edgeStart.position.z;
-
-    let t = (nodeTx * dx + nodeTy * dy + nodeTz * dz) / edgeLengthSq;
-    t = Math.max(0, Math.min(1, t));  // Clamp to [0, 1]
-
-    // Find closest point on edge
-    const closestX = edgeStart.position.x + t * dx;
-    const closestY = edgeStart.position.y + t * dy;
-    const closestZ = edgeStart.position.z + t * dz;
-
-    // Calculate distance from node to edge
-    const distX = node.position.x - closestX;
-    const distY = node.position.y - closestY;
-    const distZ = node.position.z - closestZ;
-
-    const distance = Math.sqrt(distX * distX + distY * distY + distZ * distZ) || this.MIN_DISTANCE;
-
-    // Apply repulsive force (weak, inversely proportional to distance)
-    const repulsionConstant = 0.5;  // Gentle repulsion from edges
-    const force = repulsionConstant / (distance * distance + 1);  // +1 to avoid singularity
-
-    const fx = (force * distX) / distance;
-    const fy = (force * distY) / distance;
-    const fz = (force * distZ) / distance;
-
-    // Push node away from edge
-    node.velocity.x += fx;
-    node.velocity.y += fy;
-    node.velocity.z += fz;
-  }
 
   /**
    * Apply one iteration of forces and update positions (call once per frame)
@@ -327,8 +201,9 @@ export class ForceDirectedLayout {
       }
     }
 
-    // Apply attractive forces along edges
-    for (const edge of this.edges) {
+    // Apply attractive forces along edges (filtered if edge filter is specified)
+    const edgesToProcess = this.edgeFilter ? this.edges.filter(this.edgeFilter) : this.edges;
+    for (const edge of edgesToProcess) {
       const sourceNode = this.nodes.get(edge.source);
       const targetNode = this.nodes.get(edge.target);
       if (sourceNode && targetNode) {
@@ -363,67 +238,9 @@ export class ForceDirectedLayout {
     
     // Enforce stronger minimum distance constraint between nodes from different files
     this.enforceFileCrossConstraint();
-    
-    // Enforce minimum distance constraint only for connected nodes
-    this.enforceEdgeMinimumDistance();
 
     // Return true if still converging, false if settled
     return maxVelocity >= this.EQUILIBRIUM_THRESHOLD;
-  }
-
-  /**
-   * Enforce minimum distance constraint between nodes connected by edges
-   * If either node is exported: enforce 12 units (MIN_EDGE_EXPORT_DISTANCE)
-   * Otherwise: enforce 6 units (MIN_EQUILIBRIUM_DISTANCE)
-   */
-  private enforceEdgeMinimumDistance(): void {
-    const pushForce = this.C_REPULSIVE * 5;  // Strong push force to maintain edge distance
-
-    // Enforce distance for nodes that are connected by edges
-    for (const edge of this.edges) {
-      const nodeA = this.nodes.get(edge.source);
-      const nodeB = this.nodes.get(edge.target);
-
-      if (!nodeA || !nodeB) continue;
-
-      const dx = nodeB.position.x - nodeA.position.x;
-      const dy = nodeB.position.y - nodeA.position.y;
-      const dz = nodeB.position.z - nodeA.position.z;
-
-      const distance = Math.sqrt(dx * dx + dy * dy + dz * dz) || this.MIN_DISTANCE;
-
-      // Determine minimum distance based on whether either node is exported
-      const isExportedEdge = nodeA.isExported || nodeB.isExported;
-      const minDistance = isExportedEdge ? this.MIN_EDGE_EXPORT_DISTANCE : this.MIN_EQUILIBRIUM_DISTANCE;
-
-      // If connected nodes are closer than minimum distance, push them apart
-      if (distance < minDistance) {
-        const direction = distance > 0 
-          ? { x: dx / distance, y: dy / distance, z: dz / distance }
-          : { x: Math.random() - 0.5, y: Math.random() - 0.5, z: Math.random() - 0.5 };
-
-        // Calculate how much to push
-        const pushAmount = (minDistance - distance) * pushForce;
-
-        // Push nodes apart
-        nodeA.position.x -= direction.x * pushAmount;
-        nodeA.position.y -= direction.y * pushAmount;
-        nodeA.position.z -= direction.z * pushAmount;
-
-        nodeB.position.x += direction.x * pushAmount;
-        nodeB.position.y += direction.y * pushAmount;
-        nodeB.position.z += direction.z * pushAmount;
-
-        // Re-constrain to bounds after pushing
-        nodeA.position.x = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeA.position.x));
-        nodeA.position.y = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeA.position.y));
-        nodeA.position.z = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeA.position.z));
-
-        nodeB.position.x = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeB.position.x));
-        nodeB.position.y = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeB.position.y));
-        nodeB.position.z = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeB.position.z));
-      }
-    }
   }
 
   /**

@@ -395,8 +395,29 @@ export class MeshFactory {
         continue;
       }
 
-      // Position cylinder at midpoint between nodes (world space)
-      const midpointWorld = sourceCenterPos.add(direction.scale(0.5));
+      // Get half-sizes of source and target meshes for surface contact points
+      const sourceBoundingBox = sourceMesh.getBoundingInfo().boundingBox;
+      const targetBoundingBox = targetMesh.getBoundingInfo().boundingBox;
+      // Calculate half-size as distance from center to corner
+      const sourceSize = sourceBoundingBox.maximum.subtract(sourceBoundingBox.minimum).scale(0.5);
+      const targetSize = targetBoundingBox.maximum.subtract(targetBoundingBox.minimum).scale(0.5);
+      const sourceHalfSize = sourceSize.length();  // Approximate half-size (distance to corner)
+      const targetHalfSize = targetSize.length();  // Approximate half-size (distance to corner)
+
+      // Normalize direction
+      const normalizedDir = direction.normalize();
+
+      // Start point: move source center outward by half its size
+      const edgeStartPos = sourceCenterPos.add(normalizedDir.scale(sourceHalfSize));
+      
+      // End point: move target center inward by half its size (approach from outside)
+      const edgeEndPos = targetCenterPos.add(normalizedDir.scale(-targetHalfSize));
+
+      // Use midpoint of start and end for cylinder position
+      const midpointWorld = edgeStartPos.add(edgeEndPos).scale(0.5);
+      
+      // Recalculate distance based on surface points
+      const surfaceDistance = edgeEndPos.subtract(edgeStartPos).length();
       
       // Convert world position to local position relative to parent
       // If cylinder has a parent, position is automatically local
@@ -409,14 +430,14 @@ export class MeshFactory {
         cylinder.position = midpointWorld;
       }
 
-      // Scale cylinder to distance (physics constraint ensures minimum 6 units)
-      cylinder.scaling.y = distance;
+      // Scale cylinder to surface-to-surface distance
+      cylinder.scaling.y = Math.max(surfaceDistance, 0.1);  // Minimum 0.1 to avoid invisible edges
 
       // Rotate cylinder to point along the connection
-      const normalizedDir = direction.normalize();
+      const edgeDirection = edgeEndPos.subtract(edgeStartPos).normalize();
       const yAxis = BABYLON.Axis.Y;
       const rotationQuaternion = BABYLON.Quaternion.Identity();
-      BABYLON.Quaternion.FromUnitVectorsToRef(yAxis, normalizedDir, rotationQuaternion);
+      BABYLON.Quaternion.FromUnitVectorsToRef(yAxis, edgeDirection, rotationQuaternion);
       cylinder.rotationQuaternion = rotationQuaternion;
 
       // Ensure cylinder is visible
