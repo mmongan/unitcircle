@@ -241,6 +241,11 @@ export class VRSceneManager {
               fileBox.position.x = fileNode.position.x;
               fileBox.position.y = fileNode.position.y;
               fileBox.position.z = fileNode.position.z;
+              
+              // Log first few iterations to debug positioning
+              if (this.physicsIterationCount === 1 || this.physicsIterationCount === 10 || this.physicsIterationCount === 50) {
+                console.log(`  Frame ${this.physicsIterationCount}: ${file} at [${fileNode.position.x.toFixed(1)}, ${fileNode.position.y.toFixed(1)}, ${fileNode.position.z.toFixed(1)}]`);
+              }
             }
             
             // Update file box size to fit all its nodes
@@ -574,6 +579,9 @@ export class VRSceneManager {
     // Files are "nodes" positioned by cross-file reference edges
     const files = Array.from(this.fileNodeIds.keys());
     const crossFileEdges = this.buildCrossFileEdges(graph.edges, fileMap);
+    console.log(`📍 File-level layout: ${files.length} files, ${crossFileEdges.length} cross-file edges`);
+    console.log(`   Files: ${files.join(', ')}`);
+    console.log(`   Cross-file edges: ${crossFileEdges.map(e => `${e.source}->${e.target}`).join(', ')}`);
     this.fileLayout = new ForceDirectedLayout(files, crossFileEdges);
 
     // Step 2: Create file-internal layouts for each file
