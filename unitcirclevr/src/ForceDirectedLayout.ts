@@ -28,7 +28,8 @@ export class ForceDirectedLayout {
   private readonly SPACE_SIZE = 250;
   private readonly C_REPULSIVE = 2.0;      // Repulsive force for same-file nodes
   private readonly C_REPULSIVE_CROSS_FILE = 10.0;  // Much stronger repulsion for cross-file nodes (5x stronger)
-  private readonly C_ATTRACTIVE = 0.05;    // Attractive force strength (edge pull)
+  private readonly C_ATTRACTIVE = 0.05;    // Attractive force strength for cross-file edges
+  private readonly C_ATTRACTIVE_SAME_FILE = 0.15;  // 3x stronger attraction for same-file connected nodes
   private readonly DAMPING = 0.92;         // Velocity damping per iteration
   private readonly MIN_DISTANCE = 1.0;     // Minimum distance to prevent singularity in force calculations
   private readonly MIN_NODE_SEPARATION = 25.0;    // Minimum distance between unconnected same-file nodes
@@ -161,6 +162,7 @@ export class ForceDirectedLayout {
 
   /**
    * Apply attractive force along edges (pull together)
+   * Stronger attraction for edges between nodes from the same file
    * Only applies force if nodes are farther than minimum distance
    * This allows connected nodes to attract until they reach their equilibrium distance
    */
@@ -181,8 +183,12 @@ export class ForceDirectedLayout {
       return;  // Nodes are at or below minimum distance, don't pull closer
     }
 
+    // Use stronger attraction for same-file connected nodes (3x stronger)
+    const isSameFile = nodeA.file && nodeB.file && nodeA.file === nodeB.file;
+    const attractionConstant = isSameFile ? this.C_ATTRACTIVE_SAME_FILE : this.C_ATTRACTIVE;
+
     // Spring-like force: F = k * distance
-    const force = this.C_ATTRACTIVE * distance;
+    const force = attractionConstant * distance;
 
     const fx = (force * dx) / distance;
     const fy = (force * dy) / distance;
