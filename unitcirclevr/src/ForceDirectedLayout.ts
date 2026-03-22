@@ -24,17 +24,17 @@ export class ForceDirectedLayout {
   private nodes: Map<string, Node>;
   private edges: Edge[];
   private readonly SPACE_SIZE = 250;
-  private readonly C_REPULSIVE = 0.5;      // Repulsive force strength
-  private readonly C_ATTRACTIVE = 0.01;    // Attractive force strength (edge pull)
-  private readonly DAMPING = 0.85;         // Velocity damping per iteration
+  private readonly C_REPULSIVE = 2.0;      // Repulsive force strength (increased for more realistic physics)
+  private readonly C_ATTRACTIVE = 0.05;    // Attractive force strength (edge pull)
+  private readonly DAMPING = 0.92;         // Velocity damping per iteration
   private readonly MIN_DISTANCE = 1.0;     // Minimum distance to prevent singularity
-  private readonly EQUILIBRIUM_THRESHOLD = 0.0001;  // Converged when all velocities below this
+  private readonly EQUILIBRIUM_THRESHOLD = 0.001;  // Converged when all velocities below this
 
   constructor(nodeIds: string[], edges: Edge[]) {
     this.edges = edges;
     this.nodes = new Map();
 
-    // Initialize nodes with random positions
+    // Initialize nodes with random positions (will be spread by forces)
     for (const id of nodeIds) {
       this.nodes.set(id, {
         id,
@@ -163,6 +163,62 @@ export class ForceDirectedLayout {
     nodeB.velocity.x -= fx;
     nodeB.velocity.y -= fy;
     nodeB.velocity.z -= fz;
+  }
+
+  /**
+   * Apply one iteration of forces and update positions (call once per frame)
+   * Returns true if layout is still converging, false if at equilibrium
+   */
+  public updateFrame(): boolean {
+    const nodeArray = Array.from(this.nodes.values());
+    const nodeCount = nodeArray.length;
+    let maxVelocity = 0;
+
+    // Reset forces for this frame
+    for (const node of nodeArray) {
+      node.velocity = { x: 0, y: 0, z: 0 };
+    }
+
+    // Apply repulsive forces between all node pairs
+    for (let i = 0; i < nodeCount; i++) {
+      for (let j = i + 1; j < nodeCount; j++) {
+        this.applyRepulsiveForce(nodeArray[i], nodeArray[j]);
+      }
+    }
+
+    // Apply attractive forces along edges
+    for (const edge of this.edges) {
+      const sourceNode = this.nodes.get(edge.source);
+      const targetNode = this.nodes.get(edge.target);
+      if (sourceNode && targetNode) {
+        this.applyAttractiveForce(sourceNode, targetNode);
+      }
+    }
+
+    // Update positions and apply damping
+    for (const node of nodeArray) {
+      // Apply damping to velocity
+      node.velocity.x *= this.DAMPING;
+      node.velocity.y *= this.DAMPING;
+      node.velocity.z *= this.DAMPING;
+
+      // Update position based on velocity
+      node.position.x += node.velocity.x;
+      node.position.y += node.velocity.y;
+      node.position.z += node.velocity.z;
+
+      // Constrain to bounds
+      node.position.x = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, node.position.x));
+      node.position.y = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, node.position.y));
+      node.position.z = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, node.position.z));
+
+      // Track max velocity for convergence check
+      const speed = Math.sqrt(node.velocity.x ** 2 + node.velocity.y ** 2 + node.velocity.z ** 2);
+      maxVelocity = Math.max(maxVelocity, speed);
+    }
+
+    // Return true if still converging, false if settled
+    return maxVelocity >= this.EQUILIBRIUM_THRESHOLD;
   }
 
   public getNodes(): Map<string, Node> {

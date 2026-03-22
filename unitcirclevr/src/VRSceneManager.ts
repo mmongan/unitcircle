@@ -25,6 +25,12 @@ export class VRSceneManager {
   private keysPressed: Map<string, boolean> = new Map();
   private isFlying = false;
 
+  // Real-time physics
+  private layout: ForceDirectedLayout | null = null;
+  private nodeMeshMap: Map<string, BABYLON.Mesh> = new Map();  // Map node IDs to their meshes
+  private physicsActive = false;
+  private physicsIterationCount = 0;
+
   constructor(canvas: HTMLCanvasElement) {
     this.engine = new BABYLON.Engine(canvas, true);
     this.scene = new BABYLON.Scene(this.engine);
@@ -180,6 +186,37 @@ export class VRSceneManager {
     if (this.keysPressed.get('shift') || this.keysPressed.get('control')) {
       // Move down
       this.camera.position.addInPlace(up.scale(-distance));
+    }
+  }
+
+  /**
+   * Set up per-frame physics updates for force-directed layout
+   */
+  private setupPhysicsLoop(): void {
+    if (this.scene.registerBeforeRender) {
+      this.scene.registerBeforeRender(() => {
+        if (this.physicsActive && this.layout) {
+          // Apply one iteration of forces
+          const stillConverging = this.layout.updateFrame();
+          
+          // Update mesh positions from layout
+          const layoutNodes = this.layout.getNodes();
+          for (const [nodeId, mesh] of this.nodeMeshMap.entries()) {
+            const layoutNode = layoutNodes.get(nodeId);
+            if (layoutNode && mesh.position) {
+              mesh.position.x = layoutNode.position.x;
+              mesh.position.y = layoutNode.position.y;
+              mesh.position.z = layoutNode.position.z;
+            }
+          }
+
+          // Stop physics after ~5 seconds (300 frames at 60fps) of settling
+          this.physicsIterationCount++;
+          if (this.physicsIterationCount > 300 || !stillConverging) {
+            this.physicsActive = false;
+          }
+        }
+      });
     }
   }
 
@@ -458,40 +495,46 @@ export class VRSceneManager {
 
 
   public renderCodeGraph(graph: GraphData): void {
-    // Create positions using force-directed layout
+    // Create force-directed layout - nodes start at center
     const edges = this.buildEdgeList(graph.edges);
-    const layout = new ForceDirectedLayout(
+    this.layout = new ForceDirectedLayout(
       graph.nodes.map(n => n.id),
       edges
     );
-    const layoutNodes = this.computeLayout(layout);
 
     // Calculate indegree (incoming connections) for each node
     const indegreeMap = this.calculateIndegree(graph.edges);
 
-    this.renderNodes(graph.nodes, layoutNodes, indegreeMap);
-    this.renderEdges(graph.edges, layoutNodes);
+    // Render nodes at their initial positions (all at center)
+    const initialNodes = this.layout.getNodes();
+    this.renderNodes(graph.nodes, initialNodes, indegreeMap);
+    this.renderEdges(graph.edges, initialNodes);
+
+    // Enable physics updates to push nodes apart
+    this.physicsActive = true;
+    this.physicsIterationCount = 0;
+    this.setupPhysicsLoop();
 
     console.log(`✓ Rendered code graph with ${graph.nodes.length} functions and ${graph.edges.length} calls`);
   }
 
   /**
    * Incrementally update the scene - only create/remove changed objects
-   * New nodes start at center and animate to their equilibrium position
+   * New nodes are added and physics pushes them apart
    */
   private updateCodeGraph(graph: GraphData): void {
     this.validateGraphData(graph);
 
-    // Compute layout for all nodes to get equilibrium positions
+    // Rebuild layout with all nodes for proper physics
     const edges = this.buildEdgeList(graph.edges);
-    const layout = new ForceDirectedLayout(
+    this.layout = new ForceDirectedLayout(
       graph.nodes.map(n => n.id),
       edges
     );
 
     // Calculate indegree (incoming connections) for each node
     const indegreeMap = this.calculateIndegree(graph.edges);
-    const layoutNodes = this.computeLayout(layout);
+    const layoutNodes = this.layout.getNodes();
 
     // Track new node IDs and edge pairs
     const newNodeIds = new Set(graph.nodes.map(n => n.id));
@@ -504,6 +547,7 @@ export class VRSceneManager {
     for (const nodeId of removedNodeIds) {
       this.removeMeshesForNode(nodeId);
       this.currentNodeIds.delete(nodeId);
+      this.nodeMeshMap.delete(nodeId);
     }
 
     // Remove deleted edges
@@ -513,9 +557,9 @@ export class VRSceneManager {
       this.currentEdges.delete(edgePair);
     }
 
-    // Create only new nodes - animate from center to equilibrium positions
+    // Create only new nodes - just place them, physics will spread them
     const newNodes = graph.nodes.filter(n => !this.currentNodeIds.has(n.id));
-    this.renderNodesWithAnimation(newNodes, layoutNodes, indegreeMap, true);  // animated=true - smooth transition
+    this.renderNodesWithAnimation(newNodes, layoutNodes, indegreeMap, false);  // animated=false - physics will move them
     newNodes.forEach(n => this.currentNodeIds.add(n.id));
 
     // Create only new edges
@@ -524,6 +568,10 @@ export class VRSceneManager {
     );
     this.renderEdges(newEdges, layoutNodes);
     newEdges.forEach(e => this.currentEdges.add(`${e.from}→${e.to}`));
+
+    // Restart physics to spread updated graph
+    this.physicsActive = true;
+    this.physicsIterationCount = 0;
 
     console.log(
       `✓ Updated code graph: ${removedNodeIds.length} removed, ${newNodes.length} created, ` +
@@ -586,6 +634,8 @@ export class VRSceneManager {
 
       this.meshFactory.createNodeMesh(node, startPosition, fileColor, indegree, (mesh, material, n) => {
         this.setupNodeInteraction(mesh, material, n);
+        // Track mesh for physics updates
+        this.nodeMeshMap.set(node.id, mesh);
         // Only animate if starting from center (new nodes)
         if (animateFromCenter) {
           this.animateNodeToPosition(mesh, targetPosition, 4000);  // 4 second animation
@@ -643,10 +693,6 @@ export class VRSceneManager {
     return edges.map(e => ({ source: e.from, target: e.to }));
   }
 
-  private computeLayout(layout: ForceDirectedLayout): Map<string, any> {
-    return layout.simulate(200);  // Run 200 iterations for convergence
-  }
-
   /**
    * Animate a node mesh to a target position
    */
@@ -697,8 +743,8 @@ export class VRSceneManager {
     layoutNodes: Map<string, any>,
     indegreeMap: Map<string, number> = new Map()
   ): void {
-    // Animate nodes from center to their force-directed equilibrium positions
-    this.renderNodesWithAnimation(nodes, layoutNodes, indegreeMap, true);  // animated=true - smooth transition
+    // Just place nodes at current positions - physics will move them
+    this.renderNodesWithAnimation(nodes, layoutNodes, indegreeMap, false);  // animated=false - no animation
   }
 
   /**
