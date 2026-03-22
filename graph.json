@@ -121,10 +121,18 @@
       "type": "function"
     },
     {
+      "id": "shouldNodesRepel@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
+      "name": "shouldNodesRepel",
+      "file": "ForceDirectedLayout.ts",
+      "line": 75,
+      "isExported": false,
+      "type": "function"
+    },
+    {
       "id": "simulate@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "simulate",
       "file": "ForceDirectedLayout.ts",
-      "line": 73,
+      "line": 94,
       "isExported": false,
       "type": "function"
     },
@@ -132,7 +140,7 @@
       "id": "applyRepulsiveForce@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "applyRepulsiveForce",
       "file": "ForceDirectedLayout.ts",
-      "line": 153,
+      "line": 181,
       "isExported": false,
       "type": "function"
     },
@@ -140,7 +148,7 @@
       "id": "applyAttractiveForce@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "applyAttractiveForce",
       "file": "ForceDirectedLayout.ts",
-      "line": 186,
+      "line": 213,
       "isExported": false,
       "type": "function"
     },
@@ -148,7 +156,7 @@
       "id": "applyEdgeRepulsion@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "applyEdgeRepulsion",
       "file": "ForceDirectedLayout.ts",
-      "line": 239,
+      "line": 266,
       "isExported": false,
       "type": "function"
     },
@@ -156,7 +164,7 @@
       "id": "updateFrame@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "updateFrame",
       "file": "ForceDirectedLayout.ts",
-      "line": 286,
+      "line": 313,
       "isExported": false,
       "type": "function"
     },
@@ -164,7 +172,7 @@
       "id": "enforceEdgeMinimumDistance@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "enforceEdgeMinimumDistance",
       "file": "ForceDirectedLayout.ts",
-      "line": 352,
+      "line": 379,
       "isExported": false,
       "type": "function"
     },
@@ -172,7 +180,7 @@
       "id": "enforceAllPairsMinimumDistance@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "enforceAllPairsMinimumDistance",
       "file": "ForceDirectedLayout.ts",
-      "line": 407,
+      "line": 434,
       "isExported": false,
       "type": "function"
     },
@@ -180,7 +188,7 @@
       "id": "enforceFileCrossConstraint@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "enforceFileCrossConstraint",
       "file": "ForceDirectedLayout.ts",
-      "line": 464,
+      "line": 491,
       "isExported": false,
       "type": "function"
     },
@@ -188,7 +196,7 @@
       "id": "getNodes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "getNodes",
       "file": "ForceDirectedLayout.ts",
-      "line": 516,
+      "line": 543,
       "isExported": false,
       "type": "function"
     },
@@ -1073,6 +1081,10 @@
     },
     {
       "from": "simulate@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
+      "to": "shouldNodesRepel@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts"
+    },
+    {
+      "from": "simulate@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "to": "applyRepulsiveForce@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts"
     },
     {
@@ -1548,5 +1560,5 @@
       "to": "render@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-22T14:16:39.665Z"
+  "lastUpdated": "2026-03-22T14:19:15.017Z"
 }
