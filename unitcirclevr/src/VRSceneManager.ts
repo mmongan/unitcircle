@@ -529,6 +529,7 @@ export class VRSceneManager {
     const initialNodes = this.layout.getNodes();
     this.renderNodes(graph.nodes, initialNodes, indegreeMap);
     this.renderEdges();  // Create edge cylinders
+    this.meshFactory.updateEdges();  // Position edges immediately
 
     // Enable physics updates to push nodes apart
     this.physicsActive = true;
@@ -602,6 +603,7 @@ export class VRSceneManager {
       e => !this.currentEdges.has(`${e.from}→${e.to}`)
     );
     this.renderEdges();  // Create new edge cylinders
+    this.meshFactory.updateEdges();  // Position edges immediately
     newEdges.forEach(e => this.currentEdges.add(`${e.from}→${e.to}`));
 
     // Restart physics to spread updated graph
