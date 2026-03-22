@@ -565,7 +565,7 @@ export class VRSceneManager {
   }
 
   private computeLayout(layout: ForceDirectedLayout): Map<string, any> {
-    return layout.simulate();
+    return layout.simulate(200);  // Run 200 iterations for convergence
   }
 
   /**

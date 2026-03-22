@@ -13,14 +13,14 @@ describe('ForceDirectedLayout', () => {
 
     it('should handle empty node list', () => {
       const layout = new ForceDirectedLayout([], []);
-      const result = layout.simulate();
+      const result = layout.simulate(10);
 
       expect(result.size).toBe(0);
     });
 
     it('should handle single node', () => {
       const layout = new ForceDirectedLayout(['a'], []);
-      const result = layout.simulate();
+      const result = layout.simulate(10);
 
       expect(result.size).toBe(1);
       expect(result.has('a')).toBe(true);
@@ -32,7 +32,7 @@ describe('ForceDirectedLayout', () => {
       const nodes = ['a', 'b'];
       const edges = [{ source: 'a', target: 'b' }];
       const layout = new ForceDirectedLayout(nodes, edges);
-      const result = layout.simulate();
+      const result = layout.simulate(50);
 
       expect(result).toBeInstanceOf(Map);
       expect(result.size).toBe(2);
@@ -41,7 +41,7 @@ describe('ForceDirectedLayout', () => {
     it('should assign positions to all nodes', () => {
       const nodes = ['a', 'b', 'c', 'd'];
       const layout = new ForceDirectedLayout(nodes, []);
-      const result = layout.simulate();
+      const result = layout.simulate(50);
 
       for (const node of nodes) {
         expect(result.has(node)).toBe(true);
@@ -56,7 +56,7 @@ describe('ForceDirectedLayout', () => {
     it('should track velocity for each node', () => {
       const nodes = ['a', 'b'];
       const layout = new ForceDirectedLayout(nodes, []);
-      const result = layout.simulate();
+      const result = layout.simulate(50);
 
       for (const node of nodes) {
         const pos = result.get(node);
@@ -72,7 +72,7 @@ describe('ForceDirectedLayout', () => {
       const edges = [{ source: nodes[0], target: nodes[1] }];
       const layout = new ForceDirectedLayout(nodes, edges);
 
-      const result = layout.simulate();
+      const result = layout.simulate(50);
       
       expect(result.size).toBe(nodes.length);
       for (const n of nodes) {
@@ -93,7 +93,7 @@ describe('ForceDirectedLayout', () => {
         target: nodes[i + 1],
       }));
       const layout = new ForceDirectedLayout(nodes, edges);
-      const result = layout.simulate();
+      const result = layout.simulate(200);  // More iterations for larger graph
 
       for (const node of nodes) {
         const pos = result.get(node)?.position;
@@ -111,7 +111,7 @@ describe('ForceDirectedLayout', () => {
     it('should distribute nodes across volume', () => {
       const nodes = Array.from({ length: 20 }, (_, i) => `n${i}`);
       const layout = new ForceDirectedLayout(nodes, []);
-      const result = layout.simulate();
+      const result = layout.simulate(100);
 
       // Collect all positions
       const positions = nodes.map(n => result.get(n)?.position);
@@ -138,7 +138,7 @@ describe('ForceDirectedLayout', () => {
         { source: 'b', target: 'c' }
       ];
       const layout = new ForceDirectedLayout(nodes, edges);
-      const result = layout.simulate();
+      const result = layout.simulate(50);
 
       expect(result.size).toBe(3);
     });
@@ -147,7 +147,7 @@ describe('ForceDirectedLayout', () => {
       const nodes = ['a', 'b', 'c', 'd'];
       const edges = [{ source: 'a', target: 'b' }];
       const layout = new ForceDirectedLayout(nodes, edges);
-      const result = layout.simulate();
+      const result = layout.simulate(50);
 
       expect(result.has('c')).toBe(true);
       expect(result.has('d')).toBe(true);
@@ -159,7 +159,7 @@ describe('ForceDirectedLayout', () => {
       const nodes = ['a', 'b'];
       const edges = [{ source: 'a', target: 'b' }];
       const layout = new ForceDirectedLayout(nodes, edges);
-      const result = layout.simulate();
+      const result = layout.simulate(50);
 
       for (const node of nodes) {
         const outputNode = result.get(node);
@@ -170,7 +170,7 @@ describe('ForceDirectedLayout', () => {
     it('should extract label from qualified IDs', () => {
       const nodes = ['module@a', 'module@b'];
       const layout = new ForceDirectedLayout(nodes, []);
-      const result = layout.simulate();
+      const result = layout.simulate(50);
 
       const nodeA = result.get('module@a');
       expect(nodeA?.label).toBe('module');
