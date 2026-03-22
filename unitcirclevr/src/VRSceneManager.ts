@@ -977,8 +977,8 @@ export class VRSceneManager {
 
     const files = Array.from(this.fileNodeIds.keys());
     const fileNodes = layout.getNodes();
-    const repulsionStrength = 50.0;  // Force strength for box separation
-    const minSeparationPadding = 15.0;  // Minimum distance padding between boxes
+    const repulsionStrength = 150.0;  // Force strength for box separation (increased from 50 for stronger pushback)
+    const minSeparationPadding = 40.0;  // Minimum distance padding between boxes (increased from 15 for more space)
 
     // Check all pairs of files for intersection
     for (let i = 0; i < files.length; i++) {
