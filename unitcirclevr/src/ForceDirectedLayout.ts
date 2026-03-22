@@ -18,10 +18,11 @@ export class ForceDirectedLayout {
   private nodes: Map<string, Node>;
   private edges: Edge[];
   private k: number = 1; // Optimal distance
-  private repulsiveForce: number = 0.15; // Repulsive force strength (lower = stronger repulsion)
+  private repulsiveForce: number = 0.12; // Repulsive force strength (lower = stronger repulsion)
   private attractiveForce: number = 0.05; // Attractive force strength
   private damping: number = 0.95; // Velocity damping
-  private minSeparation: number = 10; // Minimum distance between node centers (accounts for variable box sizes)
+  private minSeparation: number = 12; // Minimum distance between node centers (increased from 10 to prevent mesh overlap)
+  private xzPlaneRepulsion: number = 0.08; // Additional repulsion in xz plane to prevent horizontal collisions
 
   constructor(nodeIds: string[], edges: Edge[]) {
     this.nodes = new Map();
@@ -88,6 +89,7 @@ export class ForceDirectedLayout {
     }
 
     this.applyRepulsiveForces(forces);
+    this.applyXzPlaneRepulsion(forces);
     this.applyAttractiveForces(forces);
     return forces;
   }
@@ -107,7 +109,7 @@ export class ForceDirectedLayout {
 
         // Enforce minimum separation - push nodes apart if too close
         if (distance < this.minSeparation) {
-          const pushForce = Math.pow(this.minSeparation - distance, 1.5) * 5; // Aggressive push force
+          const pushForce = Math.pow(this.minSeparation - distance, 1.5) * 6; // Aggressive push force (increased from 5 to 6)
           const fx = (dx / distance) * pushForce;
           const fy = (dy / distance) * pushForce;
           const fz = (dz / distance) * pushForce;
@@ -139,6 +141,44 @@ export class ForceDirectedLayout {
           f1.z -= fz;
           f2.x += fx;
           f2.y += fy;
+          f2.z += fz;
+
+          forces.set(n1.id, f1);
+          forces.set(n2.id, f2);
+        }
+      }
+    }
+  }
+
+  /**
+   * Apply additional repulsion in the xz plane to prevent horizontal mesh-edge collisions
+   */
+  private applyXzPlaneRepulsion(forces: Map<string, { x: number; y: number; z: number }>): void {
+    const nodeArray = Array.from(this.nodes.values());
+    const minXzSeparation = this.minSeparation * 1.3; // Stronger horizontal separation requirement
+    
+    for (let i = 0; i < nodeArray.length; i++) {
+      for (let j = i + 1; j < nodeArray.length; j++) {
+        const n1 = nodeArray[i];
+        const n2 = nodeArray[j];
+
+        // Calculate horizontal (xz plane) distance
+        const dx = n2.position.x - n1.position.x;
+        const dz = n2.position.z - n1.position.z;
+        const xzDistance = Math.sqrt(dx * dx + dz * dz) + 0.01;
+
+        // Apply additional repulsion if nodes are too close horizontally
+        if (xzDistance < minXzSeparation) {
+          const pushForce = Math.pow(minXzSeparation - xzDistance, 1.2) * this.xzPlaneRepulsion;
+          const fx = (dx / xzDistance) * pushForce;
+          const fz = (dz / xzDistance) * pushForce;
+
+          const f1 = forces.get(n1.id) || { x: 0, y: 0, z: 0 };
+          const f2 = forces.get(n2.id) || { x: 0, y: 0, z: 0 };
+
+          f1.x -= fx;
+          f1.z -= fz;
+          f2.x += fx;
           f2.z += fz;
 
           forces.set(n1.id, f1);
