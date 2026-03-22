@@ -109,6 +109,11 @@ export class ForceDirectedLayout {
         const n1 = nodeArray[i];
         const n2 = nodeArray[j];
 
+        // Extract file paths from node IDs (format: "functionName@/path/to/file.ts")
+        const file1 = n1.id.split('@')[1];
+        const file2 = n2.id.split('@')[1];
+        const isDifferentFile = file1 !== file2;
+
         const dx = n2.position.x - n1.position.x;
         const dy = n2.position.y - n1.position.y;
         const dz = n2.position.z - n1.position.z;
@@ -116,7 +121,9 @@ export class ForceDirectedLayout {
 
         // Enforce minimum separation - push nodes apart if too close
         if (distance < this.minSeparation) {
-          const pushForce = Math.pow(this.minSeparation - distance, 1.5) * 6; // Aggressive push force (increased from 5 to 6)
+          // 2x push force for different files, normal force for same file
+          const repulsionMultiplier = isDifferentFile ? 2.0 : 1.0;
+          const pushForce = Math.pow(this.minSeparation - distance, 1.5) * 6 * repulsionMultiplier;
           const fx = (dx / distance) * pushForce;
           const fy = (dy / distance) * pushForce;
           const fz = (dz / distance) * pushForce;
@@ -135,7 +142,9 @@ export class ForceDirectedLayout {
           forces.set(n2.id, f2);
         } else {
           // Standard repulsive force for nodes at normal distance
-          const force = (this.k * this.k) / (distance * this.repulsiveForce);
+          // 2x repulsion for different files, reduced for same file
+          const repulsionMultiplier = isDifferentFile ? 2.0 : 0.5;
+          const force = (this.k * this.k) / (distance * this.repulsiveForce) * repulsionMultiplier;
           const fx = (dx / distance) * force;
           const fy = (dy / distance) * force;
           const fz = (dz / distance) * force;
@@ -196,7 +205,7 @@ export class ForceDirectedLayout {
   }
 
   private applyAttractiveForces(forces: Map<string, { x: number; y: number; z: number }>): void {
-    // Calculate attractive forces for edges
+    // Calculate attractive forces for edges - these hold nodes together against repulsion
     for (const edge of this.edges) {
       const source = this.nodes.get(edge.source);
       const target = this.nodes.get(edge.target);
@@ -207,8 +216,16 @@ export class ForceDirectedLayout {
         const dz = target.position.z - source.position.z;
         const distance = Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.01;
 
+        // Extract file paths - edges between different files get stronger attraction
+        const sourceFile = source.id.split('@')[1];
+        const targetFile = target.id.split('@')[1];
+        const isDifferentFile = sourceFile !== targetFile;
+        
+        // Increase attraction strength for cross-file edges (2x) to overcome the doubled repulsion
+        const attractionMultiplier = isDifferentFile ? 2.0 : 1.0;
+        
         // Attractive force proportional to distance
-        const force = (distance * distance) / this.k * this.attractiveForce;
+        const force = (distance * distance) / this.k * this.attractiveForce * attractionMultiplier;
         const fx = (dx / distance) * force;
         const fy = (dy / distance) * force;
         const fz = (dz / distance) * force;
