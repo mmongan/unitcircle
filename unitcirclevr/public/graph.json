@@ -124,7 +124,7 @@
       "id": "simulate@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "simulate",
       "file": "ForceDirectedLayout.ts",
-      "line": 53,
+      "line": 60,
       "isExported": false,
       "type": "function"
     },
@@ -132,7 +132,7 @@
       "id": "initializeNodeData@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "initializeNodeData",
       "file": "ForceDirectedLayout.ts",
-      "line": 62,
+      "line": 69,
       "isExported": false,
       "type": "function"
     },
@@ -140,7 +140,7 @@
       "id": "constrainNodePositions@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "constrainNodePositions",
       "file": "ForceDirectedLayout.ts",
-      "line": 71,
+      "line": 78,
       "isExported": false,
       "type": "function"
     },
@@ -148,7 +148,7 @@
       "id": "simulationStep@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "simulationStep",
       "file": "ForceDirectedLayout.ts",
-      "line": 81,
+      "line": 88,
       "isExported": false,
       "type": "function"
     },
@@ -156,7 +156,7 @@
       "id": "calculateForces@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "calculateForces",
       "file": "ForceDirectedLayout.ts",
-      "line": 86,
+      "line": 93,
       "isExported": false,
       "type": "function"
     },
@@ -164,7 +164,7 @@
       "id": "applyRepulsiveForces@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "applyRepulsiveForces",
       "file": "ForceDirectedLayout.ts",
-      "line": 98,
+      "line": 105,
       "isExported": false,
       "type": "function"
     },
@@ -172,7 +172,7 @@
       "id": "applyXzPlaneRepulsion@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "applyXzPlaneRepulsion",
       "file": "ForceDirectedLayout.ts",
-      "line": 157,
+      "line": 164,
       "isExported": false,
       "type": "function"
     },
@@ -180,7 +180,7 @@
       "id": "applyAttractiveForces@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "applyAttractiveForces",
       "file": "ForceDirectedLayout.ts",
-      "line": 192,
+      "line": 199,
       "isExported": false,
       "type": "function"
     },
@@ -188,7 +188,7 @@
       "id": "applyForces@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "applyForces",
       "file": "ForceDirectedLayout.ts",
-      "line": 226,
+      "line": 233,
       "isExported": false,
       "type": "function"
     },
@@ -196,7 +196,7 @@
       "id": "updateNodeVelocity@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "updateNodeVelocity",
       "file": "ForceDirectedLayout.ts",
-      "line": 236,
+      "line": 243,
       "isExported": false,
       "type": "function"
     },
@@ -204,7 +204,7 @@
       "id": "updateNodePosition@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "updateNodePosition",
       "file": "ForceDirectedLayout.ts",
-      "line": 242,
+      "line": 249,
       "isExported": false,
       "type": "function"
     },
@@ -212,7 +212,7 @@
       "id": "getNodes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "getNodes",
       "file": "ForceDirectedLayout.ts",
-      "line": 248,
+      "line": 255,
       "isExported": false,
       "type": "function"
     },
@@ -220,7 +220,7 @@
       "id": "getEdges@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "getEdges",
       "file": "ForceDirectedLayout.ts",
-      "line": 252,
+      "line": 259,
       "isExported": false,
       "type": "function"
     },
@@ -1460,5 +1460,5 @@
       "to": "render@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-22T01:41:14.194Z"
+  "lastUpdated": "2026-03-22T01:44:10.076Z"
 }

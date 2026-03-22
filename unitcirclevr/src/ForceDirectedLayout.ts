@@ -18,9 +18,9 @@ export class ForceDirectedLayout {
   private nodes: Map<string, Node>;
   private edges: Edge[];
   private k: number = 1; // Optimal distance
-  private repulsiveForce: number = 0.12; // Repulsive force strength (lower = stronger repulsion)
+  private repulsiveForce: number = 0.06; // Repulsive force strength (lower = stronger repulsion) - INCREASED for better spreading
   private attractiveForce: number = 0.05; // Attractive force strength
-  private damping: number = 0.95; // Velocity damping
+  private damping: number = 0.90; // Velocity damping - DECREASED to allow faster movement
   private minSeparation: number = 12; // Minimum distance between node centers (increased from 10 to prevent mesh overlap)
   private xzPlaneRepulsion: number = 0.08; // Additional repulsion in xz plane to prevent horizontal collisions
 
@@ -28,15 +28,22 @@ export class ForceDirectedLayout {
     this.nodes = new Map();
     this.edges = edges;
 
-    // Initialize all nodes near the center with tiny random perturbations
-    // This breaks symmetry so repulsive forces can push them apart
+    // Initialize nodes with initial spread to prevent center clustering
+    // Distribute nodes across a larger initial volume for better convergence
+    const initialRadius = Math.cbrt(nodeIds.length) * 3; // Cube root of node count gives good distribution
+    
     for (const id of nodeIds) {
+      // Random position on surface of sphere with initial radius
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      const r = initialRadius * (0.3 + Math.random() * 0.7); // Random distance with some spread
+      
       this.nodes.set(id, {
         id,
         position: {
-          x: (Math.random() - 0.5) * 0.01,  // Tiny random offset to break symmetry
-          y: (Math.random() - 0.5) * 0.01,
-          z: (Math.random() - 0.5) * 0.01
+          x: r * Math.sin(phi) * Math.cos(theta),
+          y: r * Math.sin(phi) * Math.sin(theta),
+          z: r * Math.cos(phi)
         },
         velocity: { x: 0, y: 0, z: 0 },
         label: id.split('@')[0]

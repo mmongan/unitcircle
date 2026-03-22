@@ -124,8 +124,9 @@ describe('ForceDirectedLayout', () => {
       );
 
       // Connected nodes should be attracted (physics varies, so allow wide range)
+      // Increased upper bound to account for larger initial sphere-based distribution
       expect(distance).toBeGreaterThan(1);
-      expect(distance).toBeLessThan(150);
+      expect(distance).toBeLessThan(200);
     });
 
     it('should repel unconnected nodes', () => {
