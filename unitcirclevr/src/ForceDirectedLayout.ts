@@ -99,6 +99,22 @@ export class ForceDirectedLayout {
         }
       }
 
+      // Apply repulsive forces from edges to nodes not connected to them
+      // This prevents nodes from crossing through edges
+      for (const edge of this.edges) {
+        const sourceNode = this.nodes.get(edge.source);
+        const targetNode = this.nodes.get(edge.target);
+        if (sourceNode && targetNode) {
+          for (const node of nodeArray) {
+            // Skip if this node is one of the edge endpoints
+            if (node.id === sourceNode.id || node.id === targetNode.id) {
+              continue;
+            }
+            this.applyEdgeRepulsion(node, sourceNode, targetNode);
+          }
+        }
+      }
+
       // Update positions and apply damping
       for (const node of nodeArray) {
         // Apply damping to velocity
@@ -214,6 +230,53 @@ export class ForceDirectedLayout {
     nodeB.velocity.x -= fx;
     nodeB.velocity.y -= fy;
     nodeB.velocity.z -= fz;
+  }
+
+  /**
+   * Apply repulsive force from an edge to a node not connected to that edge
+   * Prevents nodes from crossing through edges by pushing them away
+   */
+  private applyEdgeRepulsion(node: Node, edgeStart: Node, edgeEnd: Node): void {
+    // Calculate closest point on line segment to the node
+    const dx = edgeEnd.position.x - edgeStart.position.x;
+    const dy = edgeEnd.position.y - edgeStart.position.y;
+    const dz = edgeEnd.position.z - edgeStart.position.z;
+
+    const edgeLengthSq = dx * dx + dy * dy + dz * dz;
+    if (edgeLengthSq < 0.001) return;  // Edge is too small
+
+    // Calculate parameter t for closest point on edge
+    const nodeTx = node.position.x - edgeStart.position.x;
+    const nodeTy = node.position.y - edgeStart.position.y;
+    const nodeTz = node.position.z - edgeStart.position.z;
+
+    let t = (nodeTx * dx + nodeTy * dy + nodeTz * dz) / edgeLengthSq;
+    t = Math.max(0, Math.min(1, t));  // Clamp to [0, 1]
+
+    // Find closest point on edge
+    const closestX = edgeStart.position.x + t * dx;
+    const closestY = edgeStart.position.y + t * dy;
+    const closestZ = edgeStart.position.z + t * dz;
+
+    // Calculate distance from node to edge
+    const distX = node.position.x - closestX;
+    const distY = node.position.y - closestY;
+    const distZ = node.position.z - closestZ;
+
+    const distance = Math.sqrt(distX * distX + distY * distY + distZ * distZ) || this.MIN_DISTANCE;
+
+    // Apply repulsive force (weak, inversely proportional to distance)
+    const repulsionConstant = 0.5;  // Gentle repulsion from edges
+    const force = repulsionConstant / (distance * distance + 1);  // +1 to avoid singularity
+
+    const fx = (force * distX) / distance;
+    const fy = (force * distY) / distance;
+    const fz = (force * distZ) / distance;
+
+    // Push node away from edge
+    node.velocity.x += fx;
+    node.velocity.y += fy;
+    node.velocity.z += fz;
   }
 
   /**

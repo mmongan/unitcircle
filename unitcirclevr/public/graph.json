@@ -132,7 +132,7 @@
       "id": "applyRepulsiveForce@src\\ForceDirectedLayout.ts",
       "name": "applyRepulsiveForce",
       "file": "ForceDirectedLayout.ts",
-      "line": 137,
+      "line": 153,
       "isExported": false,
       "type": "function"
     },
@@ -140,7 +140,15 @@
       "id": "applyAttractiveForce@src\\ForceDirectedLayout.ts",
       "name": "applyAttractiveForce",
       "file": "ForceDirectedLayout.ts",
-      "line": 170,
+      "line": 186,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "applyEdgeRepulsion@src\\ForceDirectedLayout.ts",
+      "name": "applyEdgeRepulsion",
+      "file": "ForceDirectedLayout.ts",
+      "line": 239,
       "isExported": false,
       "type": "function"
     },
@@ -148,7 +156,7 @@
       "id": "updateFrame@src\\ForceDirectedLayout.ts",
       "name": "updateFrame",
       "file": "ForceDirectedLayout.ts",
-      "line": 223,
+      "line": 286,
       "isExported": false,
       "type": "function"
     },
@@ -156,7 +164,7 @@
       "id": "enforceEdgeMinimumDistance@src\\ForceDirectedLayout.ts",
       "name": "enforceEdgeMinimumDistance",
       "file": "ForceDirectedLayout.ts",
-      "line": 289,
+      "line": 352,
       "isExported": false,
       "type": "function"
     },
@@ -164,7 +172,7 @@
       "id": "enforceAllPairsMinimumDistance@src\\ForceDirectedLayout.ts",
       "name": "enforceAllPairsMinimumDistance",
       "file": "ForceDirectedLayout.ts",
-      "line": 344,
+      "line": 407,
       "isExported": false,
       "type": "function"
     },
@@ -172,7 +180,7 @@
       "id": "enforceFileCrossConstraint@src\\ForceDirectedLayout.ts",
       "name": "enforceFileCrossConstraint",
       "file": "ForceDirectedLayout.ts",
-      "line": 401,
+      "line": 464,
       "isExported": false,
       "type": "function"
     },
@@ -180,7 +188,7 @@
       "id": "getNodes@src\\ForceDirectedLayout.ts",
       "name": "getNodes",
       "file": "ForceDirectedLayout.ts",
-      "line": 453,
+      "line": 516,
       "isExported": false,
       "type": "function"
     },
@@ -1000,6 +1008,10 @@
       "to": "applyAttractiveForce@src\\ForceDirectedLayout.ts"
     },
     {
+      "from": "simulate@src\\ForceDirectedLayout.ts",
+      "to": "applyEdgeRepulsion@src\\ForceDirectedLayout.ts"
+    },
+    {
       "from": "updateFrame@src\\ForceDirectedLayout.ts",
       "to": "applyRepulsiveForce@src\\ForceDirectedLayout.ts"
     },
@@ -1412,5 +1424,5 @@
       "to": "render@src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-22T13:49:52.093Z"
+  "lastUpdated": "2026-03-22T13:53:18.549Z"
 }
