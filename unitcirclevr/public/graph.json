@@ -124,7 +124,7 @@
       "id": "simulate@src\\ForceDirectedLayout.ts",
       "name": "simulate",
       "file": "ForceDirectedLayout.ts",
-      "line": 59,
+      "line": 53,
       "isExported": false,
       "type": "function"
     },
@@ -132,7 +132,7 @@
       "id": "initializeNodeData@src\\ForceDirectedLayout.ts",
       "name": "initializeNodeData",
       "file": "ForceDirectedLayout.ts",
-      "line": 68,
+      "line": 62,
       "isExported": false,
       "type": "function"
     },
@@ -140,7 +140,7 @@
       "id": "constrainNodePositions@src\\ForceDirectedLayout.ts",
       "name": "constrainNodePositions",
       "file": "ForceDirectedLayout.ts",
-      "line": 77,
+      "line": 71,
       "isExported": false,
       "type": "function"
     },
@@ -148,7 +148,7 @@
       "id": "simulationStep@src\\ForceDirectedLayout.ts",
       "name": "simulationStep",
       "file": "ForceDirectedLayout.ts",
-      "line": 87,
+      "line": 81,
       "isExported": false,
       "type": "function"
     },
@@ -156,7 +156,7 @@
       "id": "calculateForces@src\\ForceDirectedLayout.ts",
       "name": "calculateForces",
       "file": "ForceDirectedLayout.ts",
-      "line": 92,
+      "line": 86,
       "isExported": false,
       "type": "function"
     },
@@ -164,7 +164,7 @@
       "id": "applyRepulsiveForces@src\\ForceDirectedLayout.ts",
       "name": "applyRepulsiveForces",
       "file": "ForceDirectedLayout.ts",
-      "line": 105,
+      "line": 98,
       "isExported": false,
       "type": "function"
     },
@@ -172,7 +172,7 @@
       "id": "applyXzPlaneRepulsion@src\\ForceDirectedLayout.ts",
       "name": "applyXzPlaneRepulsion",
       "file": "ForceDirectedLayout.ts",
-      "line": 173,
+      "line": 157,
       "isExported": false,
       "type": "function"
     },
@@ -180,15 +180,7 @@
       "id": "applyAttractiveForces@src\\ForceDirectedLayout.ts",
       "name": "applyAttractiveForces",
       "file": "ForceDirectedLayout.ts",
-      "line": 208,
-      "isExported": false,
-      "type": "function"
-    },
-    {
-      "id": "applySameFileAttraction@src\\ForceDirectedLayout.ts",
-      "name": "applySameFileAttraction",
-      "file": "ForceDirectedLayout.ts",
-      "line": 250,
+      "line": 192,
       "isExported": false,
       "type": "function"
     },
@@ -196,7 +188,7 @@
       "id": "applyForces@src\\ForceDirectedLayout.ts",
       "name": "applyForces",
       "file": "ForceDirectedLayout.ts",
-      "line": 293,
+      "line": 226,
       "isExported": false,
       "type": "function"
     },
@@ -204,7 +196,7 @@
       "id": "updateNodeVelocity@src\\ForceDirectedLayout.ts",
       "name": "updateNodeVelocity",
       "file": "ForceDirectedLayout.ts",
-      "line": 303,
+      "line": 236,
       "isExported": false,
       "type": "function"
     },
@@ -212,7 +204,7 @@
       "id": "updateNodePosition@src\\ForceDirectedLayout.ts",
       "name": "updateNodePosition",
       "file": "ForceDirectedLayout.ts",
-      "line": 309,
+      "line": 242,
       "isExported": false,
       "type": "function"
     },
@@ -220,7 +212,7 @@
       "id": "getNodes@src\\ForceDirectedLayout.ts",
       "name": "getNodes",
       "file": "ForceDirectedLayout.ts",
-      "line": 315,
+      "line": 248,
       "isExported": false,
       "type": "function"
     },
@@ -228,7 +220,7 @@
       "id": "getEdges@src\\ForceDirectedLayout.ts",
       "name": "getEdges",
       "file": "ForceDirectedLayout.ts",
-      "line": 319,
+      "line": 252,
       "isExported": false,
       "type": "function"
     },
@@ -873,10 +865,18 @@
       "type": "function"
     },
     {
+      "id": "getPerpendicularVector@src\\VRSceneManager.ts",
+      "name": "getPerpendicularVector",
+      "file": "VRSceneManager.ts",
+      "line": 608,
+      "isExported": false,
+      "type": "function"
+    },
+    {
       "id": "setupNodeInteraction@src\\VRSceneManager.ts",
       "name": "setupNodeInteraction",
       "file": "VRSceneManager.ts",
-      "line": 592,
+      "line": 640,
       "isExported": false,
       "type": "function"
     },
@@ -884,7 +884,7 @@
       "id": "sceneRootFlyTo@src\\VRSceneManager.ts",
       "name": "sceneRootFlyTo",
       "file": "VRSceneManager.ts",
-      "line": 617,
+      "line": 665,
       "isExported": false,
       "type": "function"
     },
@@ -892,7 +892,7 @@
       "id": "slideFaceView@src\\VRSceneManager.ts",
       "name": "slideFaceView",
       "file": "VRSceneManager.ts",
-      "line": 700,
+      "line": 748,
       "isExported": false,
       "type": "function"
     },
@@ -900,7 +900,7 @@
       "id": "calculateIndegree@src\\VRSceneManager.ts",
       "name": "calculateIndegree",
       "file": "VRSceneManager.ts",
-      "line": 776,
+      "line": 824,
       "isExported": false,
       "type": "function"
     },
@@ -908,7 +908,7 @@
       "id": "renderEdges@src\\VRSceneManager.ts",
       "name": "renderEdges",
       "file": "VRSceneManager.ts",
-      "line": 784,
+      "line": 832,
       "isExported": false,
       "type": "function"
     },
@@ -916,7 +916,7 @@
       "id": "showTooltip@src\\VRSceneManager.ts",
       "name": "showTooltip",
       "file": "VRSceneManager.ts",
-      "line": 791,
+      "line": 839,
       "isExported": false,
       "type": "function"
     },
@@ -924,7 +924,7 @@
       "id": "hideTooltip@src\\VRSceneManager.ts",
       "name": "hideTooltip",
       "file": "VRSceneManager.ts",
-      "line": 821,
+      "line": 869,
       "isExported": false,
       "type": "function"
     },
@@ -932,7 +932,7 @@
       "id": "setupWebXR@src\\VRSceneManager.ts",
       "name": "setupWebXR",
       "file": "VRSceneManager.ts",
-      "line": 826,
+      "line": 874,
       "isExported": false,
       "type": "function"
     },
@@ -940,7 +940,7 @@
       "id": "handleVRControllerClick@src\\VRSceneManager.ts",
       "name": "handleVRControllerClick",
       "file": "VRSceneManager.ts",
-      "line": 862,
+      "line": 910,
       "isExported": false,
       "type": "function"
     },
@@ -948,7 +948,7 @@
       "id": "run@src\\VRSceneManager.ts",
       "name": "run",
       "file": "VRSceneManager.ts",
-      "line": 921,
+      "line": 969,
       "isExported": false,
       "type": "function"
     },
@@ -956,7 +956,7 @@
       "id": "dispose@src\\VRSceneManager.ts",
       "name": "dispose",
       "file": "VRSceneManager.ts",
-      "line": 929,
+      "line": 977,
       "isExported": false,
       "type": "function"
     },
@@ -1062,10 +1062,6 @@
     {
       "from": "calculateForces@src\\ForceDirectedLayout.ts",
       "to": "applyAttractiveForces@src\\ForceDirectedLayout.ts"
-    },
-    {
-      "from": "calculateForces@src\\ForceDirectedLayout.ts",
-      "to": "applySameFileAttraction@src\\ForceDirectedLayout.ts"
     },
     {
       "from": "applyForces@src\\ForceDirectedLayout.ts",
@@ -1393,6 +1389,10 @@
     },
     {
       "from": "renderNodes@src\\VRSceneManager.ts",
+      "to": "getPerpendicularVector@src\\VRSceneManager.ts"
+    },
+    {
+      "from": "renderNodes@src\\VRSceneManager.ts",
       "to": "getFileColor@src\\VRSceneManager.ts"
     },
     {
@@ -1448,5 +1448,5 @@
       "to": "render@src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-22T01:28:47.710Z"
+  "lastUpdated": "2026-03-22T01:36:50.124Z"
 }

@@ -567,16 +567,64 @@ export class VRSceneManager {
       // Start nodes at center - will be animated to target position
       const centerPosition = new BABYLON.Vector3(0, 0, 0);
 
+      // Add small random perpendicular motion to make expansion more organic
+      const radiusDistance = BABYLON.Vector3.Distance(centerPosition, targetPosition);
+      if (radiusDistance > 0.1) {
+        // Calculate the radial direction (center to target)
+        const radialDirection = targetPosition.subtract(centerPosition).normalize();
+        
+        // Generate a random perpendicular vector
+        const perpendicular1 = this.getPerpendicularVector(radialDirection);
+        const perpendicular2 = BABYLON.Vector3.Cross(radialDirection, perpendicular1).normalize();
+        
+        // Random blend of the two perpendicular directions
+        const angle = Math.random() * Math.PI * 2;
+        const randomPerpendicular = perpendicular1
+          .scale(Math.cos(angle))
+          .add(perpendicular2.scale(Math.sin(angle)));
+        
+        // Add small jitter (about 5-15% of radius distance, max 2 units)
+        const jitterAmount = Math.min(2.0, radiusDistance * (0.05 + Math.random() * 0.1));
+        const jitterVector = randomPerpendicular.scale(jitterAmount);
+        
+        targetPosition.addInPlace(jitterVector);
+      }
+
       // Get or generate color for this file
       const fileColor = node.file ? this.getFileColor(node.file) : null;
       const indegree = indegreeMap.get(node.id) || 0;
 
       this.meshFactory.createNodeMesh(node, centerPosition, fileColor, indegree, (mesh, material, n) => {
         this.setupNodeInteraction(mesh, material, n);
-        // Animate the node to its target position
+        // Animate the node to its target position with jitter
         this.animateNodeToPosition(mesh, targetPosition, 4000);  // 4 second animation
       });
     }
+  }
+
+  /**
+   * Get a vector perpendicular to the given vector
+   */
+  private getPerpendicularVector(vector: BABYLON.Vector3): BABYLON.Vector3 {
+    // Find the axis least aligned with the vector
+    const absX = Math.abs(vector.x);
+    const absY = Math.abs(vector.y);
+    const absZ = Math.abs(vector.z);
+    
+    let perpendicular: BABYLON.Vector3;
+    if (absX < absY && absX < absZ) {
+      // X is smallest, use X axis
+      perpendicular = new BABYLON.Vector3(1, 0, 0);
+    } else if (absY < absZ) {
+      // Y is smallest, use Y axis
+      perpendicular = new BABYLON.Vector3(0, 1, 0);
+    } else {
+      // Z is smallest, use Z axis
+      perpendicular = new BABYLON.Vector3(0, 0, 1);
+    }
+    
+    // Cross product gives perpendicular vector
+    return BABYLON.Vector3.Cross(vector, perpendicular).normalize();
   }
 
   /**
