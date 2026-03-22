@@ -934,29 +934,35 @@ export class VRSceneManager {
   }
 
   /**
-   * Calculate bounding box dimensions for a group of nodes within their file's internal layout
-   * Uses internal layout positions, not world positions
+   * Calculate bounding box dimensions for a group of nodes in world coordinates
    */
   private calculateNodeGroupBounds(nodeIds: Set<string>, file: string): { width: number; height: number; depth: number } | null {
-    const internalLayout = this.fileInternalLayouts.get(file);
-    if (!internalLayout) return null;
+    // Get file position in world space
+    const fileNode = this.fileLayout?.getNodes().get(file);
+    if (!fileNode) return null;
+
+    const fileWorldPos = new BABYLON.Vector3(fileNode.position.x, fileNode.position.y, fileNode.position.z);
 
     let minX = Infinity, maxX = -Infinity;
     let minY = Infinity, maxY = -Infinity;
     let minZ = Infinity, maxZ = -Infinity;
     let hasNodes = false;
 
+    // Calculate bounds in world coordinates, relative to file center
     for (const nodeId of nodeIds) {
-      const internalNode = internalLayout.getNodes().get(nodeId);
-      if (internalNode) {
+      const mesh = this.nodeMeshMap.get(nodeId);
+      if (mesh) {
         hasNodes = true;
+        const nodeWorldPos = mesh.getAbsolutePosition();
+        const posRelativeToFile = nodeWorldPos.subtract(fileWorldPos);
         const halfSize = SceneConfig.FUNCTION_BOX_SIZE / 2;
-        minX = Math.min(minX, internalNode.position.x - halfSize);
-        maxX = Math.max(maxX, internalNode.position.x + halfSize);
-        minY = Math.min(minY, internalNode.position.y - halfSize);
-        maxY = Math.max(maxY, internalNode.position.y + halfSize);
-        minZ = Math.min(minZ, internalNode.position.z - halfSize);
-        maxZ = Math.max(maxZ, internalNode.position.z + halfSize);
+        
+        minX = Math.min(minX, posRelativeToFile.x - halfSize);
+        maxX = Math.max(maxX, posRelativeToFile.x + halfSize);
+        minY = Math.min(minY, posRelativeToFile.y - halfSize);
+        maxY = Math.max(maxY, posRelativeToFile.y + halfSize);
+        minZ = Math.min(minZ, posRelativeToFile.z - halfSize);
+        maxZ = Math.max(maxZ, posRelativeToFile.z + halfSize);
       }
     }
 
