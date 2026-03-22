@@ -237,13 +237,26 @@ export class VRSceneManager {
             mesh.position.z = fileNode.position.z + internalNode.position.z;
           }
 
-          // Step 4: Update file box positions based on file-level layout
+          // Step 4: Update file box positions and sizes based on file-level layout
           for (const [file, fileBox] of this.fileBoxMeshes.entries()) {
             const fileNode = filePositions.get(file);
             if (fileNode) {
               fileBox.position.x = fileNode.position.x;
               fileBox.position.y = fileNode.position.y;
               fileBox.position.z = fileNode.position.z;
+            }
+            
+            // Update file box size to fit all its nodes
+            const nodeIds = this.fileNodeIds.get(file);
+            if (nodeIds && nodeIds.size > 0) {
+              const bounds = this.calculateNodeGroupBounds(nodeIds);
+              if (bounds) {
+                // Add padding to the bounds
+                const padding = 5.0;  // Extra space around nodes
+                const size = Math.max(bounds.width, bounds.height, bounds.depth) + padding * 2;
+                // Scale the 1x1x1 box to the desired size
+                fileBox.scaling = new BABYLON.Vector3(size, size, size);
+              }
             }
           }
           
@@ -906,6 +919,38 @@ export class VRSceneManager {
     return indegreeMap;
   }
 
+  /**
+   * Calculate bounding box dimensions for a group of nodes
+   */
+  private calculateNodeGroupBounds(nodeIds: Set<string>): { width: number; height: number; depth: number } | null {
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    let minZ = Infinity, maxZ = -Infinity;
+    let hasNodes = false;
+
+    for (const nodeId of nodeIds) {
+      const mesh = this.nodeMeshMap.get(nodeId);
+      if (mesh) {
+        hasNodes = true;
+        const halfSize = SceneConfig.FUNCTION_BOX_SIZE / 2;
+        minX = Math.min(minX, mesh.position.x - halfSize);
+        maxX = Math.max(maxX, mesh.position.x + halfSize);
+        minY = Math.min(minY, mesh.position.y - halfSize);
+        maxY = Math.max(maxY, mesh.position.y + halfSize);
+        minZ = Math.min(minZ, mesh.position.z - halfSize);
+        maxZ = Math.max(maxZ, mesh.position.z + halfSize);
+      }
+    }
+
+    if (!hasNodes) return null;
+
+    return {
+      width: maxX - minX,
+      height: maxY - minY,
+      depth: maxZ - minZ
+    };
+  }
+
   private renderEdges(): void {
     // Get the current graph edges in correct format for MeshFactory
     const graphEdges = Array.from(this.currentEdges).map(edgeId => {
@@ -921,8 +966,6 @@ export class VRSceneManager {
    * Create wireframe boxes to outline each file's containing region
    */
   private renderFileBoxes(): void {
-    const boxSize = 40.0;  // Size of each file box outline
-    
     for (const file of this.fileNodeIds.keys()) {
       // Skip external modules
       if (file === 'external') continue;
@@ -930,7 +973,7 @@ export class VRSceneManager {
       // Create a wireframe box for this file
       const boxMesh = BABYLON.MeshBuilder.CreateBox(
         `filebox_${file}`,
-        { size: boxSize },
+        { size: 1 },  // Start with unit box, will be scaled by physics loop
         this.scene
       );
       
