@@ -852,7 +852,7 @@
       "id": "renderFileBoxes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "renderFileBoxes",
       "file": "VRSceneManager.ts",
-      "line": 1054,
+      "line": 1052,
       "isExported": false,
       "type": "function"
     },
@@ -860,7 +860,7 @@
       "id": "renderEdges@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "renderEdges",
       "file": "VRSceneManager.ts",
-      "line": 1086,
+      "line": 1084,
       "isExported": false,
       "type": "function"
     },
@@ -868,7 +868,7 @@
       "id": "showTooltip@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "showTooltip",
       "file": "VRSceneManager.ts",
-      "line": 1105,
+      "line": 1103,
       "isExported": false,
       "type": "function"
     },
@@ -876,7 +876,7 @@
       "id": "hideTooltip@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "hideTooltip",
       "file": "VRSceneManager.ts",
-      "line": 1135,
+      "line": 1133,
       "isExported": false,
       "type": "function"
     },
@@ -884,7 +884,7 @@
       "id": "setupWebXR@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "setupWebXR",
       "file": "VRSceneManager.ts",
-      "line": 1140,
+      "line": 1138,
       "isExported": false,
       "type": "function"
     },
@@ -892,7 +892,7 @@
       "id": "handleVRControllerClick@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "handleVRControllerClick",
       "file": "VRSceneManager.ts",
-      "line": 1176,
+      "line": 1174,
       "isExported": false,
       "type": "function"
     },
@@ -900,7 +900,7 @@
       "id": "run@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "run",
       "file": "VRSceneManager.ts",
-      "line": 1235,
+      "line": 1233,
       "isExported": false,
       "type": "function"
     },
@@ -908,7 +908,7 @@
       "id": "dispose@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "dispose",
       "file": "VRSceneManager.ts",
-      "line": 1243,
+      "line": 1241,
       "isExported": false,
       "type": "function"
     },
@@ -1368,5 +1368,5 @@
       "to": "render@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-22T21:11:31.087Z"
+  "lastUpdated": "2026-03-22T21:22:53.859Z"
 }
