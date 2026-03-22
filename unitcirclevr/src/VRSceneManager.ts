@@ -36,6 +36,7 @@ export class VRSceneManager {
   private nodeToFile: Map<string, string> = new Map();  // Map node IDs to file names
   private fileNodeIds: Map<string, Set<string>> = new Map();  // Map file names to their node IDs
   private graphNodeMap: Map<string, GraphNode> = new Map();  // Map node IDs to GraphNode data
+  private fileBoxMeshes: Map<string, BABYLON.Mesh> = new Map();  // Map file names to their wireframe box meshes
   
   private physicsActive = false;
   private physicsIterationCount = 0;
@@ -234,6 +235,16 @@ export class VRSceneManager {
             mesh.position.x = fileNode.position.x + internalNode.position.x;
             mesh.position.y = fileNode.position.y + internalNode.position.y;
             mesh.position.z = fileNode.position.z + internalNode.position.z;
+          }
+
+          // Step 4: Update file box positions based on file-level layout
+          for (const [file, fileBox] of this.fileBoxMeshes.entries()) {
+            const fileNode = filePositions.get(file);
+            if (fileNode) {
+              fileBox.position.x = fileNode.position.x;
+              fileBox.position.y = fileNode.position.y;
+              fileBox.position.z = fileNode.position.z;
+            }
           }
           
           // Step 5: Update edge cylinders to follow moving nodes
@@ -581,6 +592,9 @@ export class VRSceneManager {
     this.renderEdges();
     this.meshFactory.updateEdges();
 
+    // Step 5.5: Create file box outlines
+    this.renderFileBoxes();
+
     // Step 6: Start physics updates
     this.physicsActive = true;
     this.physicsIterationCount = 0;
@@ -612,6 +626,12 @@ export class VRSceneManager {
     for (const mesh of edgeMeshes) {
       mesh.dispose();
     }
+
+    // Dispose all file box outlines
+    for (const mesh of this.fileBoxMeshes.values()) {
+      mesh.dispose();
+    }
+    this.fileBoxMeshes.clear();
     
     // Clear tracking maps
     this.fileInternalLayouts.clear();
@@ -891,6 +911,42 @@ export class VRSceneManager {
     
     // Create edges - they'll be positioned by updateEdges() in the physics loop
     this.meshFactory.createEdges(graphEdges, new Map(), this.sceneRoot);
+  }
+
+  /**
+   * Create wireframe boxes to outline each file's containing region
+   */
+  private renderFileBoxes(): void {
+    const boxSize = 40.0;  // Size of each file box outline
+    
+    for (const file of this.fileNodeIds.keys()) {
+      // Skip external modules
+      if (file === 'external') continue;
+      
+      // Create a wireframe box for this file
+      const boxMesh = BABYLON.MeshBuilder.CreateBox(
+        `filebox_${file}`,
+        { size: boxSize },
+        this.scene
+      );
+      
+      // Get file color and create wireframe material
+      const fileColor = this.getFileColor(file);
+      const material = new BABYLON.StandardMaterial(`fileboxmat_${file}`, this.scene);
+      material.emissiveColor = fileColor;
+      material.wireframe = true;
+      material.backFaceCulling = false;
+      material.alpha = 0.8;
+      
+      boxMesh.material = material;
+      boxMesh.parent = this.sceneRoot;
+      
+      // Initially position at origin, will be updated by physics loop
+      boxMesh.position = BABYLON.Vector3.Zero();
+      
+      // Store reference for updates
+      this.fileBoxMeshes.set(file, boxMesh);
+    }
   }
 
   private showTooltip(node: { name: string; file?: string; line?: number }): void {
