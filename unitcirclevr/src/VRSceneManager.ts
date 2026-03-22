@@ -1001,6 +1001,51 @@ export class VRSceneManager {
 
       sphereData.mesh.scaling = new BABYLON.Vector3(smoothedScale, smoothedScale, smoothedScale);
     }
+
+    // Resolve overlapping spheres by reducing their radii or pushing them apart
+    this.resolveSpherOverlaps();
+  }
+
+  /**
+   * Prevent sphere overlaps by adjusting radii and applying additional separation forces
+   */
+  private resolveSpherOverlaps(): void {
+    const spheres = Array.from(this.fileBoundingSpheres.entries());
+    const minOverlapMargin = 2.0;  // Minimum gap between sphere surfaces
+
+    // Check each pair of spheres for overlaps
+    for (let i = 0; i < spheres.length; i++) {
+      for (let j = i + 1; j < spheres.length; j++) {
+        const [, sphere1Data] = spheres[i];
+        const [, sphere2Data] = spheres[j];
+
+        const pos1 = sphere1Data.mesh.position;
+        const pos2 = sphere2Data.mesh.position;
+        const distance = BABYLON.Vector3.Distance(pos1, pos2);
+
+        // Get current radii (estimate from scaling * base radius)
+        const radius1 = 50 * sphere1Data.mesh.scaling.x;  // Base sphere diameter is 100
+        const radius2 = 50 * sphere2Data.mesh.scaling.x;
+        const minDistance = radius1 + radius2 + minOverlapMargin;
+
+        // If spheres are overlapping, reduce the smaller one's radius
+        if (distance < minDistance) {
+          const overlap = minDistance - distance;
+          const totalRadius = radius1 + radius2;
+
+          // Distribute reduction proportionally to both spheres
+          const reduction1 = (radius1 / totalRadius) * overlap * 0.6;  // Reduce by 60% of overlap
+          const reduction2 = (radius2 / totalRadius) * overlap * 0.6;
+
+          // Apply radius reductions (maintain minimum radius of 5 units)
+          const newScale1 = Math.max(0.1, sphere1Data.mesh.scaling.x - (reduction1 / radius1) * 0.1);
+          const newScale2 = Math.max(0.1, sphere2Data.mesh.scaling.x - (reduction2 / radius2) * 0.1);
+
+          sphere1Data.mesh.scaling = new BABYLON.Vector3(newScale1, newScale1, newScale1);
+          sphere2Data.mesh.scaling = new BABYLON.Vector3(newScale2, newScale2, newScale2);
+        }
+      }
+    }
   }
 
   /**
