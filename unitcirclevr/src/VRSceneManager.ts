@@ -1010,11 +1010,10 @@ export class VRSceneManager {
         const box2 = this.fileBoxMeshes.get(file2);
         if (!box1 || !box2) continue;
 
-        // Calculate bounding sphere radii (half of max dimension of scaled box)
-        const maxDim1 = Math.max(box1.scaling.x, box1.scaling.y, box1.scaling.z) / 2;
-        const maxDim2 = Math.max(box2.scaling.x, box2.scaling.y, box2.scaling.z) / 2;
-        const radius1 = maxDim1;
-        const radius2 = maxDim2;
+        // Calculate bounding sphere radii using diagonal distance from center to corner
+        // For a box with dimensions (x, y, z), radius = sqrt(x² + y² + z²) / 2
+        const radius1 = Math.sqrt(box1.scaling.x ** 2 + box1.scaling.y ** 2 + box1.scaling.z ** 2) / 2;
+        const radius2 = Math.sqrt(box2.scaling.x ** 2 + box2.scaling.y ** 2 + box2.scaling.z ** 2) / 2;
 
         const pos1 = new BABYLON.Vector3(node1.position.x, node1.position.y, node1.position.z);
         const pos2 = new BABYLON.Vector3(node2.position.x, node2.position.y, node2.position.z);
