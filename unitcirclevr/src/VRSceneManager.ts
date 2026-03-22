@@ -263,7 +263,7 @@ export class VRSceneManager {
             // Update file box size to fit all its nodes
             const nodeIds = this.fileNodeIds.get(file);
             if (nodeIds && nodeIds.size > 0) {
-              const bounds = this.calculateNodeGroupBounds(nodeIds);
+              const bounds = this.calculateNodeGroupBounds(nodeIds, file);
               if (bounds) {
                 // Add padding to the bounds
                 const padding = 5.0;  // Extra space around nodes
@@ -934,25 +934,29 @@ export class VRSceneManager {
   }
 
   /**
-   * Calculate bounding box dimensions for a group of nodes
+   * Calculate bounding box dimensions for a group of nodes within their file's internal layout
+   * Uses internal layout positions, not world positions
    */
-  private calculateNodeGroupBounds(nodeIds: Set<string>): { width: number; height: number; depth: number } | null {
+  private calculateNodeGroupBounds(nodeIds: Set<string>, file: string): { width: number; height: number; depth: number } | null {
+    const internalLayout = this.fileInternalLayouts.get(file);
+    if (!internalLayout) return null;
+
     let minX = Infinity, maxX = -Infinity;
     let minY = Infinity, maxY = -Infinity;
     let minZ = Infinity, maxZ = -Infinity;
     let hasNodes = false;
 
     for (const nodeId of nodeIds) {
-      const mesh = this.nodeMeshMap.get(nodeId);
-      if (mesh) {
+      const internalNode = internalLayout.getNodes().get(nodeId);
+      if (internalNode) {
         hasNodes = true;
         const halfSize = SceneConfig.FUNCTION_BOX_SIZE / 2;
-        minX = Math.min(minX, mesh.position.x - halfSize);
-        maxX = Math.max(maxX, mesh.position.x + halfSize);
-        minY = Math.min(minY, mesh.position.y - halfSize);
-        maxY = Math.max(maxY, mesh.position.y + halfSize);
-        minZ = Math.min(minZ, mesh.position.z - halfSize);
-        maxZ = Math.max(maxZ, mesh.position.z + halfSize);
+        minX = Math.min(minX, internalNode.position.x - halfSize);
+        maxX = Math.max(maxX, internalNode.position.x + halfSize);
+        minY = Math.min(minY, internalNode.position.y - halfSize);
+        maxY = Math.max(maxY, internalNode.position.y + halfSize);
+        minZ = Math.min(minZ, internalNode.position.z - halfSize);
+        maxZ = Math.max(maxZ, internalNode.position.z + halfSize);
       }
     }
 

@@ -836,7 +836,7 @@
       "id": "calculateNodeGroupBounds@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "calculateNodeGroupBounds",
       "file": "VRSceneManager.ts",
-      "line": 939,
+      "line": 940,
       "isExported": false,
       "type": "function"
     },
@@ -844,7 +844,7 @@
       "id": "applyFileBoxRepulsion@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "applyFileBoxRepulsion",
       "file": "VRSceneManager.ts",
-      "line": 971,
+      "line": 975,
       "isExported": false,
       "type": "function"
     },
@@ -852,7 +852,7 @@
       "id": "renderEdges@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "renderEdges",
       "file": "VRSceneManager.ts",
-      "line": 1028,
+      "line": 1032,
       "isExported": false,
       "type": "function"
     },
@@ -860,7 +860,7 @@
       "id": "renderFileBoxes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "renderFileBoxes",
       "file": "VRSceneManager.ts",
-      "line": 1042,
+      "line": 1046,
       "isExported": false,
       "type": "function"
     },
@@ -868,7 +868,7 @@
       "id": "showTooltip@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "showTooltip",
       "file": "VRSceneManager.ts",
-      "line": 1073,
+      "line": 1077,
       "isExported": false,
       "type": "function"
     },
@@ -876,7 +876,7 @@
       "id": "hideTooltip@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "hideTooltip",
       "file": "VRSceneManager.ts",
-      "line": 1103,
+      "line": 1107,
       "isExported": false,
       "type": "function"
     },
@@ -884,7 +884,7 @@
       "id": "setupWebXR@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "setupWebXR",
       "file": "VRSceneManager.ts",
-      "line": 1108,
+      "line": 1112,
       "isExported": false,
       "type": "function"
     },
@@ -892,7 +892,7 @@
       "id": "handleVRControllerClick@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "handleVRControllerClick",
       "file": "VRSceneManager.ts",
-      "line": 1144,
+      "line": 1148,
       "isExported": false,
       "type": "function"
     },
@@ -900,7 +900,7 @@
       "id": "run@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "run",
       "file": "VRSceneManager.ts",
-      "line": 1203,
+      "line": 1207,
       "isExported": false,
       "type": "function"
     },
@@ -908,7 +908,7 @@
       "id": "dispose@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "dispose",
       "file": "VRSceneManager.ts",
-      "line": 1211,
+      "line": 1215,
       "isExported": false,
       "type": "function"
     },
@@ -1324,6 +1324,10 @@
       "to": "hideTooltip@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
     },
     {
+      "from": "calculateNodeGroupBounds@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "to": "getNodes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts"
+    },
+    {
       "from": "applyFileBoxRepulsion@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "to": "getNodes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts"
     },
@@ -1364,5 +1368,5 @@
       "to": "render@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-22T19:18:56.235Z"
+  "lastUpdated": "2026-03-22T19:23:56.293Z"
 }
