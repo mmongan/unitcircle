@@ -1023,46 +1023,29 @@ export class VRSceneManager {
         // Required distance to prevent intersection with padding
         const requiredDistance = radius1 + radius2 + minSeparationPadding;
 
-        // If boxes are intersecting or too close, push them apart (hard constraint)
+        // If boxes are intersecting or too close, apply gentle repulsive force through velocity
         if (distance < requiredDistance && distance > 0.01) {
           const direction = pos2.subtract(pos1).normalize();
           const separationNeeded = requiredDistance - distance;
 
-          // Directly move the nodes apart (hard constraint, not forces)
-          // Move each node by half the separation needed
-          const moveDistance = separationNeeded / 2 + 1.0;  // Add extra buffer
+          // Apply repulsion through velocity (gentle damped approach)
+          // This prevents jitter by slowly pushing apart instead of snapping
+          const repulsionStrength = 100.0;  // Units per second of repulsion
+          const damping = 0.8;  // Velocity damping factor
           
-          // Move file1 away from file2
-          node1.position.x -= direction.x * moveDistance;
-          node1.position.y -= direction.y * moveDistance;
-          node1.position.z -= direction.z * moveDistance;
-
-          // Move file2 away from file1
-          node2.position.x += direction.x * moveDistance;
-          node2.position.y += direction.y * moveDistance;
-          node2.position.z += direction.z * moveDistance;
+          // Apply repulsive forces to velocities
+          const repulsionVelocity = direction.scale(-separationNeeded * repulsionStrength);
+          node1.velocity.x += repulsionVelocity.x * damping;
+          node1.velocity.y += repulsionVelocity.y * damping;
+          node1.velocity.z += repulsionVelocity.z * damping;
+          
+          const repulsionVelocity2 = direction.scale(separationNeeded * repulsionStrength);
+          node2.velocity.x += repulsionVelocity2.x * damping;
+          node2.velocity.y += repulsionVelocity2.y * damping;
+          node2.velocity.z += repulsionVelocity2.z * damping;
         }
       }
     }
-  }
-
-  private renderEdges(): void {
-    // Get the current graph edges in correct format for MeshFactory
-    const graphEdges = Array.from(this.currentEdges).map(edgeId => {
-      const [from, to] = edgeId.split('→');
-      return { from, to };
-    });
-    
-    // Build a map of node IDs to their exported status for edge material selection
-    const nodeExportedMap = new Map<string, boolean>();
-    if (this.currentGraphData && this.currentGraphData.nodes) {
-      for (const node of this.currentGraphData.nodes) {
-        nodeExportedMap.set(node.id, node.isExported || false);
-      }
-    }
-    
-    // Create edges - they'll be positioned by updateEdges() in the physics loop
-    this.meshFactory.createEdges(graphEdges, new Map(), this.sceneRoot, nodeExportedMap);
   }
 
   /**
@@ -1098,6 +1081,25 @@ export class VRSceneManager {
       // Store reference for updates
       this.fileBoxMeshes.set(file, boxMesh);
     }
+  }
+
+  private renderEdges(): void {
+    // Get the current graph edges in correct format for MeshFactory
+    const graphEdges = Array.from(this.currentEdges).map(edgeId => {
+      const [from, to] = edgeId.split('→');
+      return { from, to };
+    });
+    
+    // Build a map of node IDs to their exported status for edge material selection
+    const nodeExportedMap = new Map<string, boolean>();
+    if (this.currentGraphData && this.currentGraphData.nodes) {
+      for (const node of this.currentGraphData.nodes) {
+        nodeExportedMap.set(node.id, node.isExported || false);
+      }
+    }
+    
+    // Create edges - they'll be positioned by updateEdges() in the physics loop
+    this.meshFactory.createEdges(graphEdges, new Map(), this.sceneRoot, nodeExportedMap);
   }
 
   private showTooltip(node: { name: string; file?: string; line?: number }): void {
