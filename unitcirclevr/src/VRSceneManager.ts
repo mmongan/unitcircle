@@ -424,7 +424,7 @@ export class VRSceneManager {
     this.camera.inertia = SceneConfig.CAMERA_INERTIA;
     this.camera.angularSensibility = SceneConfig.CAMERA_ANGULAR_SENSIBILITY;
     // Set camera to look at the center of the scene
-    this.camera.target = BABYLON.Vector3.Zero;
+    this.camera.target = BABYLON.Vector3.Zero();
     // Set camera frustum to support distant objects
     this.camera.minZ = 0.1;    // Near clipping plane
     this.camera.maxZ = 50000;  // Far clipping plane - allow raycasting to very distant meshes

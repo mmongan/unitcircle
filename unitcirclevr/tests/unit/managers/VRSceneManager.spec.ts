@@ -68,12 +68,18 @@ vi.mock('@babylonjs/core', () => {
   return {
     Engine: vi.fn(() => mockEngine),
     Scene: vi.fn(() => mockScene),
-    Vector3: vi.fn((x: number, y: number, z: number) => ({ x, y, z, add: vi.fn(), subtract: vi.fn(), clone: vi.fn() })),
+    Vector3: Object.assign(
+      vi.fn((x: number, y: number, z: number) => ({ x, y, z, add: vi.fn(), subtract: vi.fn(), clone: vi.fn() })),
+      {
+        Zero: vi.fn(() => ({ x: 0, y: 0, z: 0 })),
+      }
+    ),
     UniversalCamera: vi.fn(() => ({
       attachControl: vi.fn(),
       inertia: 0,
       angularSensibility: 0,
       position: { x: 0, y: 0, z: 0 },
+      target: { x: 0, y: 0, z: 0 },
     })),
     Color3: vi.fn((r: number, g: number, b: number) => ({ r, g, b, clone: vi.fn(() => ({ r, g, b })) })),
     HemisphericLight: vi.fn(() => ({ intensity: 0 })),
