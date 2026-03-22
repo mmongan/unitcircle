@@ -497,9 +497,19 @@ export class VRSceneManager {
   public renderCodeGraph(graph: GraphData): void {
     // Create force-directed layout - nodes start at center
     const edges = this.buildEdgeList(graph.edges);
+    
+    // Build file map for cross-file repulsion
+    const fileMap = new Map<string, string>();
+    for (const node of graph.nodes) {
+      if (node.file) {
+        fileMap.set(node.id, node.file);
+      }
+    }
+    
     this.layout = new ForceDirectedLayout(
       graph.nodes.map(n => n.id),
-      edges
+      edges,
+      fileMap
     );
 
     // Calculate indegree (incoming connections) for each node
@@ -527,9 +537,19 @@ export class VRSceneManager {
 
     // Rebuild layout with all nodes for proper physics
     const edges = this.buildEdgeList(graph.edges);
+    
+    // Build file map for cross-file repulsion
+    const fileMap = new Map<string, string>();
+    for (const node of graph.nodes) {
+      if (node.file) {
+        fileMap.set(node.id, node.file);
+      }
+    }
+    
     this.layout = new ForceDirectedLayout(
       graph.nodes.map(n => n.id),
-      edges
+      edges,
+      fileMap
     );
 
     // Calculate indegree (incoming connections) for each node

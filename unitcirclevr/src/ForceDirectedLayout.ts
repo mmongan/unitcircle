@@ -13,6 +13,7 @@ export interface Node {
   position: { x: number; y: number; z: number };
   velocity: { x: number; y: number; z: number };
   label: string;
+  file?: string;  // Source file for this node
 }
 
 export interface Edge {
@@ -24,13 +25,14 @@ export class ForceDirectedLayout {
   private nodes: Map<string, Node>;
   private edges: Edge[];
   private readonly SPACE_SIZE = 250;
-  private readonly C_REPULSIVE = 2.0;      // Repulsive force strength (increased for more realistic physics)
+  private readonly C_REPULSIVE = 2.0;      // Repulsive force for same-file nodes
+  private readonly C_REPULSIVE_CROSS_FILE = 4.0;  // Stronger repulsion for cross-file nodes
   private readonly C_ATTRACTIVE = 0.05;    // Attractive force strength (edge pull)
   private readonly DAMPING = 0.92;         // Velocity damping per iteration
   private readonly MIN_DISTANCE = 1.0;     // Minimum distance to prevent singularity
   private readonly EQUILIBRIUM_THRESHOLD = 0.001;  // Converged when all velocities below this
 
-  constructor(nodeIds: string[], edges: Edge[]) {
+  constructor(nodeIds: string[], edges: Edge[], nodeFileMap?: Map<string, string>) {
     this.edges = edges;
     this.nodes = new Map();
 
@@ -39,6 +41,7 @@ export class ForceDirectedLayout {
       this.nodes.set(id, {
         id,
         label: id.split('@')[0],
+        file: nodeFileMap?.get(id),
         position: {
           x: (Math.random() - 0.5) * 2 * this.SPACE_SIZE,
           y: (Math.random() - 0.5) * 2 * this.SPACE_SIZE,
@@ -115,6 +118,7 @@ export class ForceDirectedLayout {
 
   /**
    * Apply repulsive force between two nodes (push apart)
+   * Uses stronger force (4.0) for nodes from different source files
    */
   private applyRepulsiveForce(nodeA: Node, nodeB: Node): void {
     const dx = nodeB.position.x - nodeA.position.x;
@@ -122,7 +126,12 @@ export class ForceDirectedLayout {
     const dz = nodeB.position.z - nodeA.position.z;
 
     const distance = Math.sqrt(dx * dx + dy * dy + dz * dz) || this.MIN_DISTANCE;
-    const force = (this.C_REPULSIVE / (distance * distance)) || 0;
+    
+    // Use stronger repulsion for cross-file nodes (different source files)
+    const isDifferentFile = nodeA.file && nodeB.file && nodeA.file !== nodeB.file;
+    const repulsiveConstant = isDifferentFile ? this.C_REPULSIVE_CROSS_FILE : this.C_REPULSIVE;
+    
+    const force = (repulsiveConstant / (distance * distance)) || 0;
 
     const fx = (force * dx) / distance;
     const fy = (force * dy) / distance;
