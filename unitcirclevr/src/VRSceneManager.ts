@@ -990,7 +990,7 @@ export class VRSceneManager {
 
     const files = Array.from(this.fileNodeIds.keys());
     const fileNodes = layout.getNodes();
-    const minSeparationPadding = 15.0;  // Minimum distance padding between boxes (reduced from 60 since we removed hard minimum)
+    const minSeparationPadding = 40.0;  // Minimum distance padding between boxes
 
     // Check all pairs of files for intersection
     for (let i = 0; i < files.length; i++) {
