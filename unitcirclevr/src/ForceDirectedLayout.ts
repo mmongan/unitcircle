@@ -29,11 +29,12 @@ export class ForceDirectedLayout {
   private readonly C_REPULSIVE = 2.0;      // Repulsive force for same-file nodes
   private readonly C_REPULSIVE_CROSS_FILE = 20.0;  // Much stronger repulsion for cross-file nodes (10x stronger)
   private readonly C_ATTRACTIVE = 0.05;    // Attractive force strength for cross-file edges
-  private readonly C_ATTRACTIVE_SAME_FILE = 0.15;  // 3x stronger attraction for same-file connected nodes
+  private readonly C_ATTRACTIVE_SAME_FILE = 0.30;  // 6x stronger attraction for same-file connected nodes
   private readonly DAMPING = 0.92;         // Velocity damping per iteration
   private readonly MIN_DISTANCE = 1.0;     // Minimum distance to prevent singularity in force calculations
   private readonly MIN_NODE_SEPARATION = 25.0;    // Minimum distance between unconnected same-file nodes
   private readonly MIN_CROSS_FILE_SEPARATION = 35.0;  // Stronger separation for cross-file nodes
+  private readonly MIN_SAME_FILE_DISTANCE = 3.0;     // Smallest distance for same-file connected edges
   private readonly MIN_EQUILIBRIUM_DISTANCE = 6.0;  // Minimum distance for regular connected edges
   private readonly MIN_EDGE_EXPORT_DISTANCE = 12.0;  // Minimum distance for edges connected to exported functions
   private readonly EQUILIBRIUM_THRESHOLD = 0.001;  // Converged when all velocities below this
@@ -162,7 +163,7 @@ export class ForceDirectedLayout {
 
   /**
    * Apply attractive force along edges (pull together)
-   * Stronger attraction for edges between nodes from the same file
+   * Strongest attraction for same-file connected nodes with smallest minimum distance
    * Only applies force if nodes are farther than minimum distance
    * This allows connected nodes to attract until they reach their equilibrium distance
    */
@@ -173,9 +174,21 @@ export class ForceDirectedLayout {
 
     const distance = Math.sqrt(dx * dx + dy * dy + dz * dz) || this.MIN_DISTANCE;
 
-    // Determine minimum distance based on whether either node is exported
-    const isExportedEdge = nodeA.isExported || nodeB.isExported;
-    const minDistance = isExportedEdge ? this.MIN_EDGE_EXPORT_DISTANCE : this.MIN_EQUILIBRIUM_DISTANCE;
+    // Check if same file connection
+    const isSameFile = nodeA.file && nodeB.file && nodeA.file === nodeB.file;
+    
+    // Determine minimum distance based on file and export status
+    let minDistance: number;
+    if (isSameFile) {
+      // Same-file connections can get closest (3 units)
+      minDistance = this.MIN_SAME_FILE_DISTANCE;
+    } else if (nodeA.isExported || nodeB.isExported) {
+      // Exported connections: 12 units (cross-file or exported)
+      minDistance = this.MIN_EDGE_EXPORT_DISTANCE;
+    } else {
+      // Regular cross-file connections: 6 units
+      minDistance = this.MIN_EQUILIBRIUM_DISTANCE;
+    }
 
     // Only apply attractive force if nodes are farther apart than minimum distance
     // This ensures connected nodes attract until reaching their equilibrium distance
@@ -183,8 +196,7 @@ export class ForceDirectedLayout {
       return;  // Nodes are at or below minimum distance, don't pull closer
     }
 
-    // Use stronger attraction for same-file connected nodes (3x stronger)
-    const isSameFile = nodeA.file && nodeB.file && nodeA.file === nodeB.file;
+    // Use strongest attraction for same-file connected nodes (6x stronger)
     const attractionConstant = isSameFile ? this.C_ATTRACTIVE_SAME_FILE : this.C_ATTRACTIVE;
 
     // Spring-like force: F = k * distance
