@@ -124,7 +124,7 @@
       "id": "simulate@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "simulate",
       "file": "ForceDirectedLayout.ts",
-      "line": 62,
+      "line": 57,
       "isExported": false,
       "type": "function"
     },
@@ -132,7 +132,7 @@
       "id": "step@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "step",
       "file": "ForceDirectedLayout.ts",
-      "line": 73,
+      "line": 68,
       "isExported": false,
       "type": "function"
     },
@@ -140,7 +140,7 @@
       "id": "constrainBounds@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "constrainBounds",
       "file": "ForceDirectedLayout.ts",
-      "line": 160,
+      "line": 155,
       "isExported": false,
       "type": "function"
     },
@@ -148,7 +148,7 @@
       "id": "getNodes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "getNodes",
       "file": "ForceDirectedLayout.ts",
-      "line": 169,
+      "line": 164,
       "isExported": false,
       "type": "function"
     },
@@ -1356,5 +1356,5 @@
       "to": "render@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-22T02:17:04.533Z"
+  "lastUpdated": "2026-03-22T02:22:55.795Z"
 }

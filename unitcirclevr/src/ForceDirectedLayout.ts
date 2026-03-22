@@ -33,23 +33,18 @@ export class ForceDirectedLayout {
     this.nodes = new Map();
     this.edges = edges;
 
-    // Initialize nodes spread across a larger sphere
-    // Use surface of sphere, not random volume
-    const radius = Math.cbrt(nodeIds.length) * 5;
+    // Initialize nodes randomly within a 3x3x3 unit volume
+    // Centered at origin: -1.5 to 1.5 on each axis
+    const VOLUME_SIZE = 1.5;
     
     for (const id of nodeIds) {
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
-      // Start on sphere surface at radius, not random volume
-      const r = radius * (0.7 + Math.random() * 0.3); // 70-100% of radius
-      
       this.nodes.set(id, {
         id,
         label: id.split('@')[0],
         position: {
-          x: r * Math.sin(phi) * Math.cos(theta),
-          y: r * Math.sin(phi) * Math.sin(theta),
-          z: r * Math.cos(phi)
+          x: (Math.random() - 0.5) * 2 * VOLUME_SIZE,
+          y: (Math.random() - 0.5) * 2 * VOLUME_SIZE,
+          z: (Math.random() - 0.5) * 2 * VOLUME_SIZE
         },
         velocity: { x: 0, y: 0, z: 0 }
       });
