@@ -24,10 +24,10 @@ export class ForceDirectedLayout {
   private edges: Edge[];
   
   // Force parameters
-  private readonly C_REPULSIVE = 200;   // Repulsive force constant (stronger repulsion)
-  private readonly C_ATTRACTIVE = 0.05; // Attractive force constant (weaker attraction)
-  private readonly DAMPING = 0.75;      // Velocity damping (lower = faster movement)
-  private readonly dt = 0.02;           // Time step for integration (larger = faster convergence)
+  private readonly C_REPULSIVE = 500;   // Repulsive force constant (massive repulsion)
+  private readonly C_ATTRACTIVE = 0.02; // Attractive force constant (minimal attraction)
+  private readonly DAMPING = 0.60;      // Velocity damping (allow accumulation)
+  private readonly dt = 0.05;           // Time step for integration (large steps)
 
   constructor(nodeIds: string[], edges: Edge[]) {
     this.nodes = new Map();
@@ -153,7 +153,7 @@ export class ForceDirectedLayout {
    * Keep nodes within world bounds
    */
   private constrainBounds(): void {
-    const BOUND = 150;
+    const BOUND = 300;  // Expanded bounds to allow wider spreading
     for (const node of this.nodes.values()) {
       node.position.x = Math.max(-BOUND, Math.min(BOUND, node.position.x));
       node.position.y = Math.max(-BOUND, Math.min(BOUND, node.position.y));

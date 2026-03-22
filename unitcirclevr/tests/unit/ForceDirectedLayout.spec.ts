@@ -97,12 +97,12 @@ describe('ForceDirectedLayout', () => {
 
       for (const node of nodes) {
         const pos = result.get(node)?.position;
-        expect(pos?.x).toBeGreaterThanOrEqual(-150);
-        expect(pos?.x).toBeLessThanOrEqual(150);
-        expect(pos?.y).toBeGreaterThanOrEqual(-150);
-        expect(pos?.y).toBeLessThanOrEqual(150);
-        expect(pos?.z).toBeGreaterThanOrEqual(-150);
-        expect(pos?.z).toBeLessThanOrEqual(150);
+        expect(pos?.x).toBeGreaterThanOrEqual(-300);
+        expect(pos?.x).toBeLessThanOrEqual(300);
+        expect(pos?.y).toBeGreaterThanOrEqual(-300);
+        expect(pos?.y).toBeLessThanOrEqual(300);
+        expect(pos?.z).toBeGreaterThanOrEqual(-300);
+        expect(pos?.z).toBeLessThanOrEqual(300);
       }
     });
   });
@@ -124,9 +124,9 @@ describe('ForceDirectedLayout', () => {
       );
 
       // Connected nodes should be attracted (physics varies, so allow wide range)
-      // Simplified layout uses basic forces, so distance varies by simulation
+      // Simplified layout uses basic forces, nodes spread across full space
       expect(distance).toBeGreaterThan(1);
-      expect(distance).toBeLessThan(150);
+      expect(distance).toBeLessThan(300);
     });
 
     it('should repel unconnected nodes', () => {
