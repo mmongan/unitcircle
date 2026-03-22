@@ -210,7 +210,8 @@ export class VRSceneManager {
             }
           }
 
-          // Edges disabled - edges visualization removed
+          // Update edge cylinders to follow moving nodes
+          this.meshFactory.updateEdges();
 
           // Stop physics after ~5 seconds (300 frames at 60fps) of settling
           this.physicsIterationCount++;
@@ -502,18 +503,23 @@ export class VRSceneManager {
     // Create force-directed layout - nodes start at center
     const edges = this.buildEdgeList(graph.edges);
     
-    // Build file map for cross-file repulsion
+    // Build file and exported maps
     const fileMap = new Map<string, string>();
+    const exportedMap = new Map<string, boolean>();
     for (const node of graph.nodes) {
       if (node.file) {
         fileMap.set(node.id, node.file);
+      }
+      if ('isExported' in node) {
+        exportedMap.set(node.id, (node as any).isExported);
       }
     }
     
     this.layout = new ForceDirectedLayout(
       graph.nodes.map(n => n.id),
       edges,
-      fileMap
+      fileMap,
+      exportedMap
     );
 
     // Calculate indegree (incoming connections) for each node
@@ -522,7 +528,7 @@ export class VRSceneManager {
     // Render nodes at their initial positions (all at center)
     const initialNodes = this.layout.getNodes();
     this.renderNodes(graph.nodes, initialNodes, indegreeMap);
-    this.renderEdges();  // Edges disabled
+    this.renderEdges();  // Create edge cylinders
 
     // Enable physics updates to push nodes apart
     this.physicsActive = true;
@@ -542,18 +548,23 @@ export class VRSceneManager {
     // Rebuild layout with all nodes for proper physics
     const edges = this.buildEdgeList(graph.edges);
     
-    // Build file map for cross-file repulsion
+    // Build file and exported maps
     const fileMap = new Map<string, string>();
+    const exportedMap = new Map<string, boolean>();
     for (const node of graph.nodes) {
       if (node.file) {
         fileMap.set(node.id, node.file);
+      }
+      if ('isExported' in node) {
+        exportedMap.set(node.id, (node as any).isExported);
       }
     }
     
     this.layout = new ForceDirectedLayout(
       graph.nodes.map(n => n.id),
       edges,
-      fileMap
+      fileMap,
+      exportedMap
     );
 
     // Calculate indegree (incoming connections) for each node
@@ -590,7 +601,7 @@ export class VRSceneManager {
     const newEdges = graph.edges.filter(
       e => !this.currentEdges.has(`${e.from}→${e.to}`)
     );
-    this.renderEdges();  // Edges disabled
+    this.renderEdges();  // Create new edge cylinders
     newEdges.forEach(e => this.currentEdges.add(`${e.from}→${e.to}`));
 
     // Restart physics to spread updated graph
@@ -662,7 +673,7 @@ export class VRSceneManager {
         this.nodeMeshMap.set(node.id, mesh);
         // Only animate if starting from center (new nodes)
         if (animateFromCenter) {
-          this.animateNodeToPosition(mesh, targetPosition, 4000);  // 4 second animation
+          this.animateNodeToPosition(mesh, targetPosition, 7000);  // 7 second animation for dramatic effect
         }
       });
     }
@@ -723,7 +734,7 @@ export class VRSceneManager {
   private animateNodeToPosition(
     mesh: BABYLON.Mesh,
     targetPosition: BABYLON.Vector3,
-    duration: number = 1000  // 1 second animation
+    duration: number = 2500  // 2.5 second animation for dramatic effect
   ): void {
     const currentPosition = mesh.position.clone();
     
@@ -974,7 +985,16 @@ export class VRSceneManager {
   }
 
   private renderEdges(): void {
-    // Edges disabled - visualization shows only nodes
+    if (!this.layout) return;
+    
+    // Get the current graph edges in correct format for MeshFactory
+    const graphEdges = Array.from(this.currentEdges).map(edgeId => {
+      const [from, to] = edgeId.split('→');
+      return { from, to };
+    });
+    
+    const layoutNodes = this.layout.getNodes();
+    this.meshFactory.createEdges(graphEdges, layoutNodes, this.sceneRoot);
   }
 
   private showTooltip(node: { name: string; file?: string; line?: number }): void {
@@ -1128,7 +1148,8 @@ export class VRSceneManager {
 
   public run(): void {
     this.engine.runRenderLoop(() => {
-      // Edges disabled - visualization shows only nodes
+      // Update edge cylinders each frame
+      this.meshFactory.updateEdges();
       this.scene.render();
     });
   }

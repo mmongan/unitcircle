@@ -286,11 +286,20 @@ export class MeshFactory {
   /**
    * Create edge (cylinder) meshes connecting nodes
    * Uses cylinders that can be reused and repositioned each frame for performance
+   * Clears old edges before creating new ones
    */
   createEdges(
     edges: Array<{ from: string; to: string }>,
-    layoutNodes: Map<string, any>
+    layoutNodes: Map<string, any>,
+    sceneRoot?: BABYLON.TransformNode
   ): void {
+    // Clear old edges
+    for (const cylinder of this.edgeTubes.values()) {
+      cylinder.dispose();
+    }
+    this.edgeTubes.clear();
+    this.edgeMetadata.clear();
+
     // Create material for same-file edges
     const samFileEdgeMaterial = new BABYLON.StandardMaterial('sameFileEdgeMaterial', this.scene);
     samFileEdgeMaterial.emissiveColor = new BABYLON.Color3(0.8, 0.8, 0.8);  // Gray
@@ -324,6 +333,11 @@ export class MeshFactory {
       
       cylinder.material = material;
       cylinder.isPickable = false;
+      
+      // Parent to scene root to move with the scene
+      if (sceneRoot) {
+        cylinder.parent = sceneRoot;
+      }
 
       // Store cylinder and metadata
       this.edgeTubes.set(`${edgeIndex}`, cylinder);
@@ -368,9 +382,9 @@ export class MeshFactory {
         continue;  // Skip if nodes not found
       }
 
-      // Get current positions
-      const sourceCenterPos = sourceMesh.position.clone();
-      const targetCenterPos = targetMesh.position.clone();
+      // Get current positions (world space)
+      const sourceCenterPos = sourceMesh.getAbsolutePosition().clone();
+      const targetCenterPos = targetMesh.getAbsolutePosition().clone();
 
       // Calculate direction and distance
       const direction = targetCenterPos.subtract(sourceCenterPos);
@@ -381,9 +395,19 @@ export class MeshFactory {
         continue;
       }
 
-      // Position cylinder at midpoint between nodes
-      const midpoint = sourceCenterPos.add(direction.scale(0.5));
-      cylinder.position = midpoint;
+      // Position cylinder at midpoint between nodes (world space)
+      const midpointWorld = sourceCenterPos.add(direction.scale(0.5));
+      
+      // Convert world position to local position relative to parent
+      // If cylinder has a parent, position is automatically local
+      if (cylinder.parent) {
+        const parentMatrix = (cylinder.parent as BABYLON.TransformNode).getWorldMatrix().clone();
+        const inverseParentMatrix = BABYLON.Matrix.Invert(parentMatrix);
+        const localPosition = BABYLON.Vector3.TransformCoordinates(midpointWorld, inverseParentMatrix);
+        cylinder.position = localPosition;
+      } else {
+        cylinder.position = midpointWorld;
+      }
 
       // Scale cylinder to distance (physics constraint ensures minimum 6 units)
       cylinder.scaling.y = distance;

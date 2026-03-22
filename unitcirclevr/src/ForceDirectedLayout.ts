@@ -14,6 +14,7 @@ export interface Node {
   velocity: { x: number; y: number; z: number };
   label: string;
   file?: string;  // Source file for this node
+  isExported?: boolean;  // Whether this is an exported function/variable
 }
 
 export interface Edge {
@@ -26,16 +27,17 @@ export class ForceDirectedLayout {
   private edges: Edge[];
   private readonly SPACE_SIZE = 250;
   private readonly C_REPULSIVE = 2.0;      // Repulsive force for same-file nodes
-  private readonly C_REPULSIVE_CROSS_FILE = 4.0;  // Stronger repulsion for cross-file nodes
+  private readonly C_REPULSIVE_CROSS_FILE = 10.0;  // Much stronger repulsion for cross-file nodes (5x stronger)
   private readonly C_ATTRACTIVE = 0.05;    // Attractive force strength (edge pull)
   private readonly DAMPING = 0.92;         // Velocity damping per iteration
   private readonly MIN_DISTANCE = 1.0;     // Minimum distance to prevent singularity in force calculations
-  private readonly MIN_NODE_SEPARATION = 5.0;     // Minimum distance between ANY two nodes (prevent overlap)
-  private readonly MIN_EQUILIBRIUM_DISTANCE = 6.0;  // Minimum distance for connected nodes (configurable)
-  private readonly MIN_CROSS_FILE_DISTANCE = 12.0;  // Minimum distance between nodes from different files
+  private readonly MIN_NODE_SEPARATION = 25.0;    // Minimum distance between unconnected same-file nodes
+  private readonly MIN_CROSS_FILE_SEPARATION = 35.0;  // Stronger separation for cross-file nodes
+  private readonly MIN_EQUILIBRIUM_DISTANCE = 6.0;  // Minimum distance for regular connected edges
+  private readonly MIN_EDGE_EXPORT_DISTANCE = 12.0;  // Minimum distance for edges connected to exported functions
   private readonly EQUILIBRIUM_THRESHOLD = 0.001;  // Converged when all velocities below this
 
-  constructor(nodeIds: string[], edges: Edge[], nodeFileMap?: Map<string, string>) {
+  constructor(nodeIds: string[], edges: Edge[], nodeFileMap?: Map<string, string>, nodeExportedMap?: Map<string, boolean>) {
     this.edges = edges;
     this.nodes = new Map();
 
@@ -45,6 +47,7 @@ export class ForceDirectedLayout {
         id,
         label: id.split('@')[0],
         file: nodeFileMap?.get(id),
+        isExported: nodeExportedMap?.get(id),
         position: {
           x: (Math.random() - 0.5) * 2 * this.SPACE_SIZE,
           y: (Math.random() - 0.5) * 2 * this.SPACE_SIZE,
@@ -232,11 +235,11 @@ export class ForceDirectedLayout {
     // Enforce minimum distance constraint for all node pairs (prevent overlap)
     this.enforceAllPairsMinimumDistance();
     
+    // Enforce stronger minimum distance constraint between nodes from different files
+    this.enforceFileCrossConstraint();
+    
     // Enforce minimum distance constraint only for connected nodes
     this.enforceEdgeMinimumDistance();
-    
-    // Enforce minimum distance constraint between nodes from different files
-    this.enforceFileCrossConstraint();
 
     // Return true if still converging, false if settled
     return maxVelocity >= this.EQUILIBRIUM_THRESHOLD;
@@ -244,13 +247,13 @@ export class ForceDirectedLayout {
 
   /**
    * Enforce minimum distance constraint between nodes connected by edges
-   * Push connected nodes apart if they get closer than MIN_EQUILIBRIUM_DISTANCE
-   * Does NOT constrain unconnected nodes - they can get arbitrarily close
+   * If either node is exported: enforce 12 units (MIN_EDGE_EXPORT_DISTANCE)
+   * Otherwise: enforce 6 units (MIN_EQUILIBRIUM_DISTANCE)
    */
   private enforceEdgeMinimumDistance(): void {
     const pushForce = this.C_REPULSIVE * 5;  // Strong push force to maintain edge distance
 
-    // Only enforce distance for nodes that are connected by edges
+    // Enforce distance for nodes that are connected by edges
     for (const edge of this.edges) {
       const nodeA = this.nodes.get(edge.source);
       const nodeB = this.nodes.get(edge.target);
@@ -263,14 +266,18 @@ export class ForceDirectedLayout {
 
       const distance = Math.sqrt(dx * dx + dy * dy + dz * dz) || this.MIN_DISTANCE;
 
+      // Determine minimum distance based on whether either node is exported
+      const isExportedEdge = nodeA.isExported || nodeB.isExported;
+      const minDistance = isExportedEdge ? this.MIN_EDGE_EXPORT_DISTANCE : this.MIN_EQUILIBRIUM_DISTANCE;
+
       // If connected nodes are closer than minimum distance, push them apart
-      if (distance < this.MIN_EQUILIBRIUM_DISTANCE) {
+      if (distance < minDistance) {
         const direction = distance > 0 
           ? { x: dx / distance, y: dy / distance, z: dz / distance }
           : { x: Math.random() - 0.5, y: Math.random() - 0.5, z: Math.random() - 0.5 };
 
         // Calculate how much to push
-        const pushAmount = (this.MIN_EQUILIBRIUM_DISTANCE - distance) * pushForce;
+        const pushAmount = (minDistance - distance) * pushForce;
 
         // Push nodes apart
         nodeA.position.x -= direction.x * pushAmount;
@@ -294,22 +301,23 @@ export class ForceDirectedLayout {
   }
 
   /**
-   * Enforce minimum distance constraint between nodes from different source files
-   * Push nodes from different files apart if they get closer than MIN_CROSS_FILE_DISTANCE (12 units)
+   * Enforce minimum distance constraint between same-file node pairs
+   * Push unconnected nodes from same file apart if they get closer than MIN_NODE_SEPARATION (25 units)
+   * Cross-file pairs are handled separately by enforceFileCrossConstraint with stronger constraints
    */
-  private enforceFileCrossConstraint(): void {
+  private enforceAllPairsMinimumDistance(): void {
     const nodeArray = Array.from(this.nodes.values());
     const nodeCount = nodeArray.length;
-    const pushForce = this.C_REPULSIVE_CROSS_FILE * 3;  // Strong push for file boundary
+    const pushForce = this.C_REPULSIVE * 4;  // Strong push to prevent overlap
 
     for (let i = 0; i < nodeCount; i++) {
       for (let j = i + 1; j < nodeCount; j++) {
         const nodeA = nodeArray[i];
         const nodeB = nodeArray[j];
 
-        // Only enforce constraint for nodes from different files
-        if (!nodeA.file || !nodeB.file || nodeA.file === nodeB.file) {
-          continue;  // Skip if same file or no file info
+        // Skip cross-file pairs - they're handled by enforceFileCrossConstraint
+        if (nodeA.file && nodeB.file && nodeA.file !== nodeB.file) {
+          continue;
         }
 
         const dx = nodeB.position.x - nodeA.position.x;
@@ -318,14 +326,14 @@ export class ForceDirectedLayout {
 
         const distance = Math.sqrt(dx * dx + dy * dy + dz * dz) || this.MIN_DISTANCE;
 
-        // If nodes from different files are closer than minimum distance, push them apart
-        if (distance < this.MIN_CROSS_FILE_DISTANCE) {
+        // If same-file unconnected nodes are closer than minimum separation, push them apart
+        if (distance < this.MIN_NODE_SEPARATION) {
           const direction = distance > 0 
             ? { x: dx / distance, y: dy / distance, z: dz / distance }
             : { x: Math.random() - 0.5, y: Math.random() - 0.5, z: Math.random() - 0.5 };
 
           // Calculate how much to push
-          const pushAmount = (this.MIN_CROSS_FILE_DISTANCE - distance) * pushForce;
+          const pushAmount = (this.MIN_NODE_SEPARATION - distance) * pushForce;
 
           // Push nodes apart
           nodeA.position.x -= direction.x * pushAmount;
@@ -350,18 +358,24 @@ export class ForceDirectedLayout {
   }
 
   /**
-   * Enforce minimum distance constraint between ALL node pairs
-   * Push any nodes closer than MIN_NODE_SEPARATION apart to prevent overlap
+   * Enforce stronger minimum distance constraint between nodes from different source files
+   * Push cross-file nodes apart to create file-based clustering
+   * Uses MIN_CROSS_FILE_SEPARATION (35 units) - stronger than same-file pairs (25 units)
    */
-  private enforceAllPairsMinimumDistance(): void {
+  private enforceFileCrossConstraint(): void {
     const nodeArray = Array.from(this.nodes.values());
     const nodeCount = nodeArray.length;
-    const pushForce = this.C_REPULSIVE * 4;  // Strong push to prevent overlap
+    const pushForce = this.C_REPULSIVE_CROSS_FILE * 3;  // Strong push for file boundaries
 
     for (let i = 0; i < nodeCount; i++) {
       for (let j = i + 1; j < nodeCount; j++) {
         const nodeA = nodeArray[i];
         const nodeB = nodeArray[j];
+
+        // Only enforce constraint for nodes from different files
+        if (!nodeA.file || !nodeB.file || nodeA.file === nodeB.file) {
+          continue;  // Skip if same file or no file info
+        }
 
         const dx = nodeB.position.x - nodeA.position.x;
         const dy = nodeB.position.y - nodeA.position.y;
@@ -369,14 +383,14 @@ export class ForceDirectedLayout {
 
         const distance = Math.sqrt(dx * dx + dy * dy + dz * dz) || this.MIN_DISTANCE;
 
-        // If any nodes are closer than minimum separation, push them apart
-        if (distance < this.MIN_NODE_SEPARATION) {
+        // If cross-file nodes are closer than minimum distance, push them apart strongly
+        if (distance < this.MIN_CROSS_FILE_SEPARATION) {
           const direction = distance > 0 
             ? { x: dx / distance, y: dy / distance, z: dz / distance }
             : { x: Math.random() - 0.5, y: Math.random() - 0.5, z: Math.random() - 0.5 };
 
-          // Calculate how much to push
-          const pushAmount = (this.MIN_NODE_SEPARATION - distance) * pushForce;
+          // Calculate how much to push (stronger for cross-file)
+          const pushAmount = (this.MIN_CROSS_FILE_SEPARATION - distance) * pushForce;
 
           // Push nodes apart
           nodeA.position.x -= direction.x * pushAmount;

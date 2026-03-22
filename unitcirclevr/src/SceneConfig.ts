@@ -65,7 +65,7 @@ export class SceneConfig {
   static readonly LAYOUT_ITERATIONS = 1; // Simple random placement requires minimal iterations
 
   // Animation
-  static readonly FLY_TO_ANIMATION_TIME_MS = 900;
+  static readonly FLY_TO_ANIMATION_TIME_MS = 2000;  // Increased from 900ms for dramatic effect
   static readonly FLY_TO_ANIMATION_FPS = 60;
   static readonly FLY_TO_OFFSET = new BABYLON.Vector3(0, 0, 6.5);  // Stay outside cube (size 4.0)
 
