@@ -223,6 +223,12 @@ export class VRSceneManager {
           // Apply attraction to pull exported nodes to sphere surface
           this.applySphereAttraction(layoutNodes);
 
+          // Apply sphere-to-sphere repulsion to separate file groups
+          this.applySphereSeparation(layoutNodes);
+
+          // Apply attraction to keep nodes clustered with their file sphere
+          this.applySphereGravity(layoutNodes);
+
           // Update edge cylinders to follow moving nodes
           this.meshFactory.updateEdges();
 
@@ -1077,6 +1083,98 @@ export class VRSceneManager {
         layoutNode.velocity.x += direction.x * distanceToTarget * attractionStrength;
         layoutNode.velocity.y += direction.y * distanceToTarget * attractionStrength;
         layoutNode.velocity.z += direction.z * distanceToTarget * attractionStrength;
+      }
+    }
+  }
+
+  /**
+   * Apply repulsive forces between file spheres to separate file groups
+   */
+  private applySphereSeparation(layoutNodes: Map<string, any>): void {
+    const spheres = Array.from(this.fileBoundingSpheres.entries());
+    const separationStrength = 1.2;  // Force magnitude for sphere-to-sphere repulsion
+    const minSphereDistance = 15.0;  // Minimum distance between sphere centers
+
+    // Apply pairwise repulsion between all spheres
+    for (let i = 0; i < spheres.length; i++) {
+      for (let j = i + 1; j < spheres.length; j++) {
+        const [, sphere1Data] = spheres[i];
+        const [, sphere2Data] = spheres[j];
+
+        const pos1 = sphere1Data.mesh.position;
+        const pos2 = sphere2Data.mesh.position;
+        const distance = BABYLON.Vector3.Distance(pos1, pos2);
+
+        if (distance < 0.1) continue;  // Avoid singularity
+
+        // Direction from sphere 1 to sphere 2
+        const direction = pos2.subtract(pos1).normalize();
+
+        // Calculate repulsive force based on how close they are
+        const desiredDistance = minSphereDistance;
+        const pushDistance = Math.max(0, desiredDistance - distance);
+
+        // Apply forces to move spheres apart
+        // Note: We push nodes by applying forces to them, not directly moving spheres
+        // Nodes in sphere 1 get pushed away from sphere 2
+        const repulsionPerNode1 = pushDistance * separationStrength / Math.max(1, sphere1Data.nodeIds.size);
+        for (const nodeId of sphere1Data.nodeIds) {
+          const layoutNode = layoutNodes.get(nodeId);
+          if (layoutNode) {
+            // Push away from sphere 2
+            layoutNode.velocity.x -= direction.x * repulsionPerNode1;
+            layoutNode.velocity.y -= direction.y * repulsionPerNode1;
+            layoutNode.velocity.z -= direction.z * repulsionPerNode1;
+          }
+        }
+
+        // Nodes in sphere 2 get pushed away from sphere 1
+        const repulsionPerNode2 = pushDistance * separationStrength / Math.max(1, sphere2Data.nodeIds.size);
+        for (const nodeId of sphere2Data.nodeIds) {
+          const layoutNode = layoutNodes.get(nodeId);
+          if (layoutNode) {
+            // Push away from sphere 1
+            layoutNode.velocity.x += direction.x * repulsionPerNode2;
+            layoutNode.velocity.y += direction.y * repulsionPerNode2;
+            layoutNode.velocity.z += direction.z * repulsionPerNode2;
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Apply attractive forces to keep nodes gravitating toward their file sphere center
+   * This drags nodes along when their sphere moves away from other files
+   */
+  private applySphereGravity(layoutNodes: Map<string, any>): void {
+    if (!this.layout) return;
+
+    const gravityStrength = 0.3;  // Force magnitude for center of mass attraction
+    const maxGravityDistance = 40.0;  // Only apply gravity within this range of sphere center
+
+    // For each node, attract it toward its own file sphere center
+    for (const [nodeId, layoutNode] of layoutNodes.entries()) {
+      const graphNode = this.graphNodeMap.get(nodeId);
+      if (!graphNode) continue;
+
+      const nodeFile = graphNode.file || 'external';
+      const nodeSphere = this.fileBoundingSpheres.get(nodeFile);
+      if (!nodeSphere) continue;  // No sphere for this file
+
+      const nodePos = new BABYLON.Vector3(layoutNode.position.x, layoutNode.position.y, layoutNode.position.z);
+      const sphereCenter = nodeSphere.mesh.position;
+      const distanceToCenter = BABYLON.Vector3.Distance(nodePos, sphereCenter);
+
+      // Only apply gravity if not exported and within range
+      if (!graphNode.isExported && distanceToCenter < maxGravityDistance && distanceToCenter > 0.1) {
+        // Direction from node toward sphere center
+        const direction = sphereCenter.subtract(nodePos).normalize();
+
+        // Apply attractive force toward center
+        layoutNode.velocity.x += direction.x * gravityStrength;
+        layoutNode.velocity.y += direction.y * gravityStrength;
+        layoutNode.velocity.z += direction.z * gravityStrength;
       }
     }
   }
