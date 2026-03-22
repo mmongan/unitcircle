@@ -268,11 +268,15 @@ export class VRSceneManager {
                 // Add padding to the bounds
                 const padding = 5.0;  // Extra space around nodes
                 const calculatedSize = Math.max(bounds.width, bounds.height, bounds.depth) + padding * 2;
-                // Ensure minimum size so boxes never collapse to prevent proper repulsion
-                const minSize = 50.0;  // Minimum box size to ensure adequate separation
-                const size = Math.max(calculatedSize, minSize);
-                // Scale the 1x1x1 box to the desired size
+                // Scale the 1x1x1 box to the desired size - no hard minimum, let bounds decide
+                // Small files get small boxes, large files get large boxes
+                const size = Math.max(calculatedSize, 10.0);  // Tiny minimum to prevent zero-size boxes
                 fileBox.scaling = new BABYLON.Vector3(size, size, size);
+                
+                // Debug logging for bounds calculation
+                if (this.physicsIterationCount === 1 || this.physicsIterationCount === 50 || this.physicsIterationCount === 100) {
+                  console.log(`  ${file}: nodes=${nodeIds.size}, bounds=[w:${bounds.width.toFixed(1)}, h:${bounds.height.toFixed(1)}, d:${bounds.depth.toFixed(1)}], calcSize=${calculatedSize.toFixed(1)}, finalSize=${size.toFixed(1)}`);
+                }
               }
             }
           }
@@ -986,7 +990,7 @@ export class VRSceneManager {
 
     const files = Array.from(this.fileNodeIds.keys());
     const fileNodes = layout.getNodes();
-    const minSeparationPadding = 60.0;  // Minimum distance padding between boxes (increased from 40)
+    const minSeparationPadding = 15.0;  // Minimum distance padding between boxes (reduced from 60 since we removed hard minimum)
 
     // Check all pairs of files for intersection
     for (let i = 0; i < files.length; i++) {
