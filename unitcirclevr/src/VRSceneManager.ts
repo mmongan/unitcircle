@@ -560,12 +560,12 @@ export class VRSceneManager {
     }
   }
 
-  private buildEdgeList(edges: Array<{ from: string; to: string }>): ForceDirectedLayout['edges'] {
+  private buildEdgeList(edges: Array<{ from: string; to: string }>): Array<{ source: string; target: string }> {
     return edges.map(e => ({ source: e.from, target: e.to }));
   }
 
   private computeLayout(layout: ForceDirectedLayout): Map<string, any> {
-    return layout.simulate(SceneConfig.LAYOUT_ITERATIONS);
+    return layout.simulate();
   }
 
   /**

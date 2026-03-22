@@ -124,23 +124,7 @@
       "id": "simulate@src\\ForceDirectedLayout.ts",
       "name": "simulate",
       "file": "ForceDirectedLayout.ts",
-      "line": 57,
-      "isExported": false,
-      "type": "function"
-    },
-    {
-      "id": "step@src\\ForceDirectedLayout.ts",
-      "name": "step",
-      "file": "ForceDirectedLayout.ts",
-      "line": 68,
-      "isExported": false,
-      "type": "function"
-    },
-    {
-      "id": "constrainBounds@src\\ForceDirectedLayout.ts",
-      "name": "constrainBounds",
-      "file": "ForceDirectedLayout.ts",
-      "line": 155,
+      "line": 49,
       "isExported": false,
       "type": "function"
     },
@@ -148,7 +132,7 @@
       "id": "getNodes@src\\ForceDirectedLayout.ts",
       "name": "getNodes",
       "file": "ForceDirectedLayout.ts",
-      "line": 164,
+      "line": 53,
       "isExported": false,
       "type": "function"
     },
@@ -968,14 +952,6 @@
       "to": "updateCounterDisplay@src\\counter.ts"
     },
     {
-      "from": "simulate@src\\ForceDirectedLayout.ts",
-      "to": "step@src\\ForceDirectedLayout.ts"
-    },
-    {
-      "from": "simulate@src\\ForceDirectedLayout.ts",
-      "to": "constrainBounds@src\\ForceDirectedLayout.ts"
-    },
-    {
       "from": "loadGraph@src\\GraphViewer.ts",
       "to": "render@src\\GraphViewer.ts"
     },
@@ -1356,5 +1332,5 @@
       "to": "render@src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-22T02:39:47.748Z"
+  "lastUpdated": "2026-03-22T02:51:15.607Z"
 }
