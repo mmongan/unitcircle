@@ -461,6 +461,8 @@ export class VRSceneManager {
     indegreeMap: Map<string, number> = new Map(),
     animateFromCenter: boolean = false
   ): void {
+    console.log(`renderNodesWithAnimation: animateFromCenter=${animateFromCenter}, nodeCount=${nodes.length}`);
+    let positionCount = 0;
     for (const node of nodes) {
       const layoutNode = layoutNodes.get(node.id);
       if (!layoutNode) continue;
@@ -470,6 +472,10 @@ export class VRSceneManager {
         layoutNode.position.y,
         layoutNode.position.z
       );
+      if (positionCount < 3) {
+        console.log(`  Node ${node.id}: targetPos=(${targetPosition.x.toFixed(1)}, ${targetPosition.y.toFixed(1)}, ${targetPosition.z.toFixed(1)})`);
+        positionCount++;
+      }
 
       // If animating from center (new nodes), add perpendicular jitter to target
       if (animateFromCenter) {
