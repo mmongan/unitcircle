@@ -283,7 +283,8 @@ export class MeshFactory {
    */
   createEdges(
     edges: Array<{ from: string; to: string }>,
-    layoutNodes: Map<string, any>
+    layoutNodes: Map<string, any>,
+    fileColorMap: Map<string, BABYLON.Color3> = new Map()
   ): void {
     // Create material for normal edges (same-file calls)
     const edgeMaterial = new BABYLON.StandardMaterial('edgeMaterial', this.scene);
@@ -304,7 +305,10 @@ export class MeshFactory {
       const isCrossFile = fromFile !== toFile;
       const material = isCrossFile ? goldenEdgeMaterial : edgeMaterial;
       
-      this.createEdge(edge, layoutNodes, material, edgeIndex);
+      // Get target function's file color for arrowhead
+      const targetFileColor = toFile ? fileColorMap.get(toFile) : undefined;
+      
+      this.createEdge(edge, layoutNodes, material, edgeIndex, targetFileColor);
       edgeIndex++;
     }
   }
@@ -316,7 +320,8 @@ export class MeshFactory {
     edge: { from: string; to: string },
     layoutNodes: Map<string, any>,
     material: BABYLON.StandardMaterial,
-    index: number
+    index: number,
+    targetFileColor?: BABYLON.Color3
   ): void {
     const sourceNode = layoutNodes.get(edge.from);
     const targetNode = layoutNodes.get(edge.to);
@@ -355,7 +360,7 @@ export class MeshFactory {
       
       // Calculate arrowhead height to position tube endpoint at base of arrowhead
       const lineRadius = SceneConfig.EDGE_RADIUS;
-      const arrowheadBaseRadius = lineRadius * 1.5;
+      const arrowheadBaseRadius = lineRadius * 2.0;  // Changed from 1.5 to 2.0
       const arrowheadBaseDiameter = arrowheadBaseRadius * 2;
       const arrowheadHeight = arrowheadBaseDiameter * 1.5;
       const arrowheadBaseOffset = arrowheadHeight / 2;
@@ -374,7 +379,7 @@ export class MeshFactory {
       tube.isPickable = false;  // Edges should not be clickable
 
       // Create arrowhead at the end of the edge
-      this.createArrowhead(sourcePos, targetPos, material, index);
+      this.createArrowhead(sourcePos, targetPos, material, index, targetFileColor);
     }
   }
 
@@ -385,12 +390,13 @@ export class MeshFactory {
     sourcePos: BABYLON.Vector3,
     targetPos: BABYLON.Vector3,
     material: BABYLON.StandardMaterial,
-    index: number
+    index: number,
+    targetFileColor?: BABYLON.Color3
   ): void {
     // Scale arrowhead based on line radius
-    // Base radius = 1.5 * line radius
+    // Base radius = 2.0 * line radius (changed from 1.5)
     const lineRadius = SceneConfig.EDGE_RADIUS;
-    const arrowheadBaseRadius = lineRadius * 1.5;
+    const arrowheadBaseRadius = lineRadius * 2.0;
     const arrowheadBaseDiameter = arrowheadBaseRadius * 2;
     const arrowheadHeight = arrowheadBaseDiameter * 1.5;
     
@@ -416,7 +422,16 @@ export class MeshFactory {
     arrowhead.rotationQuaternion = rotationQuaternion;
 
     arrowhead.parent = this.sceneRoot;
-    arrowhead.material = material;
+    
+    // Use target file color for arrowhead if available, otherwise use edge material
+    if (targetFileColor) {
+      const arrowheadMaterial = new BABYLON.StandardMaterial(`arrowheadMaterial_${index}`, this.scene);
+      arrowheadMaterial.emissiveColor = targetFileColor;
+      arrowhead.material = arrowheadMaterial;
+    } else {
+      arrowhead.material = material;
+    }
+    
     arrowhead.isPickable = false;
   }
 
