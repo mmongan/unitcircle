@@ -870,6 +870,8 @@ export class VRSceneManager {
 
   public run(): void {
     this.engine.runRenderLoop(() => {
+      // Update edges to follow their nodes
+      this.meshFactory.updateEdges();
       this.scene.render();
     });
   }

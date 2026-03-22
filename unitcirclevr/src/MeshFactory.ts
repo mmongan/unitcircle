@@ -9,6 +9,8 @@ export class MeshFactory {
   private scene: BABYLON.Scene;
   private sceneRoot: BABYLON.TransformNode;
   private nodeMeshes: Map<string, BABYLON.Mesh> = new Map();  // Track meshes for raycasting
+  private edgeMeshes: Map<string, { tube: BABYLON.Mesh; arrowhead: BABYLON.Mesh; from: string; to: string }> = new Map();
+  private layoutNodes: Map<string, any> = new Map();  // Store latest layout positions for edge updates
 
   constructor(scene: BABYLON.Scene, sceneRoot: BABYLON.TransformNode) {
     this.scene = scene;
@@ -286,6 +288,9 @@ export class MeshFactory {
     layoutNodes: Map<string, any>,
     fileColorMap: Map<string, BABYLON.Color3> = new Map()
   ): void {
+    // Store layout nodes for edge updates during render loop
+    this.layoutNodes = new Map(layoutNodes);
+    
     // Create material for normal edges (same-file calls)
     const edgeMaterial = new BABYLON.StandardMaterial('edgeMaterial', this.scene);
     edgeMaterial.emissiveColor = new BABYLON.Color3(0.8, 0.8, 0.8);  // Bright gray
@@ -379,7 +384,15 @@ export class MeshFactory {
       tube.isPickable = false;  // Edges should not be clickable
 
       // Create arrowhead at the end of the edge
-      this.createArrowhead(sourcePos, targetPos, material, index, targetFileColor);
+      const arrowhead = this.createArrowhead(sourcePos, targetPos, material, index, targetFileColor);
+      
+      // Store edge mesh references for dynamic updates
+      this.edgeMeshes.set(`${index}`, {
+        tube,
+        arrowhead,
+        from: edge.from,
+        to: edge.to
+      });
     }
   }
 
@@ -392,7 +405,7 @@ export class MeshFactory {
     material: BABYLON.StandardMaterial,
     index: number,
     targetFileColor?: BABYLON.Color3
-  ): void {
+  ): BABYLON.Mesh {
     // Scale arrowhead based on line radius
     // Base radius = 2.0 * line radius (changed from 1.5)
     const lineRadius = SceneConfig.EDGE_RADIUS;
@@ -433,6 +446,8 @@ export class MeshFactory {
     }
     
     arrowhead.isPickable = false;
+    
+    return arrowhead;
   }
 
   /**
@@ -443,7 +458,82 @@ export class MeshFactory {
   }
 
   /**
-   * Create a transparent sphere container for functions in a specific file
+   * Update edge positions and geometry to follow their connected nodes
+   * Called during render loop to keep edges attached to moving nodes
    */
+  public updateEdges(): void {
+    if (this.edgeMeshes.size === 0 || this.layoutNodes.size === 0) {
+      return;  // No edges to update
+    }
 
+    for (const [edgeId, edgeData] of this.edgeMeshes) {
+      const sourceNode = this.layoutNodes.get(edgeData.from);
+      const targetNode = this.layoutNodes.get(edgeData.to);
+
+      if (!sourceNode || !targetNode) {
+        continue;  // Skip if nodes not found
+      }
+
+      const sourceCenterPos = new BABYLON.Vector3(sourceNode.position.x, sourceNode.position.y, sourceNode.position.z);
+      const targetCenterPos = new BABYLON.Vector3(targetNode.position.x, targetNode.position.y, targetNode.position.z);
+
+      let sourcePos = sourceCenterPos.clone();
+      let targetPos = targetCenterPos.clone();
+
+      // Calculate direction from source to target
+      const direction = targetCenterPos.subtract(sourceCenterPos).normalize();
+      const distance = BABYLON.Vector3.Distance(sourceCenterPos, targetCenterPos);
+
+      // Find source surface intersection point via raycast
+      const sourceMesh = this.nodeMeshes.get(edgeData.from);
+      if (sourceMesh) {
+        const sourceRay = new BABYLON.Ray(sourceCenterPos, direction, distance);
+        const sourceHit = this.scene.pickWithRay(sourceRay, (mesh) => mesh === sourceMesh);
+        if (sourceHit && sourceHit.hit && sourceHit.pickedPoint) {
+          sourcePos = sourceHit.pickedPoint.clone();
+        }
+      }
+
+      // Find target surface intersection point via raycast
+      const targetMesh = this.nodeMeshes.get(edgeData.to);
+      if (targetMesh) {
+        const reverseDirection = direction.scale(-1);
+        const targetRay = new BABYLON.Ray(targetCenterPos, reverseDirection, distance);
+        const targetHit = this.scene.pickWithRay(targetRay, (mesh) => mesh === targetMesh);
+        if (targetHit && targetHit.hit && targetHit.pickedPoint) {
+          targetPos = targetHit.pickedPoint.clone();
+        }
+      }
+
+      // Calculate arrowhead dimensions
+      const lineRadius = SceneConfig.EDGE_RADIUS;
+      const arrowheadBaseRadius = lineRadius * 2.0;
+      const arrowheadBaseDiameter = arrowheadBaseRadius * 2;
+      const arrowheadHeight = arrowheadBaseDiameter * 1.5;
+      const arrowheadBaseOffset = arrowheadHeight / 2;
+
+      // Update tube path
+      const tubeEndPos = targetPos.subtract(direction.scale(arrowheadBaseOffset));
+      const points = [sourcePos, tubeEndPos];
+
+      // Dispose old tube and create new one with updated path
+      edgeData.tube.dispose();
+      const newTube = BABYLON.MeshBuilder.CreateTube(`edge_${edgeId}`, {
+        path: points,
+        radius: SceneConfig.EDGE_RADIUS,
+      }, this.scene);
+      newTube.parent = this.sceneRoot;
+      newTube.material = edgeData.tube.material;
+      newTube.isPickable = false;
+      edgeData.tube = newTube;
+
+      // Update arrowhead position and rotation
+      const arrowheadPosition = targetPos.subtract(direction.scale(arrowheadHeight / 2));
+      edgeData.arrowhead.position = arrowheadPosition;
+
+      const rotationQuaternion = BABYLON.Quaternion.Identity();
+      BABYLON.Quaternion.FromUnitVectorsToRef(BABYLON.Axis.Y, direction, rotationQuaternion);
+      edgeData.arrowhead.rotationQuaternion = rotationQuaternion;
+    }
+  }
 }
