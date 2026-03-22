@@ -213,9 +213,10 @@ export class VRSceneManager {
           // Update edge cylinders to follow moving nodes
           this.meshFactory.updateEdges();
 
-          // Stop physics after ~5 seconds (300 frames at 60fps) of settling
+          // Continue iterating until equilibrium is reached or max iterations exceeded
+          // With stronger forces, system needs more time to fully settle
           this.physicsIterationCount++;
-          if (this.physicsIterationCount > 300 || !stillConverging) {
+          if (this.physicsIterationCount > 1200 || !stillConverging) {
             this.physicsActive = false;
           }
         }
