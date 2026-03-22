@@ -524,7 +524,7 @@
       "id": "createArrowhead@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "createArrowhead",
       "file": "MeshFactory.ts",
-      "line": 374,
+      "line": 382,
       "isExported": false,
       "type": "function"
     },
@@ -532,7 +532,7 @@
       "id": "removeMeshReference@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "removeMeshReference",
       "file": "MeshFactory.ts",
-      "line": 408,
+      "line": 416,
       "isExported": false,
       "type": "function"
     },
@@ -1380,5 +1380,5 @@
       "to": "render@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-21T22:20:18.608Z"
+  "lastUpdated": "2026-03-22T00:35:22.649Z"
 }
