@@ -28,14 +28,15 @@ export class ForceDirectedLayout {
     this.nodes = new Map();
     this.edges = edges;
 
-    // Initialize nodes with random positions
+    // Initialize all nodes near the center with tiny random perturbations
+    // This breaks symmetry so repulsive forces can push them apart
     for (const id of nodeIds) {
       this.nodes.set(id, {
         id,
         position: {
-          x: (Math.random() - 0.5) * 10,
-          y: (Math.random() - 0.5) * 10,
-          z: (Math.random() - 0.5) * 10
+          x: (Math.random() - 0.5) * 0.01,  // Tiny random offset to break symmetry
+          y: (Math.random() - 0.5) * 0.01,
+          z: (Math.random() - 0.5) * 0.01
         },
         velocity: { x: 0, y: 0, z: 0 },
         label: id.split('@')[0]
