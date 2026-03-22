@@ -210,8 +210,7 @@ export class VRSceneManager {
             }
           }
 
-          // Update edges to follow nodes
-          this.meshFactory.updateEdges();
+          // Edges disabled - edges visualization removed
 
           // Stop physics after ~5 seconds (300 frames at 60fps) of settling
           this.physicsIterationCount++;
@@ -424,6 +423,8 @@ export class VRSceneManager {
     this.camera.attachControl(canvas, true);
     this.camera.inertia = SceneConfig.CAMERA_INERTIA;
     this.camera.angularSensibility = SceneConfig.CAMERA_ANGULAR_SENSIBILITY;
+    // Set camera to look at the center of the scene
+    this.camera.target = BABYLON.Vector3.Zero;
     // Set camera frustum to support distant objects
     this.camera.minZ = 0.1;    // Near clipping plane
     this.camera.maxZ = 50000;  // Far clipping plane - allow raycasting to very distant meshes
@@ -521,7 +522,7 @@ export class VRSceneManager {
     // Render nodes at their initial positions (all at center)
     const initialNodes = this.layout.getNodes();
     this.renderNodes(graph.nodes, initialNodes, indegreeMap);
-    this.renderEdges(graph.edges, initialNodes);
+    this.renderEdges();  // Edges disabled
 
     // Enable physics updates to push nodes apart
     this.physicsActive = true;
@@ -589,7 +590,7 @@ export class VRSceneManager {
     const newEdges = graph.edges.filter(
       e => !this.currentEdges.has(`${e.from}→${e.to}`)
     );
-    this.renderEdges(newEdges, layoutNodes);
+    this.renderEdges();  // Edges disabled
     newEdges.forEach(e => this.currentEdges.add(`${e.from}→${e.to}`));
 
     // Restart physics to spread updated graph
@@ -972,11 +973,8 @@ export class VRSceneManager {
     return indegreeMap;
   }
 
-  private renderEdges(
-    edges: Array<{ from: string; to: string }>,
-    layoutNodes: Map<string, any>
-  ): void {
-    this.meshFactory.createEdges(edges, layoutNodes);
+  private renderEdges(): void {
+    // Edges disabled - visualization shows only nodes
   }
 
   private showTooltip(node: { name: string; file?: string; line?: number }): void {
@@ -1130,8 +1128,7 @@ export class VRSceneManager {
 
   public run(): void {
     this.engine.runRenderLoop(() => {
-      // Update edges to follow their nodes
-      this.meshFactory.updateEdges();
+      // Edges disabled - visualization shows only nodes
       this.scene.render();
     });
   }
