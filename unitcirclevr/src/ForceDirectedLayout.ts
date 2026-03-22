@@ -22,7 +22,7 @@ export interface Edge {
 
 export class ForceDirectedLayout {
   private nodes: Map<string, Node>;
-  private readonly SPACE_SIZE = 500;  // Much larger volume for obvious spread
+  private readonly SPACE_SIZE = 250;  // Visible spread that camera can frame at Z=-800
 
   constructor(nodeIds: string[], _edges: Edge[]) {
     this.nodes = new Map();

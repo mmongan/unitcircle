@@ -86,7 +86,7 @@ describe('ForceDirectedLayout', () => {
   });
 
   describe('Position Constraints', () => {
-    it('should keep positions bounded within ±500', () => {
+    it('should keep positions bounded within ±250', () => {
       const nodes = Array.from({ length: 50 }, (_, i) => `n${i}`);
       const edges = nodes.slice(0, -1).map((n, i) => ({
         source: n,
@@ -97,12 +97,12 @@ describe('ForceDirectedLayout', () => {
 
       for (const node of nodes) {
         const pos = result.get(node)?.position;
-        expect(pos?.x).toBeGreaterThanOrEqual(-500);
-        expect(pos?.x).toBeLessThanOrEqual(500);
-        expect(pos?.y).toBeGreaterThanOrEqual(-500);
-        expect(pos?.y).toBeLessThanOrEqual(500);
-        expect(pos?.z).toBeGreaterThanOrEqual(-500);
-        expect(pos?.z).toBeLessThanOrEqual(500);
+        expect(pos?.x).toBeGreaterThanOrEqual(-250);
+        expect(pos?.x).toBeLessThanOrEqual(250);
+        expect(pos?.y).toBeGreaterThanOrEqual(-250);
+        expect(pos?.y).toBeLessThanOrEqual(250);
+        expect(pos?.z).toBeGreaterThanOrEqual(-250);
+        expect(pos?.z).toBeLessThanOrEqual(250);
       }
     });
   });
