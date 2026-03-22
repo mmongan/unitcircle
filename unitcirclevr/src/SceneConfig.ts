@@ -62,7 +62,7 @@ export class SceneConfig {
   static readonly EDGE_RADIUS = 0.2;
 
   // Physics Layout
-  static readonly LAYOUT_ITERATIONS = 1200; // Massively increased for aggressive spreading with post-processing
+  static readonly LAYOUT_ITERATIONS = 500; // Simplified layout algorithm converges faster
 
   // Animation
   static readonly FLY_TO_ANIMATION_TIME_MS = 900;
