@@ -210,6 +210,9 @@ export class VRSceneManager {
             }
           }
 
+          // Update edges to follow nodes
+          this.meshFactory.updateEdges();
+
           // Stop physics after ~5 seconds (300 frames at 60fps) of settling
           this.physicsIterationCount++;
           if (this.physicsIterationCount > 300 || !stillConverging) {
