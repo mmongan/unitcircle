@@ -8,7 +8,8 @@ import { SceneConfig } from './SceneConfig';
 export class MeshFactory {
   private scene: BABYLON.Scene;
   private nodeMeshes: Map<string, BABYLON.Mesh> = new Map();  // Track meshes for raycasting
-  private edgeMeshes: Map<string, { tube: BABYLON.Mesh; arrowhead: BABYLON.Mesh; from: string; to: string; material: BABYLON.StandardMaterial }> = new Map();
+  private edgeTubes: Map<string, BABYLON.Mesh> = new Map();   // Simple tube storage
+  private edgeMetadata: Map<string, { from: string; to: string; isCrossFile: boolean }> = new Map();
 
   constructor(scene: BABYLON.Scene) {
     this.scene = scene;
@@ -287,183 +288,59 @@ export class MeshFactory {
    */
   createEdges(
     edges: Array<{ from: string; to: string }>,
-    layoutNodes: Map<string, any>,
-    fileColorMap: Map<string, BABYLON.Color3> = new Map()
+    layoutNodes: Map<string, any>
   ): void {
-    // Create material for normal edges (same-file calls)
-    const edgeMaterial = new BABYLON.StandardMaterial('edgeMaterial', this.scene);
-    edgeMaterial.emissiveColor = new BABYLON.Color3(0.8, 0.8, 0.8);  // Bright gray
+    // Create material for same-file edges
+    const samFileEdgeMaterial = new BABYLON.StandardMaterial('sameFileEdgeMaterial', this.scene);
+    samFileEdgeMaterial.emissiveColor = new BABYLON.Color3(0.8, 0.8, 0.8);  // Gray
 
-    // Create material for golden edges (cross-file calls)
-    const goldenEdgeMaterial = new BABYLON.StandardMaterial('goldenEdgeMaterial', this.scene);
-    goldenEdgeMaterial.emissiveColor = new BABYLON.Color3(1.0, 0.84, 0.0);  // Golden yellow
+    // Create material for cross-file edges
+    const crossFileEdgeMaterial = new BABYLON.StandardMaterial('crossFileEdgeMaterial', this.scene);
+    crossFileEdgeMaterial.emissiveColor = new BABYLON.Color3(1.0, 0.84, 0.0);  // Golden
 
-    // Render all edges connecting to function centers
+    // Create simple tube for each edge
     let edgeIndex = 0;
     for (const edge of edges) {
-      // Extract file paths from edge endpoints (format: "functionName@/path/to/file.ts")
+      const sourceNode = layoutNodes.get(edge.from);
+      const targetNode = layoutNodes.get(edge.to);
+
+      if (!sourceNode || !targetNode) {
+        edgeIndex++;
+        continue;
+      }
+
+      // Extract file paths to determine if cross-file
       const fromFile = edge.from.split('@')[1];
       const toFile = edge.to.split('@')[1];
-      
-      // Color golden if calling across files, gray if same file
       const isCrossFile = fromFile !== toFile;
-      const material = isCrossFile ? goldenEdgeMaterial : edgeMaterial;
+      const material = isCrossFile ? crossFileEdgeMaterial : samFileEdgeMaterial;
+
+      // Create tube from source to target node centers
+      const sourceCenterPos = new BABYLON.Vector3(sourceNode.position.x, sourceNode.position.y, sourceNode.position.z);
+      const targetCenterPos = new BABYLON.Vector3(targetNode.position.x, targetNode.position.y, targetNode.position.z);
+
+      const points = [sourceCenterPos, targetCenterPos];
+      const tube = BABYLON.MeshBuilder.CreateTube(`edge_${edgeIndex}`, {
+        path: points,
+        radius: SceneConfig.EDGE_RADIUS,
+      }, this.scene);
       
-      // Get target function's file color for arrowhead
-      const targetFileColor = toFile ? fileColorMap.get(toFile) : undefined;
-      
-      this.createEdge(edge, layoutNodes, material, edgeIndex, targetFileColor);
+      tube.material = material;
+      tube.isPickable = false;
+
+      // Store tube and metadata
+      this.edgeTubes.set(`${edgeIndex}`, tube);
+      this.edgeMetadata.set(`${edgeIndex}`, {
+        from: edge.from,
+        to: edge.to,
+        isCrossFile
+      });
+
       edgeIndex++;
     }
   }
 
-  /**
-   * Calculate surface connection point based on mesh bounding box
-   * Moves from mesh center toward target along direction until it hits the surface
-   */
-  private getSurfaceConnectionPoint(
-    meshCenter: BABYLON.Vector3,
-    direction: BABYLON.Vector3,
-    mesh: BABYLON.Mesh
-  ): BABYLON.Vector3 {
-    const boundingInfo = mesh.getBoundingInfo();
-    if (!boundingInfo) {
-      return meshCenter.clone();
-    }
 
-    // Get the extents (half-sizes) of the bounding box
-    const extents = boundingInfo.boundingBox.extendSize;
-
-    // Calculate how far along the direction we need to go to hit the surface
-    // by finding which axis component is largest relative to the mesh extents
-    const scaleFactor = Math.max(
-      Math.abs(direction.x) > 0 ? extents.x / Math.abs(direction.x) : 0,
-      Math.abs(direction.y) > 0 ? extents.y / Math.abs(direction.y) : 0,
-      Math.abs(direction.z) > 0 ? extents.z / Math.abs(direction.z) : 0
-    );
-
-    // Move from center along direction to hit the surface
-    return meshCenter.add(direction.scale(scaleFactor));
-  }
-
-  /**
-   * Create a single edge between two nodes
-   */
-  private createEdge(
-    edge: { from: string; to: string },
-    layoutNodes: Map<string, any>,
-    material: BABYLON.StandardMaterial,
-    index: number,
-    targetFileColor?: BABYLON.Color3
-  ): void {
-    const sourceNode = layoutNodes.get(edge.from);
-    const targetNode = layoutNodes.get(edge.to);
-
-    if (sourceNode && targetNode) {
-      const sourceCenterPos = new BABYLON.Vector3(sourceNode.position.x, sourceNode.position.y, sourceNode.position.z);
-      const targetCenterPos = new BABYLON.Vector3(targetNode.position.x, targetNode.position.y, targetNode.position.z);
-      
-      // Calculate direction from source to target
-      const direction = targetCenterPos.subtract(sourceCenterPos).normalize();
-      const reverseDirection = direction.scale(-1);
-      
-      // Get source and target meshes
-      const sourceMesh = this.nodeMeshes.get(edge.from);
-      const targetMesh = this.nodeMeshes.get(edge.to);
-      
-      // Find surface connection points using bounding boxes
-      const sourcePos = sourceMesh 
-        ? this.getSurfaceConnectionPoint(sourceCenterPos, direction, sourceMesh)
-        : sourceCenterPos.clone();
-      
-      const targetPos = targetMesh
-        ? this.getSurfaceConnectionPoint(targetCenterPos, reverseDirection, targetMesh)
-        : targetCenterPos.clone();
-      
-      // Calculate arrowhead height to position tube endpoint at base of arrowhead
-      const lineRadius = SceneConfig.EDGE_RADIUS;
-      const arrowheadBaseRadius = lineRadius * 2.0;
-      const arrowheadBaseDiameter = arrowheadBaseRadius * 2;
-      const arrowheadHeight = arrowheadBaseDiameter * 1.5;
-      const arrowheadBaseOffset = arrowheadHeight / 2;
-      
-      // Shorten tube endpoint to end at the base of the arrowhead
-      const tubeEndPos = targetPos.subtract(direction.scale(arrowheadBaseOffset));
-      
-      const points = [sourcePos, tubeEndPos];
-
-      const tube = BABYLON.MeshBuilder.CreateTube(`edge_${index}`, {
-        path: points,
-        radius: SceneConfig.EDGE_RADIUS,
-      }, this.scene);
-      tube.material = material;
-      tube.isPickable = false;  // Edges should not be clickable
-
-      // Create arrowhead at the end of the edge
-      const arrowhead = this.createArrowhead(sourcePos, targetPos, material, index, targetFileColor);
-      
-      // Store edge mesh references for dynamic updates
-      this.edgeMeshes.set(`${index}`, {
-        tube,
-        arrowhead,
-        from: edge.from,
-        to: edge.to,
-        material
-      });
-    }
-  }
-
-  /**
-   * Create an arrowhead cone at the end of an edge pointing toward the target
-   */
-  private createArrowhead(
-    sourcePos: BABYLON.Vector3,
-    targetPos: BABYLON.Vector3,
-    material: BABYLON.StandardMaterial,
-    index: number,
-    targetFileColor?: BABYLON.Color3
-  ): BABYLON.Mesh {
-    // Scale arrowhead based on line radius
-    // Base radius = 2.0 * line radius (changed from 1.5)
-    const lineRadius = SceneConfig.EDGE_RADIUS;
-    const arrowheadBaseRadius = lineRadius * 2.0;
-    const arrowheadBaseDiameter = arrowheadBaseRadius * 2;
-    const arrowheadHeight = arrowheadBaseDiameter * 1.5;
-    
-    // Create a cone-like shape using a cylinder with small top
-    const arrowhead = BABYLON.MeshBuilder.CreateCylinder(`arrowhead_${index}`, {
-      diameterTop: 0.05,
-      diameterBottom: arrowheadBaseDiameter,
-      height: arrowheadHeight,
-    }, this.scene);
-
-    // Calculate direction from source to target
-    const direction = targetPos.subtract(sourcePos).normalize();
-
-    // Position arrowhead so its tip touches the surface at targetPos
-    // Offset back by half height so the tip is at the target surface
-    const arrowheadPosition = targetPos.subtract(direction.scale(arrowheadHeight / 2));
-    arrowhead.position = arrowheadPosition;
-
-    // Create a rotation that points the cylinder along the direction vector
-    // Default cylinder points up (0, 1, 0). We need to rotate it to point along direction
-    const rotationQuaternion = BABYLON.Quaternion.Identity();
-    BABYLON.Quaternion.FromUnitVectorsToRef(BABYLON.Axis.Y, direction, rotationQuaternion);
-    arrowhead.rotationQuaternion = rotationQuaternion;
-    
-    // Use target file color for arrowhead if available, otherwise use edge material
-    if (targetFileColor) {
-      const arrowheadMaterial = new BABYLON.StandardMaterial(`arrowheadMaterial_${index}`, this.scene);
-      arrowheadMaterial.emissiveColor = targetFileColor;
-      arrowhead.material = arrowheadMaterial;
-    } else {
-      arrowhead.material = material;
-    }
-    
-    arrowhead.isPickable = false;
-    
-    return arrowhead;
-  }
 
   /**
    * Remove a node mesh reference from the tracking map
@@ -477,14 +354,17 @@ export class MeshFactory {
    * Called during render loop to keep edges attached to moving nodes
    */
   public updateEdges(): void {
-    if (this.edgeMeshes.size === 0 || this.nodeMeshes.size === 0) {
+    if (this.edgeTubes.size === 0 || this.nodeMeshes.size === 0) {
       return;  // No edges to update
     }
 
-    for (const [edgeId, edgeData] of this.edgeMeshes) {
+    for (const [edgeId, oldTube] of this.edgeTubes) {
+      const metadata = this.edgeMetadata.get(edgeId);
+      if (!metadata) continue;
+
       // Get current node positions directly from meshes (always up-to-date after layout/repulsion)
-      const sourceMesh = this.nodeMeshes.get(edgeData.from);
-      const targetMesh = this.nodeMeshes.get(edgeData.to);
+      const sourceMesh = this.nodeMeshes.get(metadata.from);
+      const targetMesh = this.nodeMeshes.get(metadata.to);
 
       if (!sourceMesh || !targetMesh) {
         continue;  // Skip if nodes not found
@@ -494,42 +374,36 @@ export class MeshFactory {
       const sourceCenterPos = sourceMesh.position.clone();
       const targetCenterPos = targetMesh.position.clone();
 
-      // Calculate direction from source to target
-      const direction = targetCenterPos.subtract(sourceCenterPos).normalize();
-      const reverseDirection = direction.scale(-1);
-
-      // Find surface connection points using bounding boxes
-      const sourcePos = this.getSurfaceConnectionPoint(sourceCenterPos, direction, sourceMesh);
-      const targetPos = this.getSurfaceConnectionPoint(targetCenterPos, reverseDirection, targetMesh);
-
-      // Calculate arrowhead dimensions
-      const lineRadius = SceneConfig.EDGE_RADIUS;
-      const arrowheadBaseRadius = lineRadius * 2.0;
-      const arrowheadBaseDiameter = arrowheadBaseRadius * 2;
-      const arrowheadHeight = arrowheadBaseDiameter * 1.5;
-      const arrowheadBaseOffset = arrowheadHeight / 2;
-
-      // Update tube path
-      const tubeEndPos = targetPos.subtract(direction.scale(arrowheadBaseOffset));
-      const points = [sourcePos, tubeEndPos];
+      // Create simple tube from source to target centers
+      const points = [sourceCenterPos, targetCenterPos];
 
       // Dispose old tube and create new one with updated path
-      edgeData.tube.dispose();
+      oldTube.dispose();
       const newTube = BABYLON.MeshBuilder.CreateTube(`edge_${edgeId}`, {
         path: points,
         radius: SceneConfig.EDGE_RADIUS,
       }, this.scene);
-      newTube.material = edgeData.material;
+
+      // Apply material based on cross-file flag
+      newTube.material = this.getDefaultEdgeMaterial(metadata.isCrossFile);
       newTube.isPickable = false;
-      edgeData.tube = newTube;
-
-      // Update arrowhead position and rotation
-      const arrowheadPosition = targetPos.subtract(direction.scale(arrowheadHeight / 2));
-      edgeData.arrowhead.position = arrowheadPosition;
-
-      const rotationQuaternion = BABYLON.Quaternion.Identity();
-      BABYLON.Quaternion.FromUnitVectorsToRef(BABYLON.Axis.Y, direction, rotationQuaternion);
-      edgeData.arrowhead.rotationQuaternion = rotationQuaternion;
+      
+      // Update stored tube
+      this.edgeTubes.set(edgeId, newTube);
     }
+  }
+
+  /**
+   * Get or create default edge material
+   */
+  private getDefaultEdgeMaterial(isCrossFile: boolean): BABYLON.StandardMaterial {
+    const material = new BABYLON.StandardMaterial(
+      isCrossFile ? 'crossFileEdgeMaterial' : 'sameFileEdgeMaterial',
+      this.scene
+    );
+    material.emissiveColor = isCrossFile
+      ? new BABYLON.Color3(1.0, 0.84, 0.0)  // Golden
+      : new BABYLON.Color3(0.8, 0.8, 0.8); // Gray
+    return material;
   }
 }
