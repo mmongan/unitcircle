@@ -62,7 +62,7 @@ export class SceneConfig {
   static readonly EDGE_RADIUS = 0.2;
 
   // Physics Layout
-  static readonly LAYOUT_ITERATIONS = 500; // Increased for better node spreading with larger initial volume
+  static readonly LAYOUT_ITERATIONS = 800; // Significantly increased for aggressive node spreading
 
   // Animation
   static readonly FLY_TO_ANIMATION_TIME_MS = 900;

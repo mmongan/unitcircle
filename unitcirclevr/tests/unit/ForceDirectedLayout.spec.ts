@@ -97,12 +97,12 @@ describe('ForceDirectedLayout', () => {
 
       for (const node of nodes) {
         const pos = result.get(node)?.position;
-        expect(pos?.x).toBeGreaterThanOrEqual(-100);
-        expect(pos?.x).toBeLessThanOrEqual(100);
-        expect(pos?.y).toBeGreaterThanOrEqual(-100);
-        expect(pos?.y).toBeLessThanOrEqual(100);
-        expect(pos?.z).toBeGreaterThanOrEqual(-100);
-        expect(pos?.z).toBeLessThanOrEqual(100);
+        expect(pos?.x).toBeGreaterThanOrEqual(-150);
+        expect(pos?.x).toBeLessThanOrEqual(150);
+        expect(pos?.y).toBeGreaterThanOrEqual(-150);
+        expect(pos?.y).toBeLessThanOrEqual(150);
+        expect(pos?.z).toBeGreaterThanOrEqual(-150);
+        expect(pos?.z).toBeLessThanOrEqual(150);
       }
     });
   });
@@ -124,9 +124,9 @@ describe('ForceDirectedLayout', () => {
       );
 
       // Connected nodes should be attracted (physics varies, so allow wide range)
-      // Increased upper bound to account for larger initial sphere-based distribution
+      // With larger initial radius and aggressive spacing, can be quite far
       expect(distance).toBeGreaterThan(1);
-      expect(distance).toBeLessThan(200);
+      expect(distance).toBeLessThan(300);
     });
 
     it('should repel unconnected nodes', () => {

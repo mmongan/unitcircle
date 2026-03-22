@@ -18,11 +18,12 @@ export class ForceDirectedLayout {
   private nodes: Map<string, Node>;
   private edges: Edge[];
   private k: number = 1; // Optimal distance
-  private repulsiveForce: number = 0.06; // Repulsive force strength (lower = stronger repulsion) - INCREASED for better spreading
+  private repulsiveForce: number = 0.03; // Repulsive force strength (lower = stronger repulsion) - DOUBLED for aggressive spreading
   private attractiveForce: number = 0.05; // Attractive force strength
-  private damping: number = 0.90; // Velocity damping - DECREASED to allow faster movement
-  private minSeparation: number = 12; // Minimum distance between node centers (increased from 10 to prevent mesh overlap)
-  private xzPlaneRepulsion: number = 0.08; // Additional repulsion in xz plane to prevent horizontal collisions
+  private damping: number = 0.80; // Velocity damping - DECREASED significantly for faster movement
+  private minSeparation: number = 16; // Minimum distance between node centers (matches typical node size better)
+  private xzPlaneRepulsion: number = 0.15; // Additional repulsion in xz plane to prevent horizontal collisions - INCREASED
+  private velocityScale: number = 0.02; // Scale factor for velocity application (increased from 0.01)
 
   constructor(nodeIds: string[], edges: Edge[]) {
     this.nodes = new Map();
@@ -30,13 +31,13 @@ export class ForceDirectedLayout {
 
     // Initialize nodes with initial spread to prevent center clustering
     // Distribute nodes across a larger initial volume for better convergence
-    const initialRadius = Math.cbrt(nodeIds.length) * 3; // Cube root of node count gives good distribution
+    const initialRadius = Math.cbrt(nodeIds.length) * 5; // Increased from 3 to 5 for better initial spread
     
     for (const id of nodeIds) {
       // Random position on surface of sphere with initial radius
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
-      const r = initialRadius * (0.3 + Math.random() * 0.7); // Random distance with some spread
+      const r = initialRadius * (0.4 + Math.random() * 0.6); // Increased minimum spread
       
       this.nodes.set(id, {
         id,
@@ -51,7 +52,8 @@ export class ForceDirectedLayout {
     }
 
     // Pre-calculate optimal distance based on number of nodes
-    this.k = Math.sqrt(1000 / nodeIds.length);
+    // Larger k value means nodes prefer to be further apart
+    this.k = Math.sqrt(2000 / nodeIds.length);  // Increased from 1000 to 2000 for more space
   }
 
   /**
@@ -76,8 +78,8 @@ export class ForceDirectedLayout {
   }
 
   private constrainNodePositions(): void {
-    // Ensure nodes stay within bounds (±100 on each axis for better distribution)
-    const BOUND = 100;
+    // Ensure nodes stay within bounds (±150 on each axis for better distribution with 122 nodes)
+    const BOUND = 150;
     for (const node of this.nodes.values()) {
       node.position.x = Math.max(-BOUND, Math.min(BOUND, node.position.x));
       node.position.y = Math.max(-BOUND, Math.min(BOUND, node.position.y));
@@ -117,7 +119,7 @@ export class ForceDirectedLayout {
 
         // Enforce minimum separation - push nodes apart if too close
         if (distance < this.minSeparation) {
-          const pushForce = Math.pow(this.minSeparation - distance, 1.5) * 6; // Aggressive push force (increased from 5 to 6)
+          const pushForce = Math.pow(this.minSeparation - distance, 1.5) * 10; // Very aggressive push force
           const fx = (dx / distance) * pushForce;
           const fy = (dy / distance) * pushForce;
           const fz = (dz / distance) * pushForce;
@@ -247,9 +249,9 @@ export class ForceDirectedLayout {
   }
 
   private updateNodePosition(node: Node): void {
-    node.position.x += node.velocity.x * 0.01;
-    node.position.y += node.velocity.y * 0.01;
-    node.position.z += node.velocity.z * 0.01;
+    node.position.x += node.velocity.x * this.velocityScale;
+    node.position.y += node.velocity.y * this.velocityScale;
+    node.position.z += node.velocity.z * this.velocityScale;
   }
 
   public getNodes(): Map<string, Node> {
