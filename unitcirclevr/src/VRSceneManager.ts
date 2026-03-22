@@ -220,6 +220,9 @@ export class VRSceneManager {
           // Apply repulsion to push nodes out of file spheres they don't belong to
           this.applySphereRepulsion(layoutNodes);
 
+          // Apply attraction to pull exported nodes to sphere surface
+          this.applySphereAttraction(layoutNodes);
+
           // Update edge cylinders to follow moving nodes
           this.meshFactory.updateEdges();
 
@@ -1033,6 +1036,47 @@ export class VRSceneManager {
             layoutNode.velocity.z += direction.z * pushDistance * repulsionStrength;
           }
         }
+      }
+    }
+  }
+
+  /**
+   * Apply attractive forces to pull exported nodes toward the surface of their file sphere
+   */
+  private applySphereAttraction(layoutNodes: Map<string, any>): void {
+    if (!this.layout) return;
+
+    const attractionStrength = 0.5;  // Force magnitude for sphere surface attraction
+    const surfaceMargin = 1.5;  // Distance from sphere surface where exported nodes should be
+
+    // For each node, if it's exported and in a file with a sphere, pull it toward sphere surface
+    for (const [nodeId, layoutNode] of layoutNodes.entries()) {
+      const graphNode = this.graphNodeMap.get(nodeId);
+      if (!graphNode || !graphNode.isExported) continue;
+
+      const nodeFile = graphNode.file || 'external';
+      const nodeSphere = this.fileBoundingSpheres.get(nodeFile);
+      if (!nodeSphere) continue;  // No sphere for this file
+
+      const nodePos = new BABYLON.Vector3(layoutNode.position.x, layoutNode.position.y, layoutNode.position.z);
+      const spherePos = nodeSphere.mesh.position;
+      const sphereRadius = nodeSphere.mesh.getBoundingInfo().boundingBox.extendSize.length() / Math.sqrt(3);
+      const distanceToCenter = BABYLON.Vector3.Distance(nodePos, spherePos);
+
+      if (distanceToCenter < 0.1) continue;  // Too close to center, avoid singularity
+
+      // Direction from sphere center toward node
+      const direction = nodePos.subtract(spherePos).normalize();
+
+      // Target distance: sphere surface + margin
+      const targetDistance = sphereRadius + surfaceMargin;
+      const distanceToTarget = targetDistance - distanceToCenter;
+
+      if (Math.abs(distanceToTarget) > 0.1) {
+        // Apply attractive velocity toward target distance
+        layoutNode.velocity.x += direction.x * distanceToTarget * attractionStrength;
+        layoutNode.velocity.y += direction.y * distanceToTarget * attractionStrength;
+        layoutNode.velocity.z += direction.z * distanceToTarget * attractionStrength;
       }
     }
   }
