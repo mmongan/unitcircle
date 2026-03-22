@@ -38,6 +38,7 @@ export class VRSceneManager {
   private fileNodeIds: Map<string, Set<string>> = new Map();  // Map file names to their node IDs
   private graphNodeMap: Map<string, GraphNode> = new Map();  // Map node IDs to GraphNode data
   private fileBoxMeshes: Map<string, BABYLON.Mesh> = new Map();  // Map file names to their wireframe box meshes
+  private currentGraphData: GraphData | null = null;  // Store full graph data for edge material selection
   
   private physicsActive = false;
   private physicsIterationCount = 0;
@@ -572,6 +573,9 @@ export class VRSceneManager {
 
 
   public renderCodeGraph(graph: GraphData): void {
+    // Store the full graph data for use in edge material selection
+    this.currentGraphData = graph;
+    
     // Store all graph nodes
     for (const node of graph.nodes) {
       this.graphNodeMap.set(node.id, node);
@@ -1049,8 +1053,16 @@ export class VRSceneManager {
       return { from, to };
     });
     
+    // Build a map of node IDs to their exported status for edge material selection
+    const nodeExportedMap = new Map<string, boolean>();
+    if (this.currentGraphData && this.currentGraphData.nodes) {
+      for (const node of this.currentGraphData.nodes) {
+        nodeExportedMap.set(node.id, node.isExported || false);
+      }
+    }
+    
     // Create edges - they'll be positioned by updateEdges() in the physics loop
-    this.meshFactory.createEdges(graphEdges, new Map(), this.sceneRoot);
+    this.meshFactory.createEdges(graphEdges, new Map(), this.sceneRoot, nodeExportedMap);
   }
 
   /**

@@ -291,7 +291,8 @@ export class MeshFactory {
   createEdges(
     edges: Array<{ from: string; to: string }>,
     layoutNodes: Map<string, any>,
-    sceneRoot?: BABYLON.TransformNode
+    sceneRoot?: BABYLON.TransformNode,
+    nodeExportedMap?: Map<string, boolean>  // Map of node IDs to isExported status
   ): void {
     // Clear old edges
     for (const cylinder of this.edgeTubes.values()) {
@@ -308,6 +309,12 @@ export class MeshFactory {
     const crossFileEdgeMaterial = new BABYLON.StandardMaterial('crossFileEdgeMaterial', this.scene);
     crossFileEdgeMaterial.emissiveColor = new BABYLON.Color3(1.0, 0.84, 0.0);  // Golden
 
+    // Create material for exported function connections (glowing yellow)
+    const exportedEdgeMaterial = new BABYLON.StandardMaterial('exportedEdgeMaterial', this.scene);
+    exportedEdgeMaterial.emissiveColor = new BABYLON.Color3(1.0, 1.0, 0.0);  // Bright yellow
+    exportedEdgeMaterial.specularColor = new BABYLON.Color3(1.0, 1.0, 0.8);
+    exportedEdgeMaterial.specularPower = 32;
+
     // Create cylinder for each edge that will be repositioned each frame
     let edgeIndex = 0;
     for (const edge of edges) {
@@ -323,7 +330,17 @@ export class MeshFactory {
       const fromFile = edge.from.split('@')[1];
       const toFile = edge.to.split('@')[1];
       const isCrossFile = fromFile !== toFile;
-      const material = isCrossFile ? crossFileEdgeMaterial : samFileEdgeMaterial;
+      
+      // Check if the target node is an exported function
+      const isExportedConnection = nodeExportedMap && nodeExportedMap.get(edge.to);
+      
+      // Select material: exported connections get glowing yellow, otherwise use file-based material
+      let material = samFileEdgeMaterial;
+      if (isExportedConnection) {
+        material = exportedEdgeMaterial;
+      } else if (isCrossFile) {
+        material = crossFileEdgeMaterial;
+      }
 
       // Create a tall cylinder that will be scaled and rotated to connect the nodes
       const cylinder = BABYLON.MeshBuilder.CreateCylinder(`edge_${edgeIndex}`, {
