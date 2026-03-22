@@ -341,7 +341,9 @@ export class MeshFactory {
       // Find source surface intersection point via raycast
       const sourceMesh = this.nodeMeshes.get(edge.from);
       if (sourceMesh) {
-        const sourceRay = new BABYLON.Ray(sourceCenterPos, direction, distance);
+        // Ray length must extend beyond the mesh to guarantee intersection
+        const rayLength = distance * 1.5;
+        const sourceRay = new BABYLON.Ray(sourceCenterPos, direction, rayLength);
         const sourceHit = this.scene.pickWithRay(sourceRay, (mesh) => mesh === sourceMesh);
         if (sourceHit && sourceHit.hit && sourceHit.pickedPoint) {
           sourcePos = sourceHit.pickedPoint.clone();
@@ -352,7 +354,9 @@ export class MeshFactory {
       const targetMesh = this.nodeMeshes.get(edge.to);
       if (targetMesh) {
         const reverseDirection = direction.scale(-1);
-        const targetRay = new BABYLON.Ray(targetCenterPos, reverseDirection, distance);
+        // Ray length must extend beyond the mesh to guarantee intersection
+        const rayLength = distance * 1.5;
+        const targetRay = new BABYLON.Ray(targetCenterPos, reverseDirection, rayLength);
         const targetHit = this.scene.pickWithRay(targetRay, (mesh) => mesh === targetMesh);
         if (targetHit && targetHit.hit && targetHit.pickedPoint) {
           targetPos = targetHit.pickedPoint.clone();
@@ -483,7 +487,9 @@ export class MeshFactory {
       const distance = BABYLON.Vector3.Distance(sourceCenterPos, targetCenterPos);
 
       // Find source surface intersection point via raycast
-      const sourceRay = new BABYLON.Ray(sourceCenterPos, direction, distance);
+      // Ray length must extend beyond the mesh to guarantee intersection
+      const sourceRayLength = distance * 1.5;
+      const sourceRay = new BABYLON.Ray(sourceCenterPos, direction, sourceRayLength);
       const sourceHit = this.scene.pickWithRay(sourceRay, (mesh) => mesh === sourceMesh);
       if (sourceHit && sourceHit.hit && sourceHit.pickedPoint) {
         sourcePos = sourceHit.pickedPoint.clone();
@@ -491,7 +497,8 @@ export class MeshFactory {
 
       // Find target surface intersection point via raycast
       const reverseDirection = direction.scale(-1);
-      const targetRay = new BABYLON.Ray(targetCenterPos, reverseDirection, distance);
+      const targetRayLength = distance * 1.5;
+      const targetRay = new BABYLON.Ray(targetCenterPos, reverseDirection, targetRayLength);
       const targetHit = this.scene.pickWithRay(targetRay, (mesh) => mesh === targetMesh);
       if (targetHit && targetHit.hit && targetHit.pickedPoint) {
         targetPos = targetHit.pickedPoint.clone();
