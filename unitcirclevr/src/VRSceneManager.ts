@@ -19,6 +19,11 @@ export class VRSceneManager {
   private currentFunctionId: string | null = null;
   private currentFaceNormal: BABYLON.Vector3 | null = null;
   private xrExperience: BABYLON.WebXRDefaultExperience | null = null;
+  
+  // Flight controls
+  private flightSpeed = 100;  // Units per second
+  private keysPressed: Map<string, boolean> = new Map();
+  private isFlying = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.engine = new BABYLON.Engine(canvas, true);
@@ -49,6 +54,9 @@ export class VRSceneManager {
 
     // Handle window resize
     window.addEventListener('resize', () => this.engine.resize());
+
+    // Setup flight controls
+    this.setupFlightControls();
 
     // Setup single scene-level click handler
     this.setupClickHandler();
@@ -104,6 +112,77 @@ export class VRSceneManager {
   /**
    * Check if click is within 10% of a cube edge and return adjacent face normal if so
    */
+  /**
+   * Setup keyboard and mouse controls for free flight
+   */
+  private setupFlightControls(): void {
+    // Keyboard event listeners for WASD movement
+    document.addEventListener('keydown', (event) => {
+      const key = event.key.toLowerCase();
+      if (['w', 'a', 's', 'd', ' ', 'shift', 'control', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+        this.keysPressed.set(key, true);
+        this.isFlying = true;
+      }
+    });
+
+    document.addEventListener('keyup', (event) => {
+      const key = event.key.toLowerCase();
+      this.keysPressed.set(key, false);
+      // Stop flying if no keys are pressed
+      if ([...this.keysPressed.values()].every(v => !v)) {
+        this.isFlying = false;
+      }
+    });
+
+    // Update flight each frame
+    if (this.scene.registerBeforeRender) {
+      this.scene.registerBeforeRender(() => {
+        if (this.isFlying) {
+          this.updateFlight();
+        }
+      });
+    }
+  }
+
+  /**
+   * Update camera position based on keyboard input for free flight
+   */
+  private updateFlight(): void {
+    const deltaTime = this.engine.getDeltaTime() / 1000; // Convert to seconds
+    const distance = this.flightSpeed * deltaTime;
+
+    // Get camera direction vectors
+    const forward = this.camera.getDirection(BABYLON.Axis.Z);
+    const right = this.camera.getDirection(BABYLON.Axis.X);
+    const up = BABYLON.Axis.Y;
+
+    // Process keyboard input
+    if (this.keysPressed.get('w') || this.keysPressed.get('arrowup')) {
+      // Move forward
+      this.camera.position.addInPlace(forward.scale(distance));
+    }
+    if (this.keysPressed.get('s') || this.keysPressed.get('arrowdown')) {
+      // Move backward
+      this.camera.position.addInPlace(forward.scale(-distance));
+    }
+    if (this.keysPressed.get('a') || this.keysPressed.get('arrowleft')) {
+      // Move left
+      this.camera.position.addInPlace(right.scale(-distance));
+    }
+    if (this.keysPressed.get('d') || this.keysPressed.get('arrowright')) {
+      // Move right
+      this.camera.position.addInPlace(right.scale(distance));
+    }
+    if (this.keysPressed.get(' ')) {
+      // Move up
+      this.camera.position.addInPlace(up.scale(distance));
+    }
+    if (this.keysPressed.get('shift') || this.keysPressed.get('control')) {
+      // Move down
+      this.camera.position.addInPlace(up.scale(-distance));
+    }
+  }
+
   private getAdjacentFaceIfNearEdge(pickedPoint: BABYLON.Vector3, cubePosition: BABYLON.Vector3, faceNormal: BABYLON.Vector3): BABYLON.Vector3 | null {
     if (!pickedPoint) return null;
     
