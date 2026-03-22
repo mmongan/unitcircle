@@ -59,6 +59,7 @@ export class CodeTreeBuilder {
    * Build the code tree by analyzing all TypeScript files
    */
   public build(): CodeGraph {
+    // Clear all maps for fresh graph generation
     this.functions.clear();
     this.variables.clear();
     this.externalModules.clear();
@@ -66,10 +67,17 @@ export class CodeTreeBuilder {
 
     // Get all TypeScript files
     const files = this.getAllTypeScriptFiles(this.sourceDir);
+    
+    if (files.length === 0) {
+      throw new Error(`No TypeScript files found in ${this.sourceDir}`);
+    }
+
+    console.log(`📊 Scanning ${files.length} TypeScript files...`);
 
     // TWO-PASS APPROACH
     // Pass 1: Extract all function and variable declarations
     const sourceFiles: Array<{ filePath: string; sourceFile: ts.SourceFile; source: string }> = [];
+    const parseErrors: Array<{ filePath: string; error: string }> = [];
     
     for (const filePath of files) {
       try {
@@ -83,8 +91,18 @@ export class CodeTreeBuilder {
         sourceFiles.push({ filePath, sourceFile, source });
         this.visitDeclarations(sourceFile, filePath);
       } catch (error) {
-        console.warn(`Could not parse ${filePath}:`, error);
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        parseErrors.push({ filePath, error: errorMsg });
+        console.error(`❌ Failed to parse ${filePath}: ${errorMsg}`);
       }
+    }
+
+    // If critical files failed to parse, the graph is incomplete
+    if (parseErrors.length > 0) {
+      const errorSummary = parseErrors.map(e => `  - ${e.filePath}: ${e.error}`).join('\n');
+      throw new Error(
+        `Failed to parse ${parseErrors.length} file(s). Graph is incomplete:\n${errorSummary}`
+      );
     }
 
     // Pass 2: Extract all function calls
@@ -97,6 +115,9 @@ export class CodeTreeBuilder {
       ...Array.from(this.variables.values()),
       ...Array.from(this.externalModules.values())
     ];
+
+    console.log(`✓ Extracted ${this.functions.size} functions, ${this.variables.size} variables, ${this.externalModules.size} external modules`);
+    console.log(`✓ Identified ${this.calls.length} function calls`);
 
     return {
       nodes,

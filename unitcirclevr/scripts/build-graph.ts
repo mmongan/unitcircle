@@ -6,26 +6,55 @@ import { fileURLToPath } from 'url';
 import * as fs from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const srcDir = path.join(__dirname, '../src');
+const publicDir = path.join(__dirname, '../public');
 
-const builder = new CodeTreeBuilder(path.join(__dirname, '../src'));
-const graph = builder.build();
+// Ensure public directory exists
+if (!fs.existsSync(publicDir)) {
+  fs.mkdirSync(publicDir, { recursive: true });
+}
 
-// Add timestamp to ensure all updates are processed
-const timestamp = new Date().toISOString();
-graph.lastUpdated = timestamp;
+console.log('\n🔄 Building fresh code graph from source...\n');
 
-// Write to public folder
-const outputPath = path.join(__dirname, '../public/graph.json');
-fs.writeFileSync(outputPath, JSON.stringify(graph, null, 2));
+try {
+  // Build a fresh complete graph from current source
+  const builder = new CodeTreeBuilder(srcDir);
+  const graph = builder.build();
 
-console.log(`✓ Generated graph with ${graph.nodes.length} functions and ${graph.edges.length} calls`);
-console.log(`✓ Saved to ${outputPath}`);
+  // Validate graph completeness
+  if (!graph.nodes || graph.nodes.length === 0) {
+    throw new Error('Graph is empty - no code nodes were extracted');
+  }
 
-// Generate version/build timestamp
-const versionData = {
-  buildTime: timestamp,
-  buildTimestamp: Date.now()
-};
-const versionPath = path.join(__dirname, '../public/version.json');
-fs.writeFileSync(versionPath, JSON.stringify(versionData, null, 2));
-console.log(`✓ Build timestamp: ${timestamp}`);
+  if (!graph.edges) {
+    throw new Error('Graph edges are missing');
+  }
+
+  // Add timestamp to ensure all updates are processed
+  const timestamp = new Date().toISOString();
+  graph.lastUpdated = timestamp;
+
+  // Write graph.json (overwrite completely for fresh build)
+  const graphPath = path.join(publicDir, 'graph.json');
+  fs.writeFileSync(graphPath, JSON.stringify(graph, null, 2));
+  console.log(`✓ Generated graph with ${graph.nodes.length} nodes and ${graph.edges.length} edges`);
+  console.log(`✓ Saved to ${graphPath}`);
+
+  // Generate version/build timestamp
+  const versionData = {
+    buildTime: timestamp,
+    buildTimestamp: Date.now(),
+    graphNodes: graph.nodes.length,
+    graphEdges: graph.edges.length
+  };
+  const versionPath = path.join(publicDir, 'version.json');
+  fs.writeFileSync(versionPath, JSON.stringify(versionData, null, 2));
+  console.log(`✓ Build timestamp: ${timestamp}`);
+  
+  console.log('\n✅ Graph build complete and complete!\n');
+  process.exit(0);
+} catch (error) {
+  const errorMsg = error instanceof Error ? error.message : String(error);
+  console.error(`\n❌ Graph build failed: ${errorMsg}\n`);
+  process.exit(1);
+}

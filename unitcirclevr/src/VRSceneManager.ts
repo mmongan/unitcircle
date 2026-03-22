@@ -398,11 +398,12 @@ export class VRSceneManager {
 
   /**
    * Incrementally update the scene - only create/remove changed objects
+   * New nodes start at center and animate to their equilibrium position
    */
   private updateCodeGraph(graph: GraphData): void {
     this.validateGraphData(graph);
 
-    // Compute layout for all nodes
+    // Compute layout for all nodes to get equilibrium positions
     const edges = this.buildEdgeList(graph.edges);
     const layout = new ForceDirectedLayout(
       graph.nodes.map(n => n.id),
@@ -433,9 +434,9 @@ export class VRSceneManager {
       this.currentEdges.delete(edgePair);
     }
 
-    // Create only new nodes
+    // Create only new nodes - start at center and animate to equilibrium
     const newNodes = graph.nodes.filter(n => !this.currentNodeIds.has(n.id));
-    this.renderNodes(newNodes, layoutNodes, indegreeMap);
+    this.renderNodesWithAnimation(newNodes, layoutNodes, indegreeMap, true);  // animated=true
     newNodes.forEach(n => this.currentNodeIds.add(n.id));
 
     // Create only new edges
@@ -449,6 +450,69 @@ export class VRSceneManager {
       `✓ Updated code graph: ${removedNodeIds.length} removed, ${newNodes.length} created, ` +
       `${removedEdges.length} edges removed, ${newEdges.length} edges created`
     );
+  }
+
+  /**
+   * Render nodes with optional animation control
+   */
+  private renderNodesWithAnimation(
+    nodes: GraphNode[],
+    layoutNodes: Map<string, any>,
+    indegreeMap: Map<string, number> = new Map(),
+    animateFromCenter: boolean = false
+  ): void {
+    for (const node of nodes) {
+      const layoutNode = layoutNodes.get(node.id);
+      if (!layoutNode) continue;
+
+      const targetPosition = new BABYLON.Vector3(
+        layoutNode.position.x,
+        layoutNode.position.y,
+        layoutNode.position.z
+      );
+
+      // If animating from center (new nodes), add perpendicular jitter to target
+      if (animateFromCenter) {
+        const radiusDistance = BABYLON.Vector3.Distance(new BABYLON.Vector3(0, 0, 0), targetPosition);
+        if (radiusDistance > 0.1) {
+          // Calculate the radial direction (center to target)
+          const radialDirection = targetPosition.normalize();
+          
+          // Generate a random perpendicular vector
+          const perpendicular1 = this.getPerpendicularVector(radialDirection);
+          const perpendicular2 = BABYLON.Vector3.Cross(radialDirection, perpendicular1).normalize();
+          
+          // Random blend of the two perpendicular directions
+          const angle = Math.random() * Math.PI * 2;
+          const randomPerpendicular = perpendicular1
+            .scale(Math.cos(angle))
+            .add(perpendicular2.scale(Math.sin(angle)));
+          
+          // Add small jitter (about 5-15% of radius distance, max 2 units)
+          const jitterAmount = Math.min(2.0, radiusDistance * (0.05 + Math.random() * 0.1));
+          const jitterVector = randomPerpendicular.scale(jitterAmount);
+          
+          targetPosition.addInPlace(jitterVector);
+        }
+      }
+
+      // Get or generate color for this file
+      const fileColor = node.file ? this.getFileColor(node.file) : null;
+      const indegree = indegreeMap.get(node.id) || 0;
+
+      // Start position: center for new nodes, or target for existing nodes
+      const startPosition = animateFromCenter 
+        ? new BABYLON.Vector3(0, 0, 0) 
+        : targetPosition;
+
+      this.meshFactory.createNodeMesh(node, startPosition, fileColor, indegree, (mesh, material, n) => {
+        this.setupNodeInteraction(mesh, material, n);
+        // Only animate if starting from center (new nodes)
+        if (animateFromCenter) {
+          this.animateNodeToPosition(mesh, targetPosition, 4000);  // 4 second animation
+        }
+      });
+    }
   }
 
   /**
@@ -554,77 +618,8 @@ export class VRSceneManager {
     layoutNodes: Map<string, any>,
     indegreeMap: Map<string, number> = new Map()
   ): void {
-    for (const node of nodes) {
-      const layoutNode = layoutNodes.get(node.id);
-      if (!layoutNode) continue;
-
-      const targetPosition = new BABYLON.Vector3(
-        layoutNode.position.x,
-        layoutNode.position.y,
-        layoutNode.position.z
-      );
-
-      // Start nodes at center - will be animated to target position
-      const centerPosition = new BABYLON.Vector3(0, 0, 0);
-
-      // Add small random perpendicular motion to make expansion more organic
-      const radiusDistance = BABYLON.Vector3.Distance(centerPosition, targetPosition);
-      if (radiusDistance > 0.1) {
-        // Calculate the radial direction (center to target)
-        const radialDirection = targetPosition.subtract(centerPosition).normalize();
-        
-        // Generate a random perpendicular vector
-        const perpendicular1 = this.getPerpendicularVector(radialDirection);
-        const perpendicular2 = BABYLON.Vector3.Cross(radialDirection, perpendicular1).normalize();
-        
-        // Random blend of the two perpendicular directions
-        const angle = Math.random() * Math.PI * 2;
-        const randomPerpendicular = perpendicular1
-          .scale(Math.cos(angle))
-          .add(perpendicular2.scale(Math.sin(angle)));
-        
-        // Add small jitter (about 5-15% of radius distance, max 2 units)
-        const jitterAmount = Math.min(2.0, radiusDistance * (0.05 + Math.random() * 0.1));
-        const jitterVector = randomPerpendicular.scale(jitterAmount);
-        
-        targetPosition.addInPlace(jitterVector);
-      }
-
-      // Get or generate color for this file
-      const fileColor = node.file ? this.getFileColor(node.file) : null;
-      const indegree = indegreeMap.get(node.id) || 0;
-
-      this.meshFactory.createNodeMesh(node, centerPosition, fileColor, indegree, (mesh, material, n) => {
-        this.setupNodeInteraction(mesh, material, n);
-        // Animate the node to its target position with jitter
-        this.animateNodeToPosition(mesh, targetPosition, 4000);  // 4 second animation
-      });
-    }
-  }
-
-  /**
-   * Get a vector perpendicular to the given vector
-   */
-  private getPerpendicularVector(vector: BABYLON.Vector3): BABYLON.Vector3 {
-    // Find the axis least aligned with the vector
-    const absX = Math.abs(vector.x);
-    const absY = Math.abs(vector.y);
-    const absZ = Math.abs(vector.z);
-    
-    let perpendicular: BABYLON.Vector3;
-    if (absX < absY && absX < absZ) {
-      // X is smallest, use X axis
-      perpendicular = new BABYLON.Vector3(1, 0, 0);
-    } else if (absY < absZ) {
-      // Y is smallest, use Y axis
-      perpendicular = new BABYLON.Vector3(0, 1, 0);
-    } else {
-      // Z is smallest, use Z axis
-      perpendicular = new BABYLON.Vector3(0, 0, 1);
-    }
-    
-    // Cross product gives perpendicular vector
-    return BABYLON.Vector3.Cross(vector, perpendicular).normalize();
+    // Use the animated version for initial render as well
+    this.renderNodesWithAnimation(nodes, layoutNodes, indegreeMap, true);  // animated=true for initial load
   }
 
   /**
@@ -964,6 +959,25 @@ export class VRSceneManager {
         }
       }
     }
+  }
+
+  /**
+   * Generate a perpendicular vector to the given direction
+   * Used to create random jitter perpendicular to the radial direction
+   */
+  private getPerpendicularVector(direction: BABYLON.Vector3): BABYLON.Vector3 {
+    const upVector = new BABYLON.Vector3(0, 1, 0);
+    const normalizedDir = direction.normalize();
+    
+    // If direction is parallel to up vector, use a different reference
+    const dotProduct = BABYLON.Vector3.Dot(normalizedDir, upVector);
+    const refVector = Math.abs(dotProduct) > 0.9 
+      ? new BABYLON.Vector3(1, 0, 0)  // Use X axis if nearly parallel to Y
+      : upVector;
+    
+    // Cross product gives a perpendicular vector
+    const perpendicular = BABYLON.Vector3.Cross(normalizedDir, refVector);
+    return perpendicular.normalize();
   }
 
   public run(): void {
