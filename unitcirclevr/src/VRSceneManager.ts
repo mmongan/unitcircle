@@ -588,7 +588,11 @@ export class VRSceneManager {
     // Step 4: Render nodes at initial positions from their file's internal layout
     this.renderNodes(graph.nodes, indegreeMap);
 
-    // Step 5: Create edges
+    // Step 5: Populate edge list and create edges
+    this.currentEdges.clear();
+    for (const edge of graph.edges) {
+      this.currentEdges.add(`${edge.from}→${edge.to}`);
+    }
     this.renderEdges();
     this.meshFactory.updateEdges();
 
