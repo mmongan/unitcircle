@@ -124,7 +124,7 @@
       "id": "simulate@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "simulate",
       "file": "ForceDirectedLayout.ts",
-      "line": 72,
+      "line": 73,
       "isExported": false,
       "type": "function"
     },
@@ -132,7 +132,7 @@
       "id": "applyRepulsiveForce@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "applyRepulsiveForce",
       "file": "ForceDirectedLayout.ts",
-      "line": 136,
+      "line": 137,
       "isExported": false,
       "type": "function"
     },
@@ -140,7 +140,7 @@
       "id": "applyAttractiveForce@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "applyAttractiveForce",
       "file": "ForceDirectedLayout.ts",
-      "line": 169,
+      "line": 170,
       "isExported": false,
       "type": "function"
     },
@@ -148,7 +148,7 @@
       "id": "updateFrame@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "updateFrame",
       "file": "ForceDirectedLayout.ts",
-      "line": 211,
+      "line": 223,
       "isExported": false,
       "type": "function"
     },
@@ -156,7 +156,7 @@
       "id": "enforceEdgeMinimumDistance@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "enforceEdgeMinimumDistance",
       "file": "ForceDirectedLayout.ts",
-      "line": 277,
+      "line": 289,
       "isExported": false,
       "type": "function"
     },
@@ -164,7 +164,7 @@
       "id": "enforceAllPairsMinimumDistance@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "enforceAllPairsMinimumDistance",
       "file": "ForceDirectedLayout.ts",
-      "line": 332,
+      "line": 344,
       "isExported": false,
       "type": "function"
     },
@@ -172,7 +172,7 @@
       "id": "enforceFileCrossConstraint@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "enforceFileCrossConstraint",
       "file": "ForceDirectedLayout.ts",
-      "line": 389,
+      "line": 401,
       "isExported": false,
       "type": "function"
     },
@@ -180,7 +180,7 @@
       "id": "getNodes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "getNodes",
       "file": "ForceDirectedLayout.ts",
-      "line": 441,
+      "line": 453,
       "isExported": false,
       "type": "function"
     },
@@ -1412,5 +1412,5 @@
       "to": "render@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-22T13:48:31.762Z"
+  "lastUpdated": "2026-03-22T13:50:21.258Z"
 }
