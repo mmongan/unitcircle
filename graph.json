@@ -124,7 +124,7 @@
       "id": "simulate@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "simulate",
       "file": "ForceDirectedLayout.ts",
-      "line": 72,
+      "line": 79,
       "isExported": false,
       "type": "function"
     },
@@ -132,7 +132,7 @@
       "id": "applyRepulsiveForce@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "applyRepulsiveForce",
       "file": "ForceDirectedLayout.ts",
-      "line": 122,
+      "line": 129,
       "isExported": false,
       "type": "function"
     },
@@ -140,7 +140,7 @@
       "id": "applyAttractiveForce@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "applyAttractiveForce",
       "file": "ForceDirectedLayout.ts",
-      "line": 152,
+      "line": 159,
       "isExported": false,
       "type": "function"
     },
@@ -148,7 +148,7 @@
       "id": "updateFrame@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "updateFrame",
       "file": "ForceDirectedLayout.ts",
-      "line": 187,
+      "line": 194,
       "isExported": false,
       "type": "function"
     },
@@ -156,7 +156,7 @@
       "id": "enforceAllPairsMinimumDistance@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "enforceAllPairsMinimumDistance",
       "file": "ForceDirectedLayout.ts",
-      "line": 251,
+      "line": 258,
       "isExported": false,
       "type": "function"
     },
@@ -164,7 +164,7 @@
       "id": "enforceFileCrossConstraint@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "enforceFileCrossConstraint",
       "file": "ForceDirectedLayout.ts",
-      "line": 308,
+      "line": 315,
       "isExported": false,
       "type": "function"
     },
@@ -172,7 +172,7 @@
       "id": "getNodes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "name": "getNodes",
       "file": "ForceDirectedLayout.ts",
-      "line": 360,
+      "line": 367,
       "isExported": false,
       "type": "function"
     },
@@ -1352,5 +1352,5 @@
       "to": "render@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-23T00:21:52.539Z"
+  "lastUpdated": "2026-03-23T00:24:16.476Z"
 }
