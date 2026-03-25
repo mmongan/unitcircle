@@ -1087,7 +1087,7 @@ export class VRSceneManager {
    * Auto-size file boxes to fit their child nodes based on actual mesh bounds
    */
   private autosizeFileBoxes(): void {
-    for (const [file, fileBox] of this.fileBoxMeshes.entries()) {
+    for (const fileBox of this.fileBoxMeshes.values()) {
       // Get all children of this file box
       const children = fileBox.getChildren();
       
