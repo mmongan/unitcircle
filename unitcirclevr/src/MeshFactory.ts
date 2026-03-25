@@ -144,8 +144,8 @@ export class MeshFactory {
     material.specularPower = 16;
     material.wireframe = false;
     
-    // Make cube faces transparent
-    material.alpha = 0.7;
+    // Hide cube faces (fully transparent)
+    material.alpha = 0;
     material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
 
     box.material = material;
@@ -304,16 +304,22 @@ export class MeshFactory {
     // Create material for same-file edges
     const samFileEdgeMaterial = new BABYLON.StandardMaterial('sameFileEdgeMaterial', this.scene);
     samFileEdgeMaterial.emissiveColor = new BABYLON.Color3(0.8, 0.8, 0.8);  // Gray
+    samFileEdgeMaterial.alpha = 0;  // Hidden
+    samFileEdgeMaterial.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
 
     // Create material for cross-file edges
     const crossFileEdgeMaterial = new BABYLON.StandardMaterial('crossFileEdgeMaterial', this.scene);
     crossFileEdgeMaterial.emissiveColor = new BABYLON.Color3(1.0, 0.84, 0.0);  // Golden
+    crossFileEdgeMaterial.alpha = 0;  // Hidden
+    crossFileEdgeMaterial.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
 
     // Create material for exported function connections (glowing yellow)
     const exportedEdgeMaterial = new BABYLON.StandardMaterial('exportedEdgeMaterial', this.scene);
     exportedEdgeMaterial.emissiveColor = new BABYLON.Color3(1.0, 1.0, 0.0);  // Bright yellow
     exportedEdgeMaterial.specularColor = new BABYLON.Color3(1.0, 1.0, 0.8);
     exportedEdgeMaterial.specularPower = 32;
+    exportedEdgeMaterial.alpha = 0;  // Hidden
+    exportedEdgeMaterial.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
 
     // Create cylinder for each edge that will be repositioned each frame
     let edgeIndex = 0;
