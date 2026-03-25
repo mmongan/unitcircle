@@ -593,6 +593,9 @@ export class VRSceneManager {
     // Nodes will be parented to their file boxes for automatic movement
     this.renderNodes(graph.nodes, indegreeMap);
 
+    // Step 6.5: Auto-size file boxes to fit their child nodes
+    this.autosizeFileBoxes();
+
     // Step 7: Populate edge list and create edges
     this.currentEdges.clear();
     for (const edge of graph.edges) {
@@ -1078,6 +1081,66 @@ export class VRSceneManager {
     const boxSize = Math.max(120.0, maxDim + padding);  // Minimum 120 units
 
     return boxSize;
+  }
+
+  /**
+   * Auto-size file boxes to fit their child nodes based on actual mesh bounds
+   */
+  private autosizeFileBoxes(): void {
+    for (const [file, fileBox] of this.fileBoxMeshes.entries()) {
+      // Get all children of this file box
+      const children = fileBox.getChildren();
+      
+      if (children.length === 0) {
+        // No children, use minimum size
+        fileBox.scaling = new BABYLON.Vector3(120, 120, 120);
+        continue;
+      }
+
+      // Calculate bounding box of all children
+      let minX = Infinity, maxX = -Infinity;
+      let minY = Infinity, maxY = -Infinity;
+      let minZ = Infinity, maxZ = -Infinity;
+
+      for (const child of children) {
+        const mesh = child as BABYLON.Mesh;
+        if (!mesh.getBoundingInfo) continue;
+
+        const boundingBox = mesh.getBoundingInfo().boundingBox;
+        const childMin = boundingBox.minimumWorld;
+        const childMax = boundingBox.maximumWorld;
+
+        // Convert world coords to local coords relative to file box
+        const localMin = BABYLON.Vector3.TransformCoordinates(
+          childMin,
+          BABYLON.Matrix.Invert(fileBox.getWorldMatrix())
+        );
+        const localMax = BABYLON.Vector3.TransformCoordinates(
+          childMax,
+          BABYLON.Matrix.Invert(fileBox.getWorldMatrix())
+        );
+
+        minX = Math.min(minX, localMin.x, localMax.x);
+        maxX = Math.max(maxX, localMin.x, localMax.x);
+        minY = Math.min(minY, localMin.y, localMax.y);
+        maxY = Math.max(maxY, localMin.y, localMax.y);
+        minZ = Math.min(minZ, localMin.z, localMax.z);
+        maxZ = Math.max(maxZ, localMin.z, localMax.z);
+      }
+
+      // Calculate dimensions
+      const width = maxX === -Infinity ? 120 : maxX - minX;
+      const height = maxY === -Infinity ? 120 : maxY - minY;
+      const depth = maxZ === -Infinity ? 120 : maxZ - minZ;
+
+      // Use maximum dimension for uniform cube
+      const maxDim = Math.max(width, height, depth);
+      const padding = 30.0;  // Extra space around nodes
+      const boxSize = Math.max(120.0, maxDim + padding);
+
+      // Apply scaling to unit box
+      fileBox.scaling = new BABYLON.Vector3(boxSize, boxSize, boxSize);
+    }
   }
 
   private renderEdges(): void {
