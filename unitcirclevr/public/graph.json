@@ -5,7 +5,7 @@
       "name": "parseSourceFiles",
       "file": "CodeParser.ts",
       "line": 20,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -125,7 +125,7 @@
       "name": "simulate",
       "file": "ForceDirectedLayout.ts",
       "line": 79,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -149,7 +149,7 @@
       "name": "updateFrame",
       "file": "ForceDirectedLayout.ts",
       "line": 194,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -173,7 +173,7 @@
       "name": "getNodes",
       "file": "ForceDirectedLayout.ts",
       "line": 367,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -181,7 +181,7 @@
       "name": "checkForUpdates",
       "file": "GraphLoader.ts",
       "line": 20,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -189,7 +189,7 @@
       "name": "loadGraph",
       "file": "GraphLoader.ts",
       "line": 47,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -197,7 +197,7 @@
       "name": "getCachedGraph",
       "file": "GraphLoader.ts",
       "line": 86,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -205,7 +205,7 @@
       "name": "shouldPoll",
       "file": "GraphLoader.ts",
       "line": 93,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -213,7 +213,7 @@
       "name": "setPollInterval",
       "file": "GraphLoader.ts",
       "line": 101,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -221,7 +221,7 @@
       "name": "loadGraph",
       "file": "GraphViewer.ts",
       "line": 58,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -229,7 +229,7 @@
       "name": "search",
       "file": "GraphViewer.ts",
       "line": 78,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -237,7 +237,7 @@
       "name": "filterByType",
       "file": "GraphViewer.ts",
       "line": 86,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -253,7 +253,7 @@
       "name": "getStats",
       "file": "GraphViewer.ts",
       "line": 131,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -261,7 +261,7 @@
       "name": "findCallsFrom",
       "file": "GraphViewer.ts",
       "line": 156,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -269,7 +269,7 @@
       "name": "findCallsTo",
       "file": "GraphViewer.ts",
       "line": 164,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -277,7 +277,7 @@
       "name": "getNode",
       "file": "GraphViewer.ts",
       "line": 172,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -421,7 +421,7 @@
       "name": "createNodeMesh",
       "file": "MeshFactory.ts",
       "line": 21,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -469,7 +469,7 @@
       "name": "createEdges",
       "file": "MeshFactory.ts",
       "line": 291,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -477,7 +477,7 @@
       "name": "removeMeshReference",
       "file": "MeshFactory.ts",
       "line": 377,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -485,7 +485,7 @@
       "name": "updateEdges",
       "file": "MeshFactory.ts",
       "line": 386,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -493,7 +493,7 @@
       "name": "loadGraph",
       "file": "VRGraphViewer.ts",
       "line": 58,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -509,7 +509,7 @@
       "name": "run",
       "file": "VRGraphViewer.ts",
       "line": 86,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -517,7 +517,7 @@
       "name": "dispose",
       "file": "VRGraphViewer.ts",
       "line": 93,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -525,7 +525,7 @@
       "name": "refreshGraph",
       "file": "VRGraphViewer.ts",
       "line": 100,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -533,7 +533,7 @@
       "name": "getGraphData",
       "file": "VRGraphViewer.ts",
       "line": 109,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -541,7 +541,7 @@
       "name": "getOriginalGraphData",
       "file": "VRGraphViewer.ts",
       "line": 116,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -549,7 +549,7 @@
       "name": "getNodeCount",
       "file": "VRGraphViewer.ts",
       "line": 123,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -557,7 +557,7 @@
       "name": "getEdgeCount",
       "file": "VRGraphViewer.ts",
       "line": 131,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -565,7 +565,7 @@
       "name": "showNodeTypes",
       "file": "VRGraphViewer.ts",
       "line": 140,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -573,7 +573,7 @@
       "name": "showExportedOnly",
       "file": "VRGraphViewer.ts",
       "line": 162,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -581,7 +581,7 @@
       "name": "showAll",
       "file": "VRGraphViewer.ts",
       "line": 183,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -589,7 +589,7 @@
       "name": "getStats",
       "file": "VRGraphViewer.ts",
       "line": 192,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -597,7 +597,7 @@
       "name": "getNode",
       "file": "VRGraphViewer.ts",
       "line": 217,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -605,7 +605,7 @@
       "name": "findCallsFrom",
       "file": "VRGraphViewer.ts",
       "line": 225,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -613,7 +613,7 @@
       "name": "findCallsTo",
       "file": "VRGraphViewer.ts",
       "line": 233,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -621,7 +621,7 @@
       "name": "isReady",
       "file": "VRGraphViewer.ts",
       "line": 241,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -677,7 +677,7 @@
       "name": "initialize",
       "file": "VRSceneManager.ts",
       "line": 357,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -757,7 +757,7 @@
       "name": "renderCodeGraph",
       "file": "VRSceneManager.ts",
       "line": 531,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -901,7 +901,7 @@
       "name": "run",
       "file": "VRSceneManager.ts",
       "line": 1232,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -909,7 +909,7 @@
       "name": "dispose",
       "file": "VRSceneManager.ts",
       "line": 1240,
-      "isExported": false,
+      "isExported": true,
       "type": "function"
     },
     {
@@ -1372,5 +1372,5 @@
       "to": "render@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-25T01:37:32.283Z"
+  "lastUpdated": "2026-03-25T01:42:19.898Z"
 }

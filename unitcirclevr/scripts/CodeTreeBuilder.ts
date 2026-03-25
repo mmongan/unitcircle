@@ -210,7 +210,11 @@ export class CodeTreeBuilder {
       const methodName = (node.name as any).text;
       const lineNumber = this.getLineNumber(node, filePath);
       const id = `${methodName}@${filePath}`;
-      const isExported = node.modifiers?.some(mod => mod.kind === ts.SyntaxKind.ExportKeyword) ?? false;
+      // Method is exported if it has export modifier OR if its parent class is exported
+      const hasExportModifier = node.modifiers?.some(mod => mod.kind === ts.SyntaxKind.ExportKeyword) ?? false;
+      const isPublicOrDefault = !node.modifiers?.some(mod => mod.kind === ts.SyntaxKind.PrivateKeyword) ?? true;
+      const parentClassExported = this.isMethodInExportedClass(node);
+      const isExported = hasExportModifier || (parentClassExported && isPublicOrDefault);
 
       this.functions.set(id, {
         id,
@@ -227,7 +231,11 @@ export class CodeTreeBuilder {
       const methodName = node.name.text;
       const lineNumber = this.getLineNumber(node, filePath);
       const id = `${methodName}@${filePath}`;
-      const isExported = node.modifiers?.some(mod => mod.kind === ts.SyntaxKind.ExportKeyword) ?? false;
+      // Property is exported if it has export modifier OR if its parent class is exported
+      const hasExportModifier = node.modifiers?.some(mod => mod.kind === ts.SyntaxKind.ExportKeyword) ?? false;
+      const isPublicOrDefault = !node.modifiers?.some(mod => mod.kind === ts.SyntaxKind.PrivateKeyword) ?? true;
+      const parentClassExported = this.isMethodInExportedClass(node);
+      const isExported = hasExportModifier || (parentClassExported && isPublicOrDefault);
 
       this.functions.set(id, {
         id,
@@ -241,6 +249,21 @@ export class CodeTreeBuilder {
 
     // Recurse through children
     ts.forEachChild(node, (child) => this.visitDeclarations(child, filePath));
+  }
+
+  /**
+   * Check if a method/property is inside an exported class
+   */
+  private isMethodInExportedClass(node: ts.Node): boolean {
+    let current = node.parent;
+    while (current) {
+      if (ts.isClassDeclaration(current)) {
+        const hasExportModifier = current.modifiers?.some(mod => mod.kind === ts.SyntaxKind.ExportKeyword) ?? false;
+        return hasExportModifier;
+      }
+      current = current.parent;
+    }
+    return false;
   }
 
   private visitCalls(node: ts.Node, filePath: string): void {
