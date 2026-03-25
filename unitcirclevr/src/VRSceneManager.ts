@@ -721,7 +721,17 @@ export class VRSceneManager {
         if (file !== 'external') {
           const fileBox = this.fileBoxMeshes.get(file);
           if (fileBox) {
+            // Save the world position before parenting
+            const worldPos = mesh.position.clone();
+            // Parent to the file box
             mesh.parent = fileBox;
+            // Convert world position to local position relative to the parent
+            // This ensures the node maintains its correct world position but is now positioned relative to the parent
+            const localPos = BABYLON.Vector3.TransformCoordinates(
+              worldPos,
+              BABYLON.Matrix.Invert(fileBox.getWorldMatrix())
+            );
+            mesh.position = localPos;
           }
         }
       });
