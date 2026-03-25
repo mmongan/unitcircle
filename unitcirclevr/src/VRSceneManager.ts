@@ -42,6 +42,7 @@ export class VRSceneManager {
   
   private physicsActive = false;
   private physicsIterationCount = 0;
+  private physicsLoopInitialized = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.engine = new BABYLON.Engine(canvas, true);
@@ -207,6 +208,11 @@ export class VRSceneManager {
    * Level 2: File-internal layouts position nodes within their boxes
    */
   private setupPhysicsLoop(): void {
+    if (this.physicsLoopInitialized) {
+      return;
+    }
+    this.physicsLoopInitialized = true;
+
     if (this.scene.registerBeforeRender) {
       this.scene.registerBeforeRender(() => {
         if (this.physicsActive && this.fileLayout && this.fileInternalLayouts.size > 0) {
@@ -240,6 +246,25 @@ export class VRSceneManager {
           
           // Step 3b: Apply repulsive forces to prevent file box intersections
           this.applyFileBoxRepulsion(this.fileLayout);
+
+          // Step 3c: Enforce deterministic non-overlap each frame so boxes
+          // cannot remain interpenetrating under ongoing layout forces.
+          this.resolveInitialFileBoxOverlaps(4);
+
+          // Step 3d: Enforce a minimum surface gap between file boxes.
+          this.enforceMinimumFileBoxGap(10.0, 4);
+
+          // Re-apply file box transforms after collision resolution so visual meshes
+          // immediately match corrected file-level positions in the same frame.
+          for (const [file, fileBox] of this.fileBoxMeshes.entries()) {
+            const fileNode = filePositions.get(file);
+            if (!fileNode) {
+              continue;
+            }
+            fileBox.position.x = fileNode.position.x;
+            fileBox.position.y = fileNode.position.y;
+            fileBox.position.z = fileNode.position.z;
+          }
           
           // Step 4: Update edge cylinders to follow moving nodes
           this.meshFactory.updateEdges();
@@ -529,36 +554,79 @@ export class VRSceneManager {
 
 
   public renderCodeGraph(graph: GraphData): void {
-    // Store the full graph data for use in edge material selection
+    this.prepareRenderState(graph);
+
+    const fileMap = this.buildFileNodeMaps(graph);
+    this.createAndSettleInternalLayouts(graph, fileMap);
+
+    const indegreeMap = this.calculateIndegree(graph.edges);
+    this.renderFileBoxes();
+
+    const files = this.createAndSettleFileLevelLayout(graph, fileMap);
+    this.applyFileLayoutPositions();
+
+    this.renderNodes(graph.nodes, indegreeMap);
+    this.fitAndSeparateFileBoxes();
+
+    this.populateCurrentEdges(graph);
+    this.resolveEdgeObstructions(30);
+    this.placeExportedFunctionsOnOptimalFace();
+    this.pullInternalNodesToExportedFace();
+    this.resolveNodeEdgeObstructions(20);
+    this.resolveExportedFaceEdgeObstructions(15);
+
+    this.frameCameraToExportedFunctions();
+    this.renderEdges();
+    this.meshFactory.updateEdges();
+
+    this.physicsActive = false;
+    this.physicsIterationCount = 0;
+    this.setupPhysicsLoop();
+
+    console.log(`✓ Rendered code graph with ${graph.nodes.length} functions in ${files.length} files and ${graph.edges.length} calls`);
+  }
+
+  private prepareRenderState(graph: GraphData): void {
+    // Always start new graph renders from the world origin so objects are not
+    // biased by any prior camera-follow animation offsets.
+    this.sceneRoot.position = BABYLON.Vector3.Zero();
+    this.currentFunctionId = null;
+    this.currentFaceNormal = null;
+    this.isAnimating = false;
+
     this.currentGraphData = graph;
-    
-    // Store all graph nodes
+    this.graphNodeMap.clear();
     for (const node of graph.nodes) {
       this.graphNodeMap.set(node.id, node);
     }
+  }
 
-    // Build file map for layout creation
+  private buildFileNodeMaps(graph: GraphData): Map<string, string> {
     const fileMap = new Map<string, string>();
     for (const node of graph.nodes) {
-      if (node.file) {
-        fileMap.set(node.id, node.file);
-        this.nodeToFile.set(node.id, node.file);
-        if (!this.fileNodeIds.has(node.file)) {
-          this.fileNodeIds.set(node.file, new Set());
-        }
-        this.fileNodeIds.get(node.file)!.add(node.id);
+      if (!node.file) {
+        continue;
       }
-    }
 
-    // Step 1: Create file-internal layouts for each file
+      fileMap.set(node.id, node.file);
+      this.nodeToFile.set(node.id, node.file);
+
+      if (!this.fileNodeIds.has(node.file)) {
+        this.fileNodeIds.set(node.file, new Set());
+      }
+      this.fileNodeIds.get(node.file)!.add(node.id);
+    }
+    return fileMap;
+  }
+
+  private createAndSettleInternalLayouts(graph: GraphData, fileMap: Map<string, string>): void {
     const allEdges = this.buildEdgeList(graph.edges);
     for (const [file, nodeIds] of this.fileNodeIds.entries()) {
       const nodeArray = Array.from(nodeIds);
-      // Filter edges to only those within this file
-      const sameFileEdges = allEdges.filter(e => 
+      const sameFileEdges = allEdges.filter(e =>
         nodeIds.has(e.source) && nodeIds.has(e.target)
       );
-      
+
       const internalLayout = new ForceDirectedLayout(
         nodeArray,
         sameFileEdges,
@@ -567,49 +635,60 @@ export class VRSceneManager {
       this.fileInternalLayouts.set(file, internalLayout);
     }
 
-    // Step 2: Simulate internal layouts to convergence to get final node positions
-    // This allows us to calculate accurate file box sizes based on actual node bounds
     for (const internalLayout of this.fileInternalLayouts.values()) {
-      internalLayout.simulate(500);  // Run full simulation to convergence
+      internalLayout.simulate(500);
     }
 
-    // Step 3: Calculate indegree for visualization
-    const indegreeMap = this.calculateIndegree(graph.edges);
+    this.recenterInternalLayouts();
+  }
 
-    // Step 4: Create file box outlines FIRST (before nodes)
-    // Now with accurate sizes based on laid-out nodes
-    this.renderFileBoxes();
-
-    // Step 5: Create file-level layout AFTER file boxes exist (so we know file sizes)
-    // Files are positioned by cross-file reference edges
+  private createAndSettleFileLevelLayout(graph: GraphData, fileMap: Map<string, string>): string[] {
     const files = Array.from(this.fileNodeIds.keys());
     const crossFileEdges = this.buildCrossFileEdges(graph.edges, fileMap);
+
     console.log(`📍 File-level layout: ${files.length} files, ${crossFileEdges.length} cross-file edges`);
     console.log(`   Files: ${files.join(', ')}`);
     console.log(`   Cross-file edges: ${crossFileEdges.map(e => `${e.source}->${e.target}`).join(', ')}`);
+
     this.fileLayout = new ForceDirectedLayout(files, crossFileEdges);
+    this.fileLayout.simulate(600);
+    return files;
+  }
 
-    // Step 6: Render nodes at initial positions from their file's internal layout
-    // Nodes will be parented to their file boxes for automatic movement
-    this.renderNodes(graph.nodes, indegreeMap);
+  private applyFileLayoutPositions(): void {
+    if (!this.fileLayout) {
+      return;
+    }
 
-    // Step 6.5: Auto-size file boxes to fit their child nodes
+    const initialFilePositions = this.fileLayout.getNodes();
+    for (const [file, fileBox] of this.fileBoxMeshes.entries()) {
+      const fileNode = initialFilePositions.get(file);
+      if (!fileNode) {
+        continue;
+      }
+      fileBox.position.x = fileNode.position.x;
+      fileBox.position.y = fileNode.position.y;
+      fileBox.position.z = fileNode.position.z;
+    }
+  }
+
+  private fitAndSeparateFileBoxes(): void {
     this.autosizeFileBoxes();
+    this.ensureExportedFunctionsParentedToFileBoxes();
+    this.clampNodesInsideFileBoxes();
 
-    // Step 7: Populate edge list and create edges
+    this.positionFileBoxesInGrid();
+
+    // Always resolve collisions immediately after any resize/reposition.
+    this.resolveInitialFileBoxOverlaps(6);
+    this.enforceMinimumFileBoxGap(10.0, 6);
+  }
+
+  private populateCurrentEdges(graph: GraphData): void {
     this.currentEdges.clear();
     for (const edge of graph.edges) {
       this.currentEdges.add(`${edge.from}→${edge.to}`);
     }
-    this.renderEdges();
-    this.meshFactory.updateEdges();
-
-    // Step 5: Start physics updates
-    this.physicsActive = true;
-    this.physicsIterationCount = 0;
-    this.setupPhysicsLoop();
-
-    console.log(`✓ Rendered code graph with ${graph.nodes.length} functions in ${files.length} files and ${graph.edges.length} calls`);
   }
 
   /**
@@ -686,12 +765,19 @@ export class VRSceneManager {
     nodes: GraphNode[],
     indegreeMap: Map<string, number> = new Map()
   ): void {
+    const isFunctionNode = (node: GraphNode): boolean => node.type !== 'variable' && node.type !== 'external';
+
+    let functionRenderCount = 0;
+
     for (const node of nodes) {
+      if (!isFunctionNode(node)) {
+        continue;
+      }
+
       const file = node.file || 'external';
       const fileLayout = this.fileInternalLayouts.get(file);
-      
-      // Get position from file's internal layout (local position relative to file box)
-      let position: BABYLON.Vector3;
+
+      let position = BABYLON.Vector3.Zero();
       if (fileLayout) {
         const layoutNode = fileLayout.getNodes().get(node.id);
         if (layoutNode) {
@@ -700,11 +786,7 @@ export class VRSceneManager {
             layoutNode.position.y,
             layoutNode.position.z
           );
-        } else {
-          position = BABYLON.Vector3.Zero();
         }
-      } else {
-        position = BABYLON.Vector3.Zero();
       }
 
       // Get or generate color for this file
@@ -713,29 +795,46 @@ export class VRSceneManager {
 
       this.meshFactory.createNodeMesh(node, position, fileColor, indegree, (mesh, material, n) => {
         this.setupNodeInteraction(mesh, material, n);
+
+        // Ensure exported functions are visibly rendered from first frame.
+        if (n.type === 'function' && n.isExported) {
+          mesh.isVisible = true;
+          mesh.setEnabled(true);
+          material.alpha = 1.0;
+          material.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
+          material.disableLighting = true;
+          material.emissiveColor = new BABYLON.Color3(0.95, 0.95, 1.0);
+        }
+
         // Track mesh for physics updates
         this.nodeMeshMap.set(node.id, mesh);
         
-        // Parent node to its file box for automatic movement
-        // This ensures nodes move with their file when file positions change
-        if (file !== 'external') {
-          const fileBox = this.fileBoxMeshes.get(file);
-          if (fileBox) {
-            // Save the world position before parenting
-            const worldPos = mesh.position.clone();
-            // Parent to the file box
-            mesh.parent = fileBox;
-            // Convert world position to local position relative to the parent
-            // This ensures the node maintains its correct world position but is now positioned relative to the parent
-            const localPos = BABYLON.Vector3.TransformCoordinates(
-              worldPos,
-              BABYLON.Matrix.Invert(fileBox.getWorldMatrix())
-            );
-            mesh.position = localPos;
-          }
+        // Parent function nodes to their file box and keep local placement.
+        const fileBox = this.fileBoxMeshes.get(file);
+        if (fileBox) {
+          mesh.parent = fileBox;
+          mesh.position = position.clone();
+          this.applyChildScaleCompensation(mesh, fileBox);
+        } else {
+          mesh.parent = this.sceneRoot;
+          mesh.position = position.clone();
         }
+
+        functionRenderCount++;
       });
     }
+
+    console.log(`📦 Rendered function boxes: ${functionRenderCount}`);
+  }
+
+  /**
+   * Keep child mesh world scale stable when parent file boxes are resized.
+   */
+  private applyChildScaleCompensation(child: BABYLON.Mesh, fileBox: BABYLON.Mesh): void {
+    const safeX = Math.max(0.0001, fileBox.scaling.x);
+    const safeY = Math.max(0.0001, fileBox.scaling.y);
+    const safeZ = Math.max(0.0001, fileBox.scaling.z);
+    child.scaling = new BABYLON.Vector3(1 / safeX, 1 / safeY, 1 / safeZ);
   }
 
   private setupNodeInteraction(
@@ -941,7 +1040,7 @@ export class VRSceneManager {
 
     const files = Array.from(this.fileNodeIds.keys());
     const fileNodes = layout.getNodes();
-    const minSeparationPadding = 200.0;  // Reduced back since files now spread naturally without spring forces
+    const minSeparationPadding = 10.0;
 
     // Check all pairs of files for intersection
     for (let i = 0; i < files.length; i++) {
@@ -957,59 +1056,370 @@ export class VRSceneManager {
         const box2 = this.fileBoxMeshes.get(file2);
         if (!box1 || !box2) continue;
 
-        // Calculate bounding sphere radii using diagonal distance from center to corner
-        // For a box with dimensions (x, y, z), radius = sqrt(x² + y² + z²) / 2
-        const radius1 = Math.sqrt(box1.scaling.x ** 2 + box1.scaling.y ** 2 + box1.scaling.z ** 2) / 2;
-        const radius2 = Math.sqrt(box2.scaling.x ** 2 + box2.scaling.y ** 2 + box2.scaling.z ** 2) / 2;
+        // Use per-axis half extents so resized (non-uniform) file boxes are separated accurately.
+        const half1 = {
+          x: box1.scaling.x / 2,
+          y: box1.scaling.y / 2,
+          z: box1.scaling.z / 2
+        };
+        const half2 = {
+          x: box2.scaling.x / 2,
+          y: box2.scaling.y / 2,
+          z: box2.scaling.z / 2
+        };
 
-        const pos1 = new BABYLON.Vector3(node1.position.x, node1.position.y, node1.position.z);
-        const pos2 = new BABYLON.Vector3(node2.position.x, node2.position.y, node2.position.z);
-        const distance = BABYLON.Vector3.Distance(pos1, pos2);
+        const dx = node2.position.x - node1.position.x;
+        const dy = node2.position.y - node1.position.y;
+        const dz = node2.position.z - node1.position.z;
 
-        // Required distance to prevent intersection with padding
-        const requiredDistance = radius1 + radius2 + minSeparationPadding;
+        const reqX = half1.x + half2.x + minSeparationPadding;
+        const reqY = half1.y + half2.y + minSeparationPadding;
+        const reqZ = half1.z + half2.z + minSeparationPadding;
 
-        // Apply repulsive velocity BEFORE boxes get too close (proactive, not reactive)
-        // This prevents jitter by gently pushing apart rather than snapping apart
-        if (distance < requiredDistance && distance > 0.1) {
-          const direction = pos2.subtract(pos1).normalize();
-          const tooCloseFactor = 1.0 - (distance / requiredDistance);  // 0 when at required distance, 1 when touching
-          
-          // Debug on early iterations
-          if (this.physicsIterationCount < 3) {
-            console.log(`  🔄 Collision: ${file1} <-> ${file2}: dist=${distance.toFixed(1)}, required=${requiredDistance.toFixed(1)}, factor=${tooCloseFactor.toFixed(3)}`);
+        const overlapX = reqX - Math.abs(dx);
+        const overlapY = reqY - Math.abs(dy);
+        const overlapZ = reqZ - Math.abs(dz);
+
+        // Collision only if overlaps exist on all three axes.
+        if (overlapX > 0 && overlapY > 0 && overlapZ > 0) {
+          // Push along the axis with smallest penetration to resolve quickly and stably.
+          let axis: 'x' | 'y' | 'z' = 'x';
+          let penetration = overlapX;
+          if (overlapY < penetration) {
+            axis = 'y';
+            penetration = overlapY;
           }
-          
-          // Strong proactive velocity-based repulsion that increases as boxes get closer
-          // Use a much higher repulsion strength to overcome attractive forces and larger box sizes
-          const repulsionStrength = 2500.0 * tooCloseFactor;  // Reduced back now that springs are weaker
-          
-          const repulsionVelocity1 = direction.scale(-repulsionStrength);
-          node1.velocity.x += repulsionVelocity1.x;
-          node1.velocity.y += repulsionVelocity1.y;
-          node1.velocity.z += repulsionVelocity1.z;
-          
-          const repulsionVelocity2 = direction.scale(repulsionStrength);
-          node2.velocity.x += repulsionVelocity2.x;
-          node2.velocity.y += repulsionVelocity2.y;
-          node2.velocity.z += repulsionVelocity2.z;
-          
-          // If boxes are actually overlapping (not just close), apply a HARD constraint as safety net
-          const actualOverlap = distance < (radius1 + radius2);
-          if (actualOverlap) {
-            // Minimal hard push just to prevent penetration
-            const overlapAmount = (radius1 + radius2) - distance;
-            const safeguardMove = overlapAmount + 1.0;  // Move by overlap amount plus small buffer
-            
-            node1.position.x -= direction.x * safeguardMove;
-            node1.position.y -= direction.y * safeguardMove;
-            node1.position.z -= direction.z * safeguardMove;
-            
-            node2.position.x += direction.x * safeguardMove;
-            node2.position.y += direction.y * safeguardMove;
-            node2.position.z += direction.z * safeguardMove;
+          if (overlapZ < penetration) {
+            axis = 'z';
+            penetration = overlapZ;
+          }
+
+          const sign = axis === 'x'
+            ? (dx >= 0 ? 1 : -1)
+            : axis === 'y'
+              ? (dy >= 0 ? 1 : -1)
+              : (dz >= 0 ? 1 : -1);
+
+          const correction = (penetration / 2) + 0.5;
+          const repulsionStrength = Math.max(500, penetration * 40);
+
+          if (axis === 'x') {
+            node1.position.x -= sign * correction;
+            node2.position.x += sign * correction;
+            node1.velocity.x -= sign * repulsionStrength;
+            node2.velocity.x += sign * repulsionStrength;
+          } else if (axis === 'y') {
+            node1.position.y -= sign * correction;
+            node2.position.y += sign * correction;
+            node1.velocity.y -= sign * repulsionStrength;
+            node2.velocity.y += sign * repulsionStrength;
+          } else {
+            node1.position.z -= sign * correction;
+            node2.position.z += sign * correction;
+            node1.velocity.z -= sign * repulsionStrength;
+            node2.velocity.z += sign * repulsionStrength;
+          }
+
+          if (this.physicsIterationCount < 3) {
+            console.log(`  🔄 Collision: ${file1} <-> ${file2} axis=${axis} penetration=${penetration.toFixed(1)}`);
           }
         }
+      }
+    }
+  }
+
+  /**
+   * Perform deterministic overlap separation for file boxes.
+   * Used both before physics starts and during physics updates.
+   */
+  private resolveInitialFileBoxOverlaps(maxPasses: number = 10): void {
+    if (!this.fileLayout) {
+      return;
+    }
+
+    const files = Array.from(this.fileNodeIds.keys());
+    const fileNodes = this.fileLayout.getNodes();
+    const padding = 10.0;
+
+    for (let pass = 0; pass < maxPasses; pass++) {
+      let movedAny = false;
+
+      for (let i = 0; i < files.length; i++) {
+        for (let j = i + 1; j < files.length; j++) {
+          const file1 = files[i];
+          const file2 = files[j];
+
+          const node1 = fileNodes.get(file1);
+          const node2 = fileNodes.get(file2);
+          const box1 = this.fileBoxMeshes.get(file1);
+          const box2 = this.fileBoxMeshes.get(file2);
+          if (!node1 || !node2 || !box1 || !box2) {
+            continue;
+          }
+
+          const half1 = {
+            x: box1.scaling.x / 2,
+            y: box1.scaling.y / 2,
+            z: box1.scaling.z / 2
+          };
+          const half2 = {
+            x: box2.scaling.x / 2,
+            y: box2.scaling.y / 2,
+            z: box2.scaling.z / 2
+          };
+
+          const dx = node2.position.x - node1.position.x;
+          const dy = node2.position.y - node1.position.y;
+          const dz = node2.position.z - node1.position.z;
+
+          const overlapX = (half1.x + half2.x + padding) - Math.abs(dx);
+          const overlapY = (half1.y + half2.y + padding) - Math.abs(dy);
+          const overlapZ = (half1.z + half2.z + padding) - Math.abs(dz);
+
+          if (overlapX > 0 && overlapY > 0 && overlapZ > 0) {
+            let axis: 'x' | 'y' | 'z' = 'x';
+            let penetration = overlapX;
+            if (overlapY < penetration) {
+              axis = 'y';
+              penetration = overlapY;
+            }
+            if (overlapZ < penetration) {
+              axis = 'z';
+              penetration = overlapZ;
+            }
+
+            const sign = axis === 'x'
+              ? (dx >= 0 ? 1 : -1)
+              : axis === 'y'
+                ? (dy >= 0 ? 1 : -1)
+                : (dz >= 0 ? 1 : -1);
+
+            const correction = (penetration / 2) + 0.5;
+            if (axis === 'x') {
+              node1.position.x -= sign * correction;
+              node2.position.x += sign * correction;
+            } else if (axis === 'y') {
+              node1.position.y -= sign * correction;
+              node2.position.y += sign * correction;
+            } else {
+              node1.position.z -= sign * correction;
+              node2.position.z += sign * correction;
+            }
+            movedAny = true;
+          }
+        }
+      }
+
+      if (!movedAny) {
+        break;
+      }
+    }
+
+    // Sync corrected positions back to file box meshes.
+    for (const [file, fileBox] of this.fileBoxMeshes.entries()) {
+      const fileNode = fileNodes.get(file);
+      if (!fileNode) {
+        continue;
+      }
+      fileBox.position.x = fileNode.position.x;
+      fileBox.position.y = fileNode.position.y;
+      fileBox.position.z = fileNode.position.z;
+    }
+  }
+
+  /**
+   * Enforce a strict minimum surface gap between all file boxes.
+   * Gap is measured using bounding spheres around each (possibly non-uniform) box.
+   */
+  private enforceMinimumFileBoxGap(minGap: number, maxPasses: number = 6): void {
+    if (!this.fileLayout) {
+      return;
+    }
+
+    const files = Array.from(this.fileNodeIds.keys());
+    const fileNodes = this.fileLayout.getNodes();
+
+    for (let pass = 0; pass < maxPasses; pass++) {
+      let movedAny = false;
+
+      for (let i = 0; i < files.length; i++) {
+        for (let j = i + 1; j < files.length; j++) {
+          const file1 = files[i];
+          const file2 = files[j];
+          const node1 = fileNodes.get(file1);
+          const node2 = fileNodes.get(file2);
+          const box1 = this.fileBoxMeshes.get(file1);
+          const box2 = this.fileBoxMeshes.get(file2);
+          if (!node1 || !node2 || !box1 || !box2) {
+            continue;
+          }
+
+          const radius1 = Math.sqrt(
+            (box1.scaling.x * 0.5) ** 2 +
+            (box1.scaling.y * 0.5) ** 2 +
+            (box1.scaling.z * 0.5) ** 2
+          );
+          const radius2 = Math.sqrt(
+            (box2.scaling.x * 0.5) ** 2 +
+            (box2.scaling.y * 0.5) ** 2 +
+            (box2.scaling.z * 0.5) ** 2
+          );
+
+          const dx = node2.position.x - node1.position.x;
+          const dy = node2.position.y - node1.position.y;
+          const dz = node2.position.z - node1.position.z;
+          let distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+          let dirX = 0;
+          let dirY = 0;
+          let dirZ = 0;
+          if (distance < 0.0001) {
+            // Deterministic fallback for coincident centers.
+            const fallbackX = ((i + 1) % 3) - 1;
+            const fallbackY = ((j + 2) % 3) - 1;
+            const fallbackZ = 1;
+            const fallbackLen = Math.sqrt(fallbackX * fallbackX + fallbackY * fallbackY + fallbackZ * fallbackZ);
+            dirX = fallbackX / fallbackLen;
+            dirY = fallbackY / fallbackLen;
+            dirZ = fallbackZ / fallbackLen;
+            distance = 0.0001;
+          } else {
+            dirX = dx / distance;
+            dirY = dy / distance;
+            dirZ = dz / distance;
+          }
+
+          const requiredCenterDistance = radius1 + radius2 + minGap;
+          if (distance < requiredCenterDistance) {
+            const deficit = requiredCenterDistance - distance;
+            const correction = (deficit / 2) + 0.1;
+
+            node1.position.x -= dirX * correction;
+            node1.position.y -= dirY * correction;
+            node1.position.z -= dirZ * correction;
+
+            node2.position.x += dirX * correction;
+            node2.position.y += dirY * correction;
+            node2.position.z += dirZ * correction;
+
+            movedAny = true;
+          }
+        }
+      }
+
+      if (!movedAny) {
+        break;
+      }
+    }
+
+    // Sync corrected positions back onto meshes.
+    for (const [file, fileBox] of this.fileBoxMeshes.entries()) {
+      const fileNode = fileNodes.get(file);
+      if (!fileNode) {
+        continue;
+      }
+      fileBox.position.x = fileNode.position.x;
+      fileBox.position.y = fileNode.position.y;
+      fileBox.position.z = fileNode.position.z;
+    }
+  }
+
+  /**
+   * Recenter each file's internal layout so local node coordinates are centered
+   * around (0,0,0), which keeps file boxes naturally containing their children.
+   */
+  private recenterInternalLayouts(): void {
+    // Target local half-extent: children should fit within ±TARGET of the unit box (±0.5 local).
+    // This prevents world positions from exploding when parent scaling is applied.
+    const TARGET_LOCAL_HALF_EXTENT = 0.40;
+
+    for (const internalLayout of this.fileInternalLayouts.values()) {
+      const nodes = Array.from(internalLayout.getNodes().values());
+      if (nodes.length === 0) {
+        continue;
+      }
+
+      let minX = Infinity, maxX = -Infinity;
+      let minY = Infinity, maxY = -Infinity;
+      let minZ = Infinity, maxZ = -Infinity;
+
+      for (const node of nodes) {
+        minX = Math.min(minX, node.position.x);
+        maxX = Math.max(maxX, node.position.x);
+        minY = Math.min(minY, node.position.y);
+        maxY = Math.max(maxY, node.position.y);
+        minZ = Math.min(minZ, node.position.z);
+        maxZ = Math.max(maxZ, node.position.z);
+      }
+
+      const centerX = (minX + maxX) / 2;
+      const centerY = (minY + maxY) / 2;
+      const centerZ = (minZ + maxZ) / 2;
+
+      for (const node of nodes) {
+        node.position.x -= centerX;
+        node.position.y -= centerY;
+        node.position.z -= centerZ;
+      }
+
+      // Normalize positions so the max extent equals TARGET_LOCAL_HALF_EXTENT.
+      // ForceDirectedLayout seeds positions at 5-20% of SPACE_SIZE (up to ±30 for internal
+      // layouts), so without normalization child world positions = scaling * 30 = 600+, which
+      // makes the scene span thousands of world units and renders nodes as sub-pixel dots.
+      let maxExtent = 0;
+      for (const node of nodes) {
+        maxExtent = Math.max(
+          maxExtent,
+          Math.abs(node.position.x),
+          Math.abs(node.position.y),
+          Math.abs(node.position.z)
+        );
+      }
+      if (maxExtent > 0.001) {
+        const normScale = TARGET_LOCAL_HALF_EXTENT / maxExtent;
+        for (const node of nodes) {
+          node.position.x *= normScale;
+          node.position.y *= normScale;
+          node.position.z *= normScale;
+        }
+      }
+    }
+  }
+
+  /**
+   * Clamp child node meshes so they remain fully contained in their file box.
+   */
+  public clampNodesInsideFileBoxes(): void {
+    for (const fileBox of this.fileBoxMeshes.values()) {
+      if (fileBox.scaling.x <= 0 || fileBox.scaling.y <= 0 || fileBox.scaling.z <= 0) {
+        continue;
+      }
+
+      fileBox.computeWorldMatrix(true);
+      const localHalfExtent = 0.5;
+
+      for (const child of fileBox.getChildren()) {
+        const mesh = child as BABYLON.Mesh;
+        if (!mesh.getBoundingInfo) {
+          continue;
+        }
+
+        // Exported function nodes are intentionally placed on/outside faces.
+        // Do not clamp them back inside the file box volume.
+        const nodeData = (mesh as any).nodeData as GraphNode | undefined;
+        if (nodeData?.isExported) {
+          continue;
+        }
+
+        mesh.computeWorldMatrix(true);
+        const radiusWorld = mesh.getBoundingInfo().boundingSphere.radiusWorld;
+        const parentMaxScale = Math.max(fileBox.scaling.x, fileBox.scaling.y, fileBox.scaling.z);
+        const radiusLocal = (radiusWorld / Math.max(parentMaxScale, 0.0001)) + 0.01;
+        const maxOffset = Math.max(0, localHalfExtent - radiusLocal);
+
+        mesh.position.x = Math.max(-maxOffset, Math.min(maxOffset, mesh.position.x));
+        mesh.position.y = Math.max(-maxOffset, Math.min(maxOffset, mesh.position.y));
+        mesh.position.z = Math.max(-maxOffset, Math.min(maxOffset, mesh.position.z));
       }
     }
   }
@@ -1023,28 +1433,45 @@ export class VRSceneManager {
       // Skip external modules
       if (file === 'external') continue;
       
-      // Calculate bounding box from actual node positions in the internal layout
-      const internalLayout = this.fileInternalLayouts.get(file);
-      const boxSize = this.calculateFileBoxSize(file, internalLayout);
+      // Seed size before per-axis autosizing runs.
+      const boxSize = 20.0;
       
       // Create a wireframe box for this file
       const boxMesh = BABYLON.MeshBuilder.CreateBox(
         `filebox_${file}`,
-        { size: 1 },  // Unit box, will be scaled based on calculated size
+        { size: 1 },
         this.scene
       );
-      
-      // Set scale to the calculated size (box starts at size 1, so scale = desired size)
+
+      // Unit box uses scaling for dimensions; autosize updates this per-axis.
       boxMesh.scaling = new BABYLON.Vector3(boxSize, boxSize, boxSize);
       
-      // Get file color and create glass material
+      // Get file color and create transparent glass material
       const fileColor = this.getFileColor(file);
       const material = new BABYLON.StandardMaterial(`fileboxmat_${file}`, this.scene);
-      material.emissiveColor = fileColor;
+      // Tint the glass with the file's unique colour at low intensity
+      material.diffuseColor = new BABYLON.Color3(
+        fileColor.r * 0.3,
+        fileColor.g * 0.3,
+        fileColor.b * 0.3
+      );
+      // Subtle self-illumination so the tint is visible even without direct lighting
+      material.emissiveColor = new BABYLON.Color3(
+        fileColor.r * 0.08,
+        fileColor.g * 0.08,
+        fileColor.b * 0.08
+      );
+      // Strong specular highlight for a glassy look
       material.specularColor = new BABYLON.Color3(1, 1, 1);
-      material.specularPower = 64;
+      material.specularPower = 128;
+      // Render both inner and outer faces for a solid-glass appearance
       material.backFaceCulling = false;
-      material.alpha = 0.05;
+      // Transparency: mostly see-through, slight body
+      material.alpha = 0.18;
+      material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+      // Use refraction-style index of refraction for glass feel
+      material.indexOfRefraction = 1.5;
+      material.wireframe = false;
       
       boxMesh.material = material;
       boxMesh.parent = this.sceneRoot;
@@ -1054,13 +1481,76 @@ export class VRSceneManager {
       
       // Store reference for updates
       this.fileBoxMeshes.set(file, boxMesh);
+
+      // Add a readable file-name plaque on each file box.
+      this.createFileBoxLabel(file, boxMesh);
     }
+  }
+
+  /**
+   * Create a label plaque for a file box.
+   */
+  private createFileBoxLabel(file: string, fileBox: BABYLON.Mesh): void {
+    const labelTexture = new BABYLON.DynamicTexture(
+      `fileLabelTexture_${file}`,
+      { width: 1024, height: 256 },
+      this.scene,
+      false
+    );
+    const ctx = labelTexture.getContext() as CanvasRenderingContext2D;
+
+    ctx.clearRect(0, 0, 1024, 256);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+    ctx.fillRect(0, 0, 1024, 256);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(4, 4, 1016, 248);
+
+    const displayName = file.split(/[\\/]/).pop() || file;
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 88px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(displayName, 512, 128);
+    labelTexture.update();
+
+    const label = BABYLON.MeshBuilder.CreatePlane(
+      `filelabel_${file}`,
+      { width: 8, height: 2 },
+      this.scene
+    );
+
+    const labelMaterial = new BABYLON.StandardMaterial(`filelabelmat_${file}`, this.scene);
+    labelMaterial.diffuseTexture = labelTexture;
+    labelMaterial.emissiveColor = new BABYLON.Color3(0.85, 0.85, 0.85);
+    labelMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
+    labelMaterial.backFaceCulling = false;
+    labelMaterial.useAlphaFromDiffuseTexture = true;
+    label.material = labelMaterial;
+
+    label.parent = fileBox;
+    label.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+
+    this.updateFileBoxLabelTransform(label, fileBox);
+  }
+
+  /**
+   * Keep file label offset and world size stable as file box scales.
+   */
+  private updateFileBoxLabelTransform(label: BABYLON.Mesh, fileBox: BABYLON.Mesh): void {
+    const safeX = Math.max(0.0001, fileBox.scaling.x);
+    const safeY = Math.max(0.0001, fileBox.scaling.y);
+    const safeZ = Math.max(0.0001, fileBox.scaling.z);
+
+    const worldOffsetAboveTop = 1.0;
+    label.position = new BABYLON.Vector3(0, 0.5 + (worldOffsetAboveTop / safeY), 0);
+    label.scaling = new BABYLON.Vector3(1 / safeX, 1 / safeY, 1 / safeZ);
   }
 
   /**
    * Calculate file box size from actual node positions
    */
-  private calculateFileBoxSize(_file: string, internalLayout: ForceDirectedLayout | undefined): number {
+  public calculateFileBoxSize(_file: string, internalLayout: ForceDirectedLayout | undefined): number {
     if (!internalLayout) {
       return 120.0;  // Default size if no layout
     }
@@ -1096,61 +1586,1022 @@ export class VRSceneManager {
   /**
    * Auto-size file boxes to fit their child nodes based on actual mesh bounds
    */
-  private autosizeFileBoxes(): void {
+  public autosizeFileBoxes(): void {
+    // Node world size as created by MeshFactory (Math.max(3.0, FUNCTION_BOX_SIZE)).
+    const nodeWorldSize = Math.max(3.0, SceneConfig.FUNCTION_BOX_SIZE);
+
     for (const fileBox of this.fileBoxMeshes.values()) {
-      // Get all children of this file box
-      const children = fileBox.getChildren();
-      
+      const children = fileBox.getChildren().filter(
+        c => !c.name?.startsWith('filelabel_') && (c as BABYLON.Mesh).getBoundingInfo
+      ) as BABYLON.Mesh[];
+
       if (children.length === 0) {
-        // No children, use minimum size
-        fileBox.scaling = new BABYLON.Vector3(120, 120, 120);
+        // Empty file box: keep a sensible minimum size.
+        const minSize = nodeWorldSize * 4;
+        fileBox.scaling = new BABYLON.Vector3(minSize, minSize, minSize);
         continue;
       }
 
-      // Calculate bounding box of all children
+      // ── Step 1: read LOCAL positions (child.position is already in parent-local space) ──
+      // Do NOT use world→local inverse-transform because that inherits the current scaling
+      // and then re-setting the scaling causes world positions to explode: a circular bug.
       let minX = Infinity, maxX = -Infinity;
       let minY = Infinity, maxY = -Infinity;
       let minZ = Infinity, maxZ = -Infinity;
 
       for (const child of children) {
-        const mesh = child as BABYLON.Mesh;
-        if (!mesh.getBoundingInfo) continue;
-
-        const boundingBox = mesh.getBoundingInfo().boundingBox;
-        const childMin = boundingBox.minimumWorld;
-        const childMax = boundingBox.maximumWorld;
-
-        // Convert world coords to local coords relative to file box
-        const localMin = BABYLON.Vector3.TransformCoordinates(
-          childMin,
-          BABYLON.Matrix.Invert(fileBox.getWorldMatrix())
-        );
-        const localMax = BABYLON.Vector3.TransformCoordinates(
-          childMax,
-          BABYLON.Matrix.Invert(fileBox.getWorldMatrix())
-        );
-
-        minX = Math.min(minX, localMin.x, localMax.x);
-        maxX = Math.max(maxX, localMin.x, localMax.x);
-        minY = Math.min(minY, localMin.y, localMax.y);
-        maxY = Math.max(maxY, localMin.y, localMax.y);
-        minZ = Math.min(minZ, localMin.z, localMax.z);
-        maxZ = Math.max(maxZ, localMin.z, localMax.z);
+        minX = Math.min(minX, child.position.x);
+        maxX = Math.max(maxX, child.position.x);
+        minY = Math.min(minY, child.position.y);
+        maxY = Math.max(maxY, child.position.y);
+        minZ = Math.min(minZ, child.position.z);
+        maxZ = Math.max(maxZ, child.position.z);
       }
 
-      // Calculate dimensions
-      const width = maxX === -Infinity ? 120 : maxX - minX;
-      const height = maxY === -Infinity ? 120 : maxY - minY;
-      const depth = maxZ === -Infinity ? 120 : maxZ - minZ;
+      if (!Number.isFinite(minX)) {
+        continue;
+      }
 
-      // Use maximum dimension for uniform cube
-      const maxDim = Math.max(width, height, depth);
-      const padding = 30.0;  // Extra space around nodes
-      const boxSize = Math.max(120.0, maxDim + padding);
+      // ── Step 2: center children around the file-box local origin ──
+      const cx = (minX + maxX) / 2;
+      const cy = (minY + maxY) / 2;
+      const cz = (minZ + maxZ) / 2;
+      for (const child of children) {
+        child.position.x -= cx;
+        child.position.y -= cy;
+        child.position.z -= cz;
+      }
 
-      // Apply scaling to unit box
-      fileBox.scaling = new BABYLON.Vector3(boxSize, boxSize, boxSize);
+      // ── Step 3: compute per-axis local extents of children ──
+      const currentScaleX = fileBox.scaling.x;
+      const currentScaleY = fileBox.scaling.y;
+      const currentScaleZ = fileBox.scaling.z;
+      let maxLocalExtentX = 0, maxLocalExtentY = 0, maxLocalExtentZ = 0;
+      for (const child of children) {
+        maxLocalExtentX = Math.max(maxLocalExtentX, Math.abs(child.position.x));
+        maxLocalExtentY = Math.max(maxLocalExtentY, Math.abs(child.position.y));
+        maxLocalExtentZ = Math.max(maxLocalExtentZ, Math.abs(child.position.z));
+      }
+
+      // ── Step 4: compute desired per-axis world scale ──
+      // Each axis: scale = (worldHalfExtent + padding) * 2, minimum 4 node-widths.
+      // Use 4× node size as per-axis padding so internal functions have generous spacing.
+      const axisPadding = nodeWorldSize * 4;
+      const desiredScaleX = Math.max(nodeWorldSize * 4, (maxLocalExtentX * currentScaleX + axisPadding) * 2);
+      const desiredScaleY = Math.max(nodeWorldSize * 4, (maxLocalExtentY * currentScaleY + axisPadding) * 2);
+      const desiredScaleZ = Math.max(nodeWorldSize * 4, (maxLocalExtentZ * currentScaleZ + axisPadding) * 2);
+
+      // ── Step 5: rescale LOCAL positions per axis to preserve world positions ──
+      // world = scale * local  →  new_local = old_local * (oldScale / newScale)
+      // Skip exported functions here — they will be re-snapped to the face surface below.
+      for (const child of children) {
+        const nodeId = (child as any).nodeData?.id as string | undefined;
+        const isExported = nodeId && this.graphNodeMap.get(nodeId)?.isExported;
+        if (isExported) continue;
+        if (desiredScaleX !== currentScaleX) child.position.x *= currentScaleX / desiredScaleX;
+        if (desiredScaleY !== currentScaleY) child.position.y *= currentScaleY / desiredScaleY;
+        if (desiredScaleZ !== currentScaleZ) child.position.z *= currentScaleZ / desiredScaleZ;
+      }
+
+      fileBox.scaling = new BABYLON.Vector3(desiredScaleX, desiredScaleY, desiredScaleZ);
+
+      // ── Step 6: re-snap exported functions to the face they were on ──
+      // Exported functions live at one of the 6 face centres (largest |local coord| = 0.5).
+      // The face surface is always at ±0.5 in local space regardless of scaling.
+      for (const child of children) {
+        const nodeId = (child as any).nodeData?.id as string | undefined;
+        if (!nodeId) continue;
+        const node = this.graphNodeMap.get(nodeId);
+        if (!node?.isExported) continue;
+
+        const ax = Math.abs(child.position.x);
+        const ay = Math.abs(child.position.y);
+        const az = Math.abs(child.position.z);
+
+        if (ax >= ay && ax >= az) {
+          child.position.x = child.position.x >= 0 ? 0.5 : -0.5;
+          child.position.y = 0;
+          child.position.z = 0;
+        } else if (ay >= ax && ay >= az) {
+          child.position.x = 0;
+          child.position.y = child.position.y >= 0 ? 0.5 : -0.5;
+          child.position.z = 0;
+        } else {
+          child.position.x = 0;
+          child.position.y = 0;
+          child.position.z = child.position.z >= 0 ? 0.5 : -0.5;
+        }
+      }
+
+      for (const child of fileBox.getChildren()) {
+        const mesh = child as BABYLON.Mesh;
+        if (mesh.name?.startsWith('filelabel_')) {
+          this.updateFileBoxLabelTransform(mesh, fileBox);
+          continue;
+        }
+        this.applyChildScaleCompensation(mesh, fileBox);
+      }
     }
+  }
+
+  /**
+   * Ensure exported function meshes are children of their file boxes.
+   */
+  public ensureExportedFunctionsParentedToFileBoxes(): void {
+    for (const [nodeId, mesh] of this.nodeMeshMap.entries()) {
+      const node = this.graphNodeMap.get(nodeId);
+      if (!node) {
+        continue;
+      }
+
+      if (node.type !== 'function' || !node.isExported) {
+        continue;
+      }
+
+      const file = node.file;
+      if (!file || file === 'external') {
+        continue;
+      }
+
+      const fileBox = this.fileBoxMeshes.get(file);
+      if (!fileBox) {
+        continue;
+      }
+
+      // Enforce visibility for exported function meshes.
+      mesh.isVisible = true;
+      mesh.setEnabled(true);
+      mesh.renderOutline = false;
+      const meshMaterial = mesh.material as BABYLON.StandardMaterial | null;
+      if (meshMaterial) {
+        meshMaterial.alpha = 1.0;
+        meshMaterial.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
+        meshMaterial.disableLighting = true;
+        meshMaterial.emissiveColor = new BABYLON.Color3(0.95, 0.95, 1.0);
+      }
+
+      if (mesh.parent !== fileBox) {
+        // Preserve world transform while switching parent.
+        const worldPos = mesh.getAbsolutePosition().clone();
+        mesh.parent = fileBox;
+        const localPos = BABYLON.Vector3.TransformCoordinates(
+          worldPos,
+          BABYLON.Matrix.Invert(fileBox.getWorldMatrix())
+        );
+        mesh.position = localPos;
+      }
+
+      // Keep exported function world size stable while parent file box scales.
+      this.applyChildScaleCompensation(mesh, fileBox);
+    }
+  }
+
+  /**
+   * For each exported function node, find the face of its parent file box
+   * whose centre minimises the total Euclidean distance to all connected nodes
+   * in other files, then snap the node's local position to that face centre.
+   *
+   * The parent file box is a unit cube (local coords −0.5 → +0.5) scaled by
+   * fileBox.scaling, so each face centre in LOCAL space is ±0.5 on one axis.
+   * World position = fileBox.position + fileBox.scaling ⊙ localPos.
+   */
+  private placeExportedFunctionsOnOptimalFace(): void {
+    // Build a quick lookup: nodeId → world positions of all cross-file neighbours.
+    // We use file-box positions as a proxy for neighbours inside the same remote file
+    // (the exported function of the target file hasn't been repositioned yet during
+    // the same loop, so using the box centre is stable and avoids ordering issues).
+    const crossFileNeighbours = new Map<string, BABYLON.Vector3[]>();
+
+    for (const edgeId of this.currentEdges) {
+      const arrow = edgeId.indexOf('→');
+      if (arrow < 0) continue;
+      const from = edgeId.slice(0, arrow);
+      const to   = edgeId.slice(arrow + 1);
+
+      const fromFile = this.nodeToFile.get(from);
+      const toFile   = this.nodeToFile.get(to);
+      if (!fromFile || !toFile || fromFile === toFile) continue;
+
+      // For the `from` side: neighbour world pos is the `to` node mesh world pos
+      // (or its file box centre if the mesh is not available).
+      const toMesh   = this.nodeMeshMap.get(to);
+      const toBox    = this.fileBoxMeshes.get(toFile);
+      const toWorld  = toMesh
+        ? toMesh.getAbsolutePosition().clone()
+        : (toBox ? toBox.position.clone() : null);
+      if (toWorld) {
+        if (!crossFileNeighbours.has(from)) crossFileNeighbours.set(from, []);
+        crossFileNeighbours.get(from)!.push(toWorld);
+      }
+
+      // For the `to` side symmetrically.
+      const fromMesh  = this.nodeMeshMap.get(from);
+      const fromBox   = this.fileBoxMeshes.get(fromFile);
+      const fromWorld = fromMesh
+        ? fromMesh.getAbsolutePosition().clone()
+        : (fromBox ? fromBox.position.clone() : null);
+      if (fromWorld) {
+        if (!crossFileNeighbours.has(to)) crossFileNeighbours.set(to, []);
+        crossFileNeighbours.get(to)!.push(fromWorld);
+      }
+    }
+
+    // The unit box has face centres at ±0.5 along each local axis.
+    const faceCentresLocal: Array<BABYLON.Vector3> = [
+      new BABYLON.Vector3( 0.5,  0,    0),
+      new BABYLON.Vector3(-0.5,  0,    0),
+      new BABYLON.Vector3( 0,    0.5,  0),
+      new BABYLON.Vector3( 0,   -0.5,  0),
+      new BABYLON.Vector3( 0,    0,    0.5),
+      new BABYLON.Vector3( 0,    0,   -0.5),
+    ];
+
+    for (const [nodeId, mesh] of this.nodeMeshMap.entries()) {
+      const node = this.graphNodeMap.get(nodeId);
+      if (!node || node.type !== 'function' || !node.isExported) continue;
+
+      const file = node.file;
+      if (!file || file === 'external') continue;
+
+      const fileBox = this.fileBoxMeshes.get(file);
+      if (!fileBox) continue;
+
+      const neighbours = crossFileNeighbours.get(nodeId);
+      if (!neighbours || neighbours.length === 0) {
+        // No cross-file neighbours: still force exported node onto a face.
+        // Use the dominant local axis from its current placement.
+        const lp = mesh.position;
+        const ax = Math.abs(lp.x);
+        const ay = Math.abs(lp.y);
+        const az = Math.abs(lp.z);
+
+        if (ax >= ay && ax >= az) {
+          const sign = lp.x >= 0 ? 1 : -1;
+          const target = this.getExportedFaceLocalTarget(fileBox, mesh, 'x', sign);
+          mesh.position = new BABYLON.Vector3(target, 0, 0);
+        } else if (ay >= ax && ay >= az) {
+          const sign = lp.y >= 0 ? 1 : -1;
+          const target = this.getExportedFaceLocalTarget(fileBox, mesh, 'y', sign);
+          mesh.position = new BABYLON.Vector3(0, target, 0);
+        } else {
+          const sign = lp.z >= 0 ? 1 : -1;
+          const target = this.getExportedFaceLocalTarget(fileBox, mesh, 'z', sign);
+          mesh.position = new BABYLON.Vector3(0, 0, target);
+        }
+
+        this.applyChildScaleCompensation(mesh, fileBox);
+        continue;
+      }
+
+      // Find the face whose world centre has the smallest sum of distances to
+      // all cross-file neighbours.
+      let bestLocalPos = faceCentresLocal[0];
+      let bestCost     = Infinity;
+
+      for (const localFace of faceCentresLocal) {
+        // world = boxPos + scaling ⊙ localPos  (component-wise, no rotation)
+        const worldX = fileBox.position.x + fileBox.scaling.x * localFace.x;
+        const worldY = fileBox.position.y + fileBox.scaling.y * localFace.y;
+        const worldZ = fileBox.position.z + fileBox.scaling.z * localFace.z;
+
+        let cost = 0;
+        for (const nb of neighbours) {
+          const dx = worldX - nb.x;
+          const dy = worldY - nb.y;
+          const dz = worldZ - nb.z;
+          cost += Math.sqrt(dx * dx + dy * dy + dz * dz);
+        }
+
+        if (cost < bestCost) {
+          bestCost     = cost;
+          bestLocalPos = localFace;
+        }
+      }
+
+      // Move the mesh to the best face, protruding outside the file box.
+      if (Math.abs(bestLocalPos.x) > 0) {
+        const sign = bestLocalPos.x > 0 ? 1 : -1;
+        const target = this.getExportedFaceLocalTarget(fileBox, mesh, 'x', sign);
+        mesh.position = new BABYLON.Vector3(target, 0, 0);
+      } else if (Math.abs(bestLocalPos.y) > 0) {
+        const sign = bestLocalPos.y > 0 ? 1 : -1;
+        const target = this.getExportedFaceLocalTarget(fileBox, mesh, 'y', sign);
+        mesh.position = new BABYLON.Vector3(0, target, 0);
+      } else {
+        const sign = bestLocalPos.z > 0 ? 1 : -1;
+        const target = this.getExportedFaceLocalTarget(fileBox, mesh, 'z', sign);
+        mesh.position = new BABYLON.Vector3(0, 0, target);
+      }
+      this.applyChildScaleCompensation(mesh, fileBox);
+    }
+  }
+
+  /**
+   * Compute the local coordinate for an exported node centre so the node sits
+   * just outside a file-box face on the given axis/sign.
+   */
+  private getExportedFaceLocalTarget(
+    fileBox: BABYLON.Mesh,
+    mesh: BABYLON.Mesh,
+    axis: 'x' | 'y' | 'z',
+    sign: number
+  ): number {
+    const boxScale = axis === 'x'
+      ? Math.max(0.0001, fileBox.scaling.x)
+      : axis === 'y'
+        ? Math.max(0.0001, fileBox.scaling.y)
+        : Math.max(0.0001, fileBox.scaling.z);
+
+    const clearance = 0.01;
+
+    // Test doubles may not implement full Babylon bounding APIs.
+    if (typeof (mesh as any).getBoundingInfo !== 'function') {
+      const exportedBoxSize = Math.max(6.0, SceneConfig.FUNCTION_BOX_SIZE);
+      const worldHalf = exportedBoxSize * 0.5;
+      const localProtrusion = worldHalf / boxScale;
+      return (sign >= 0 ? 1 : -1) * (0.5 + localProtrusion + clearance);
+    }
+
+    if (typeof (mesh as any).computeWorldMatrix === 'function') {
+      mesh.computeWorldMatrix(true);
+    }
+    const bbox = mesh.getBoundingInfo().boundingBox;
+
+    const maxWorld = (bbox as any).maximumWorld ?? bbox.maximum;
+    const minWorld = (bbox as any).minimumWorld ?? bbox.minimum;
+    const worldHalf = axis === 'x'
+      ? (maxWorld.x - minWorld.x) * 0.5
+      : axis === 'y'
+        ? (maxWorld.y - minWorld.y) * 0.5
+        : (maxWorld.z - minWorld.z) * 0.5;
+
+    const localProtrusion = worldHalf / boxScale;
+    return (sign >= 0 ? 1 : -1) * (0.5 + localProtrusion + clearance);
+  }
+
+  /**
+   * Push non-endpoint file boxes away from every cross-file edge path so
+   * edges do not visually collide with unconnected file boxes.
+   *
+   * Algorithm (repeated up to `iterations` times):
+   *   For each unique cross-file edge (boxA → boxB):
+   *     For each other box C (not A or B):
+   *       Find the closest point on segment A→B to C's centre.
+   *       If the distance is less than C's bounding-sphere radius + padding,
+   *       push C perpendicularly away from the segment by the deficit amount.
+   *   After each full edge-obstruction pass, re-resolve any new overlaps.
+   */
+  private resolveEdgeObstructions(iterations: number = 30): void {
+    // Collect unique cross-file edge pairs.
+    const crossFileEdges: Array<[string, string]> = [];
+    const seen = new Set<string>();
+    for (const edgeId of this.currentEdges) {
+      const arrow = edgeId.indexOf('→');
+      if (arrow < 0) continue;
+      const from = edgeId.slice(0, arrow);
+      const to   = edgeId.slice(arrow + 1);
+      const fromFile = this.nodeToFile.get(from);
+      const toFile   = this.nodeToFile.get(to);
+      if (!fromFile || !toFile || fromFile === toFile) continue;
+      const key = fromFile < toFile
+        ? `${fromFile}⟷${toFile}`
+        : `${toFile}⟷${fromFile}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        crossFileEdges.push([fromFile, toFile]);
+      }
+    }
+    if (crossFileEdges.length === 0) return;
+
+    const allFiles = Array.from(this.fileBoxMeshes.keys());
+    const edgePadding = 6.0; // clearance beyond bounding-sphere radius
+
+    for (let iter = 0; iter < iterations; iter++) {
+      let moved = false;
+
+      for (const [fileA, fileB] of crossFileEdges) {
+        const boxA = this.fileBoxMeshes.get(fileA);
+        const boxB = this.fileBoxMeshes.get(fileB);
+        if (!boxA || !boxB) continue;
+
+        const Ax = boxA.position.x, Ay = boxA.position.y, Az = boxA.position.z;
+        const Bx = boxB.position.x, By = boxB.position.y, Bz = boxB.position.z;
+        const ABx = Bx - Ax, ABy = By - Ay, ABz = Bz - Az;
+        const AB2 = ABx * ABx + ABy * ABy + ABz * ABz;
+        if (AB2 < 0.0001) continue; // degenerate (same position)
+        const ABlen = Math.sqrt(AB2);
+
+        // Compute t-range that excludes the interiors of the endpoint boxes.
+        const rA = Math.sqrt(
+          (boxA.scaling.x * 0.5) ** 2 +
+          (boxA.scaling.y * 0.5) ** 2 +
+          (boxA.scaling.z * 0.5) ** 2
+        );
+        const rB = Math.sqrt(
+          (boxB.scaling.x * 0.5) ** 2 +
+          (boxB.scaling.y * 0.5) ** 2 +
+          (boxB.scaling.z * 0.5) ** 2
+        );
+        const tMin = rA / ABlen;
+        const tMax = 1.0 - rB / ABlen;
+        if (tMin >= tMax) continue; // boxes are touching / overlapping
+
+        for (const fileC of allFiles) {
+          if (fileC === fileA || fileC === fileB) continue;
+          const boxC = this.fileBoxMeshes.get(fileC);
+          if (!boxC) continue;
+
+          const Cx = boxC.position.x, Cy = boxC.position.y, Cz = boxC.position.z;
+
+          // Closest point on segment AB to C, clamped to [tMin, tMax]
+          const ACx = Cx - Ax, ACy = Cy - Ay, ACz = Cz - Az;
+          const tRaw = (ACx * ABx + ACy * ABy + ACz * ABz) / AB2;
+          const t = Math.max(tMin, Math.min(tMax, tRaw));
+
+          const closestX = Ax + t * ABx;
+          const closestY = Ay + t * ABy;
+          const closestZ = Az + t * ABz;
+
+          const dx = Cx - closestX;
+          const dy = Cy - closestY;
+          const dz = Cz - closestZ;
+          const dist2 = dx * dx + dy * dy + dz * dz;
+
+          const rC = Math.sqrt(
+            (boxC.scaling.x * 0.5) ** 2 +
+            (boxC.scaling.y * 0.5) ** 2 +
+            (boxC.scaling.z * 0.5) ** 2
+          );
+          const required = rC + edgePadding;
+
+          if (dist2 < required * required) {
+            const dist    = Math.sqrt(dist2);
+            const deficit = required - dist;
+
+            let pushX: number, pushY: number, pushZ: number;
+            if (dist < 0.001) {
+              // Box centre lies exactly on the edge — push perpendicular to edge.
+              const ex = ABx / ABlen, ey = ABy / ABlen, ez = ABz / ABlen;
+              // Cross with Y-up to get a perpendicular; fall back to X-right if parallel.
+              let perpX = ey * 0 - ez * 1;   // cross(e, up=(0,1,0))
+              let perpZ = ex * 1 - ey * 0;
+              let perpLen = Math.sqrt(perpX * perpX + perpZ * perpZ);
+              if (perpLen < 0.001) { perpX = 1; perpZ = 0; perpLen = 1; }
+              pushX = (perpX / perpLen) * required;
+              pushY = 0;
+              pushZ = (perpZ / perpLen) * required;
+            } else {
+              pushX = (dx / dist) * deficit;
+              pushY = (dy / dist) * deficit;
+              pushZ = (dz / dist) * deficit;
+            }
+
+            boxC.position.x += pushX;
+            boxC.position.y += pushY;
+            boxC.position.z += pushZ;
+            moved = true;
+          }
+        }
+      }
+
+      // Re-resolve any overlaps created by the pushes before the next pass.
+      this.resolveFileBoxOverlapsByMesh(3);
+
+      if (!moved) break;
+    }
+  }
+
+  /**
+   * Resolve AABB overlaps between all file boxes working directly with mesh
+   * positions (does not touch ForceDirectedLayout node data).
+   */
+  private resolveFileBoxOverlapsByMesh(maxPasses: number = 10): void {
+    const files = Array.from(this.fileBoxMeshes.keys());
+    const padding = 6.0;
+
+    for (let pass = 0; pass < maxPasses; pass++) {
+      let moved = false;
+
+      for (let i = 0; i < files.length; i++) {
+        for (let j = i + 1; j < files.length; j++) {
+          const box1 = this.fileBoxMeshes.get(files[i]);
+          const box2 = this.fileBoxMeshes.get(files[j]);
+          if (!box1 || !box2) continue;
+
+          const dx = box2.position.x - box1.position.x;
+          const dy = box2.position.y - box1.position.y;
+          const dz = box2.position.z - box1.position.z;
+
+          const overlapX = (box1.scaling.x * 0.5 + box2.scaling.x * 0.5 + padding) - Math.abs(dx);
+          const overlapY = (box1.scaling.y * 0.5 + box2.scaling.y * 0.5 + padding) - Math.abs(dy);
+          const overlapZ = (box1.scaling.z * 0.5 + box2.scaling.z * 0.5 + padding) - Math.abs(dz);
+
+          if (overlapX > 0 && overlapY > 0 && overlapZ > 0) {
+            let axis: 'x' | 'y' | 'z' = 'x';
+            let penetration = overlapX;
+            if (overlapY < penetration) { axis = 'y'; penetration = overlapY; }
+            if (overlapZ < penetration) { axis = 'z'; penetration = overlapZ; }
+
+            const correction = penetration * 0.5 + 0.5;
+            if (axis === 'x') {
+              const sign = dx >= 0 ? 1 : -1;
+              box1.position.x -= sign * correction;
+              box2.position.x += sign * correction;
+            } else if (axis === 'y') {
+              const sign = dy >= 0 ? 1 : -1;
+              box1.position.y -= sign * correction;
+              box2.position.y += sign * correction;
+            } else {
+              const sign = dz >= 0 ? 1 : -1;
+              box1.position.z -= sign * correction;
+              box2.position.z += sign * correction;
+            }
+            moved = true;
+          }
+        }
+      }
+
+      if (!moved) break;
+    }
+  }
+
+  /**
+   * For each exported function that has been placed on a file-box face, find all
+   * internal (non-exported) nodes in the same file that share an edge with it and
+   * slide them toward the same face surface (along the face-normal axis). This
+   * creates a visual cluster of "incoming callers" near the gateway of each box.
+   *
+   * The pull target is LOCAL_PULL_TARGET (≈ ±0.38) — inside the face but close
+   * enough to be visually adjacent to the exported box at ±0.5.
+   * After pulling, internal-node collisions are resolved.
+   */
+  private pullInternalNodesToExportedFace(): void {
+    const PULL_TARGET = 0.38; // local-space depth to pull toward (face is at ±0.5)
+    const CENTER_PULL_FACTOR = 0.5; // keep only-internal nodes biased toward box centre
+    type Axis = 'x' | 'y' | 'z';
+
+    // Track connectivity for non-exported internal function nodes.
+    // hasCrossFile=true means at least one edge crosses file boundaries.
+    const internalConnectionStats = new Map<string, { hasAny: boolean; hasCrossFile: boolean }>();
+    const markInternalConnection = (nodeId: string, isCrossFile: boolean): void => {
+      const node = this.graphNodeMap.get(nodeId);
+      if (!node || node.isExported || node.type !== 'function') return;
+      const stats = internalConnectionStats.get(nodeId) || { hasAny: false, hasCrossFile: false };
+      stats.hasAny = true;
+      if (isCrossFile) stats.hasCrossFile = true;
+      internalConnectionStats.set(nodeId, stats);
+    };
+
+    for (const edgeId of this.currentEdges) {
+      const arrow = edgeId.indexOf('→');
+      if (arrow < 0) continue;
+      const fromId = edgeId.slice(0, arrow);
+      const toId   = edgeId.slice(arrow + 1);
+
+      const fromFile = this.nodeToFile.get(fromId);
+      const toFile   = this.nodeToFile.get(toId);
+      if (!fromFile || !toFile) continue;
+
+      const isCrossFile = fromFile !== toFile;
+      markInternalConnection(fromId, isCrossFile);
+      markInternalConnection(toId, isCrossFile);
+    }
+
+    // Build pull targets from edges that connect non-exported internal nodes to
+    // exported functions.
+    // - Cross-file: pull toward the face that points at the exported target file.
+    // - Same-file caller→exported: pull toward the SAME inside face as exported.
+    // If multiple candidates exist for a node, choose the shortest edge.
+    const pullTargets = new Map<string, {
+      normalAxis: Axis;
+      normalSign: number;
+      edgeLength: number;
+    }>();
+
+    for (const edgeId of this.currentEdges) {
+      const arrow = edgeId.indexOf('→');
+      if (arrow < 0) continue;
+      const fromId = edgeId.slice(0, arrow);
+      const toId   = edgeId.slice(arrow + 1);
+
+      const fromFile = this.nodeToFile.get(fromId);
+      const toFile   = this.nodeToFile.get(toId);
+      if (!fromFile || !toFile) continue;
+      const isCrossFile = fromFile !== toFile;
+
+      const fromNode = this.graphNodeMap.get(fromId);
+      const toNode   = this.graphNodeMap.get(toId);
+      if (!fromNode || !toNode) continue;
+
+      // Identify which side is the non-exported internal node and which is exported.
+      let internalId:   string | null = null;
+      let internalFile: string | null = null;
+      let exportedId:   string | null = null;
+
+      if (isCrossFile) {
+        if (toNode.isExported && fromNode.type === 'function' && !fromNode.isExported) {
+          internalId = fromId; internalFile = fromFile; exportedId = toId;
+        } else if (fromNode.isExported && toNode.type === 'function' && !toNode.isExported) {
+          internalId = toId;   internalFile = toFile;   exportedId = fromId;
+        }
+      } else {
+        // Same-file caller -> exported callee.
+        if (fromNode.type === 'function' && !fromNode.isExported && toNode.isExported) {
+          internalId = fromId; internalFile = fromFile; exportedId = toId;
+        }
+      }
+      if (!internalId || !internalFile || !exportedId) continue;
+
+      // World position of the exported function (fall back to its file box centre).
+      const exportedMesh = this.nodeMeshMap.get(exportedId);
+      const exportedBox  = this.fileBoxMeshes.get(this.nodeToFile.get(exportedId) || '');
+      const exportedWorld = exportedMesh
+        ? exportedMesh.getAbsolutePosition().clone()
+        : (exportedBox ? exportedBox.position.clone() : null);
+      if (!exportedWorld) continue;
+
+      // Direction from the internal node's file box centre to the exported node,
+      // expressed in the file box's local space (divide by scaling, no rotation).
+      const internalBox = this.fileBoxMeshes.get(internalFile);
+      if (!internalBox) continue;
+
+      const internalMesh = this.nodeMeshMap.get(internalId);
+      const internalWorld = internalMesh
+        ? internalMesh.getAbsolutePosition().clone()
+        : internalBox.position.clone();
+
+      // Use actual edge length (node-to-node in world space when available)
+      // to choose the strongest pull target.
+      const edgeLength = exportedWorld.subtract(internalWorld).length();
+
+      let normalAxis: Axis = 'x';
+      let normalSign = 1;
+
+      if (!isCrossFile && exportedMesh) {
+        // Same-file case: mirror exported function's current face axis/sign.
+        const lp = exportedMesh.position;
+        const ax = Math.abs(lp.x), ay = Math.abs(lp.y), az = Math.abs(lp.z);
+        if (ax >= ay && ax >= az) {
+          normalAxis = 'x';
+          normalSign = lp.x >= 0 ? 1 : -1;
+        } else if (ay >= ax && ay >= az) {
+          normalAxis = 'y';
+          normalSign = lp.y >= 0 ? 1 : -1;
+        } else {
+          normalAxis = 'z';
+          normalSign = lp.z >= 0 ? 1 : -1;
+        }
+      } else {
+        const dx = (exportedWorld.x - internalBox.position.x) / Math.max(0.0001, internalBox.scaling.x);
+        const dy = (exportedWorld.y - internalBox.position.y) / Math.max(0.0001, internalBox.scaling.y);
+        const dz = (exportedWorld.z - internalBox.position.z) / Math.max(0.0001, internalBox.scaling.z);
+
+        // Cross-file case: face that points toward exported target.
+        const ax = Math.abs(dx), ay = Math.abs(dy), az = Math.abs(dz);
+        normalAxis = 'x';
+        normalSign = dx >= 0 ? 1 : -1;
+        if (ay > ax && ay >= az) { normalAxis = 'y'; normalSign = dy >= 0 ? 1 : -1; }
+        else if (az > ax && az > ay) { normalAxis = 'z'; normalSign = dz >= 0 ? 1 : -1; }
+      }
+
+      const existing = pullTargets.get(internalId);
+      if (!existing || edgeLength < existing.edgeLength) {
+        pullTargets.set(internalId, { normalAxis, normalSign, edgeLength });
+      }
+    }
+
+    // Apply the pulls toward the chosen shortest-edge face target.
+    for (const [internalId, { normalAxis, normalSign }] of pullTargets.entries()) {
+      const mesh    = this.nodeMeshMap.get(internalId);
+      if (!mesh) continue;
+      const fileBox = this.fileBoxMeshes.get(this.nodeToFile.get(internalId) || '');
+      if (!mesh.parent || mesh.parent !== fileBox) continue;
+
+      const target  = normalSign * PULL_TARGET;
+      (mesh.position as any)[normalAxis] = target;
+    }
+
+    // Internal nodes with only same-file connections should live closer to the
+    // centre of their file box rather than near a face.
+    for (const [nodeId, stats] of internalConnectionStats.entries()) {
+      if (!stats.hasAny || stats.hasCrossFile) continue;
+      if (pullTargets.has(nodeId)) continue;
+
+      const mesh = this.nodeMeshMap.get(nodeId);
+      if (!mesh) continue;
+      const fileBox = this.fileBoxMeshes.get(this.nodeToFile.get(nodeId) || '');
+      if (!mesh.parent || mesh.parent !== fileBox) continue;
+
+      mesh.position.x *= CENTER_PULL_FACTOR;
+      mesh.position.y *= CENTER_PULL_FACTOR;
+      mesh.position.z *= CENTER_PULL_FACTOR;
+    }
+
+    this.clampNodesInsideFileBoxes();
+    this.resolveInternalNodeCollisions(10);
+  }
+
+  /**
+   * Push apart internal (non-exported) node meshes that sit in the same file box
+   * and overlap in world space. Exported nodes are left pinned to their faces.
+   * Operates in world space for push computation, converts result to local space.
+   */
+  private resolveInternalNodeCollisions(maxPasses: number = 10): void {
+    // World-space minimum centre-to-centre separation.
+    // Nodes have world size ≈ 1.0 after scale compensation.
+    const minSepWorld = 2.0; // 1.0 diameter × 2, a small gap between boxes
+
+    for (const [, fileBox] of this.fileBoxMeshes.entries()) {
+      // Gather non-exported children of this file box.
+      const children: BABYLON.Mesh[] = [];
+      for (const [nodeId, mesh] of this.nodeMeshMap.entries()) {
+        const node = this.graphNodeMap.get(nodeId);
+        if (!node || node.isExported) continue;
+        if (mesh.parent !== fileBox) continue;
+        children.push(mesh);
+      }
+      if (children.length < 2) continue;
+
+      for (let pass = 0; pass < maxPasses; pass++) {
+        let moved = false;
+        for (let i = 0; i < children.length; i++) {
+          for (let j = i + 1; j < children.length; j++) {
+            const a = children[i];
+            const b = children[j];
+            const wa = a.getAbsolutePosition();
+            const wb = b.getAbsolutePosition();
+            const dx = wb.x - wa.x;
+            const dy = wb.y - wa.y;
+            const dz = wb.z - wa.z;
+            const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            if (dist >= minSepWorld) continue;
+
+            const deficit = (minSepWorld - dist) * 0.5;
+            let nx: number, ny: number, nz: number;
+            if (dist < 0.001) {
+              nx = 1; ny = 0; nz = 0;
+            } else {
+              nx = dx / dist; ny = dy / dist; nz = dz / dist;
+            }
+
+            // Convert world-space push to local space.
+            const safeX = Math.max(0.0001, fileBox.scaling.x);
+            const safeY = Math.max(0.0001, fileBox.scaling.y);
+            const safeZ = Math.max(0.0001, fileBox.scaling.z);
+            a.position.x -= (nx * deficit) / safeX;
+            a.position.y -= (ny * deficit) / safeY;
+            a.position.z -= (nz * deficit) / safeZ;
+            b.position.x += (nx * deficit) / safeX;
+            b.position.y += (ny * deficit) / safeY;
+            b.position.z += (nz * deficit) / safeZ;
+            moved = true;
+          }
+        }
+        if (!moved) break;
+      }
+    }
+
+    this.clampNodesInsideFileBoxes();
+  }
+
+  /**
+   * Slide exported function nodes along their pinned face to avoid edges
+   * that pass too close. Movement is constrained to the face plane so the
+  * node never leaves its face (face-normal local coordinate stays outside the
+  * box at ±(0.5 + protrusion)).
+   * The two tangential local axes are clamped to ±0.45 so the node stays
+   * visibly on the face.
+   */
+  private resolveExportedFaceEdgeObstructions(iterations: number = 15): void {
+    const nodeRadius = 0.5;
+    const nodePadding = 5.0;
+    const required = nodeRadius + nodePadding;
+    const maxTangent = 0.45; // local-space limit along face tangent axes
+    // Threshold at or above which a local axis is treated as the face normal.
+    const faceThresh = 0.45;
+
+    for (let iter = 0; iter < iterations; iter++) {
+      // Rebuild world-space edge segments each pass.
+      const segments: Array<{
+        fromId: string; toId: string;
+        from: BABYLON.Vector3; to: BABYLON.Vector3;
+      }> = [];
+      for (const edgeId of this.currentEdges) {
+        const arrow = edgeId.indexOf('→');
+        if (arrow < 0) continue;
+        const fromId = edgeId.slice(0, arrow);
+        const toId   = edgeId.slice(arrow + 1);
+        const fromMesh = this.nodeMeshMap.get(fromId);
+        const toMesh   = this.nodeMeshMap.get(toId);
+        if (!fromMesh || !toMesh) continue;
+        segments.push({
+          fromId, toId,
+          from: fromMesh.getAbsolutePosition().clone(),
+          to:   toMesh.getAbsolutePosition().clone(),
+        });
+      }
+      if (segments.length === 0) break;
+
+      let moved = false;
+
+      for (const [nodeId, mesh] of this.nodeMeshMap.entries()) {
+        const node = this.graphNodeMap.get(nodeId);
+        if (!node || !node.isExported || node.type !== 'function') continue;
+
+        const fileBox = this.fileBoxMeshes.get(node.file || '');
+        if (!fileBox) continue;
+
+        const lp = mesh.position; // local position in file-box space
+
+        // Determine face normal axis (whichever local coord has |value| ≥ faceThresh).
+        type Axis = 'x' | 'y' | 'z';
+        let normalAxis: Axis | null = null;
+        let normalSign = 1;
+        if (Math.abs(lp.x) >= faceThresh) { normalAxis = 'x'; normalSign = Math.sign(lp.x); }
+        else if (Math.abs(lp.y) >= faceThresh) { normalAxis = 'y'; normalSign = Math.sign(lp.y); }
+        else if (Math.abs(lp.z) >= faceThresh) { normalAxis = 'z'; normalSign = Math.sign(lp.z); }
+        if (!normalAxis) continue; // not yet face-placed
+
+        const tangentAxes: Axis[] = (['x', 'y', 'z'] as Axis[]).filter(a => a !== normalAxis);
+
+        const wp = mesh.getAbsolutePosition();
+
+        for (const seg of segments) {
+          if (seg.fromId === nodeId || seg.toId === nodeId) continue;
+
+          const ABx = seg.to.x - seg.from.x;
+          const ABy = seg.to.y - seg.from.y;
+          const ABz = seg.to.z - seg.from.z;
+          const AB2 = ABx * ABx + ABy * ABy + ABz * ABz;
+          if (AB2 < 0.0001) continue;
+
+          const t = Math.max(0, Math.min(1,
+            ((wp.x - seg.from.x) * ABx +
+             (wp.y - seg.from.y) * ABy +
+             (wp.z - seg.from.z) * ABz) / AB2
+          ));
+
+          const cx = seg.from.x + t * ABx;
+          const cy = seg.from.y + t * ABy;
+          const cz = seg.from.z + t * ABz;
+
+          const dx = wp.x - cx;
+          const dy = wp.y - cy;
+          const dz = wp.z - cz;
+          const dist2 = dx * dx + dy * dy + dz * dz;
+          if (dist2 >= required * required) continue;
+
+          const dist    = Math.sqrt(dist2);
+          const deficit = required - dist;
+
+          let pushX: number, pushY: number, pushZ: number;
+          if (dist < 0.001) {
+            const ABlen = Math.sqrt(AB2);
+            const ex = ABx / ABlen, ey = ABy / ABlen, ez = ABz / ABlen;
+            let perpX = ey * 0 - ez * 1;
+            let perpZ = ex * 1 - ey * 0;
+            const perpLen = Math.sqrt(perpX * perpX + perpZ * perpZ);
+            if (perpLen > 0.001) { perpX /= perpLen; perpZ /= perpLen; } else { perpX = 1; perpZ = 0; }
+            pushX = perpX * required;
+            pushY = 0;
+            pushZ = perpZ * required;
+          } else {
+            pushX = (dx / dist) * deficit;
+            pushY = (dy / dist) * deficit;
+            pushZ = (dz / dist) * deficit;
+          }
+
+          // Convert world push to local, zero out normal axis, apply tangents only.
+          const push: Record<Axis, number> = {
+            x: pushX / Math.max(0.0001, fileBox.scaling.x),
+            y: pushY / Math.max(0.0001, fileBox.scaling.y),
+            z: pushZ / Math.max(0.0001, fileBox.scaling.z),
+          };
+          push[normalAxis] = 0;
+
+          for (const axis of tangentAxes) {
+            (mesh.position as any)[axis] = Math.max(-maxTangent,
+              Math.min(maxTangent, (mesh.position as any)[axis] + push[axis]));
+          }
+          // Keep normal axis pinned outside the chosen face.
+          const target = this.getExportedFaceLocalTarget(fileBox, mesh, normalAxis, normalSign);
+          (mesh.position as any)[normalAxis] = target;
+
+          moved = true;
+        }
+      }
+
+      if (!moved) break;
+    }
+  }
+
+  /**
+   * Nudge non-exported internal function-node meshes away from any edge segment
+   * to improve visual clarity. Exported functions are left in place because
+   * they are pinned to their file-box face by placeExportedFunctionsOnOptimalFace.
+   * After all nudges, nodes are re-clamped inside their parent file box.
+   */
+  private resolveNodeEdgeObstructions(iterations: number = 20): void {
+    // Internal function nodes have world-space size ≈ 1.0 after scale compensation.
+    const nodeRadius = 0.5;
+    const nodePadding = 5.0; // additional world-space clearance around each node
+    const required = nodeRadius + nodePadding;
+
+    for (let iter = 0; iter < iterations; iter++) {
+      // Rebuild segments each pass – endpoints may have shifted from prior nudges.
+      const segments: Array<{
+        fromId: string; toId: string;
+        from: BABYLON.Vector3; to: BABYLON.Vector3;
+      }> = [];
+
+      for (const edgeId of this.currentEdges) {
+        const arrow = edgeId.indexOf('→');
+        if (arrow < 0) continue;
+        const fromId = edgeId.slice(0, arrow);
+        const toId   = edgeId.slice(arrow + 1);
+        const fromMesh = this.nodeMeshMap.get(fromId);
+        const toMesh   = this.nodeMeshMap.get(toId);
+        if (!fromMesh || !toMesh) continue;
+        segments.push({
+          fromId, toId,
+          from: fromMesh.getAbsolutePosition().clone(),
+          to:   toMesh.getAbsolutePosition().clone(),
+        });
+      }
+
+      if (segments.length === 0) break;
+
+      let moved = false;
+
+      for (const [nodeId, mesh] of this.nodeMeshMap.entries()) {
+        const node = this.graphNodeMap.get(nodeId);
+        if (!node || node.type === 'variable' || node.type === 'external') continue;
+        if (node.isExported) continue; // pinned to face – do not move
+
+        const fileBox = this.fileBoxMeshes.get(node.file || '');
+        if (!fileBox) continue;
+
+        const wp = mesh.getAbsolutePosition();
+
+        for (const seg of segments) {
+          if (seg.fromId === nodeId || seg.toId === nodeId) continue;
+
+          const ABx = seg.to.x - seg.from.x;
+          const ABy = seg.to.y - seg.from.y;
+          const ABz = seg.to.z - seg.from.z;
+          const AB2 = ABx * ABx + ABy * ABy + ABz * ABz;
+          if (AB2 < 0.0001) continue;
+
+          const t = Math.max(0, Math.min(1,
+            ((wp.x - seg.from.x) * ABx +
+             (wp.y - seg.from.y) * ABy +
+             (wp.z - seg.from.z) * ABz) / AB2
+          ));
+
+          const cx = seg.from.x + t * ABx;
+          const cy = seg.from.y + t * ABy;
+          const cz = seg.from.z + t * ABz;
+
+          const dx = wp.x - cx;
+          const dy = wp.y - cy;
+          const dz = wp.z - cz;
+          const dist2 = dx * dx + dy * dy + dz * dz;
+          if (dist2 >= required * required) continue;
+
+          const dist    = Math.sqrt(dist2);
+          const deficit = required - dist;
+
+          let pushX: number, pushY: number, pushZ: number;
+          if (dist < 0.001) {
+            // Node centre lies on the segment – push perpendicular to edge direction.
+            const ABlen = Math.sqrt(AB2);
+            const ex = ABx / ABlen, ey = ABy / ABlen, ez = ABz / ABlen;
+            let perpX = ey * 0 - ez * 1;
+            let perpZ = ex * 1 - ey * 0;
+            let perpLen = Math.sqrt(perpX * perpX + perpZ * perpZ);
+            if (perpLen < 0.001) { perpX = 1; perpZ = 0; perpLen = 1; }
+            pushX = (perpX / perpLen) * required;
+            pushY = 0;
+            pushZ = (perpZ / perpLen) * required;
+          } else {
+            pushX = (dx / dist) * deficit;
+            pushY = (dy / dist) * deficit;
+            pushZ = (dz / dist) * deficit;
+          }
+
+          // Convert world-space push into parent file-box local space.
+          mesh.position.x += pushX / fileBox.scaling.x;
+          mesh.position.y += pushY / fileBox.scaling.y;
+          mesh.position.z += pushZ / fileBox.scaling.z;
+          moved = true;
+        }
+      }
+
+      if (!moved) break;
+    }
+
+    // Re-clamp all nudged nodes to remain inside their parent file box.
+    this.clampNodesInsideFileBoxes();
   }
 
   private renderEdges(): void {
@@ -1170,6 +2621,120 @@ export class VRSceneManager {
     
     // Create edges - they'll be positioned by updateEdges() in the physics loop
     this.meshFactory.createEdges(graphEdges, new Map(), this.sceneRoot, nodeExportedMap);
+  }
+
+  /**
+   * Position and target the camera so visible function meshes are in view.
+   */
+  private frameCameraToExportedFunctions(): void {
+    const exportedPoints: BABYLON.Vector3[] = [];
+    const functionPoints: BABYLON.Vector3[] = [];
+
+    for (const [nodeId, mesh] of this.nodeMeshMap.entries()) {
+      const node = this.graphNodeMap.get(nodeId);
+      const isFunctionNode = !!node && node.type !== 'variable' && node.type !== 'external';
+      if (!node || !isFunctionNode) {
+        continue;
+      }
+      if (!mesh.isVisible || !mesh.isEnabled()) {
+        continue;
+      }
+      const p = mesh.getAbsolutePosition().clone();
+      functionPoints.push(p);
+      if (node.isExported) {
+        exportedPoints.push(p);
+      }
+    }
+
+    const points = functionPoints;
+    const modeLabel = 'all';
+
+    if (points.length === 0) {
+      console.warn('⚠ No visible function meshes found for camera framing');
+      this.camera.setTarget(BABYLON.Vector3.Zero());
+      this.camera.position = new BABYLON.Vector3(0, 0, -20);
+      return;
+    }
+
+    let minX = Infinity, minY = Infinity, minZ = Infinity;
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+
+    for (const p of points) {
+      minX = Math.min(minX, p.x);
+      minY = Math.min(minY, p.y);
+      minZ = Math.min(minZ, p.z);
+      maxX = Math.max(maxX, p.x);
+      maxY = Math.max(maxY, p.y);
+      maxZ = Math.max(maxZ, p.z);
+    }
+
+    if (!Number.isFinite(minX) || !Number.isFinite(maxX)) {
+      return;
+    }
+
+    const center = new BABYLON.Vector3(
+      (minX + maxX) / 2,
+      (minY + maxY) / 2,
+      (minZ + maxZ) / 2
+    );
+
+    const sizeX = maxX - minX;
+    const sizeY = maxY - minY;
+    const sizeZ = maxZ - minZ;
+    const radius = Math.max(1.0, Math.max(sizeX, sizeY, sizeZ) * 0.5);
+
+    // Compute camera distance needed to fit the largest scene extent.
+    const fov = Math.max(0.1, this.camera.fov);
+    const distance = Math.max(20, (radius / Math.tan(fov * 0.5)) * 1.2);
+
+    this.camera.setTarget(center);
+    this.camera.position = new BABYLON.Vector3(center.x, center.y, center.z - distance);
+    console.log(`👁 Framed camera to ${points.length} ${modeLabel} function meshes`);
+  }
+
+  /**
+   * Place file boxes in a deterministic visible grid near the origin.
+   */
+  private positionFileBoxesInGrid(): void {
+    const files = Array.from(this.fileBoxMeshes.keys()).sort();
+    if (files.length === 0) {
+      return;
+    }
+
+    const columns = Math.max(1, Math.ceil(Math.sqrt(files.length)));
+    let maxHalfExtent = 0;
+    for (const file of files) {
+      const box = this.fileBoxMeshes.get(file);
+      if (!box) {
+        continue;
+      }
+      box.computeWorldMatrix(true);
+      const bounds = box.getBoundingInfo().boundingBox;
+      const extentX = (bounds.maximumWorld.x - bounds.minimumWorld.x) / 2;
+      const extentY = (bounds.maximumWorld.y - bounds.minimumWorld.y) / 2;
+      const extentZ = (bounds.maximumWorld.z - bounds.minimumWorld.z) / 2;
+      maxHalfExtent = Math.max(maxHalfExtent, extentX, extentY, extentZ);
+    }
+
+    const minGap = 20; // guaranteed surface-to-surface separation
+    const spacing = Math.max(34, (maxHalfExtent * 2) + minGap);
+    const centerX = (columns - 1) * 0.5;
+    const rows = Math.ceil(files.length / columns);
+    const centerY = (rows - 1) * 0.5;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const fileBox = this.fileBoxMeshes.get(file);
+      if (!fileBox) {
+        continue;
+      }
+
+      const row = Math.floor(i / columns);
+      const col = i % columns;
+      fileBox.position.x = (col - centerX) * spacing;
+      fileBox.position.y = (centerY - row) * spacing;
+      fileBox.position.z = 0;
+    }
   }
 
   private showTooltip(node: { name: string; file?: string; line?: number }): void {

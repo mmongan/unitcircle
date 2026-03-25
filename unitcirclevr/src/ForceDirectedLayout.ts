@@ -33,7 +33,7 @@ export class ForceDirectedLayout {
   private readonly C_ATTRACTIVE_SAME_FILE = 0.30;  // 6x stronger attraction for same-file connected nodes
   private readonly DAMPING = 0.92;         // Velocity damping per iteration
   private readonly MIN_DISTANCE = 1.0;     // Minimum distance to prevent singularity in force calculations
-  private readonly MIN_NODE_SEPARATION = 25.0;    // Minimum distance between unconnected same-file nodes
+  private readonly MIN_NODE_SEPARATION = 90.0;    // Minimum distance between unconnected same-file nodes
   private readonly MIN_CROSS_FILE_SEPARATION = 35.0;  // Stronger separation for cross-file nodes
   private readonly EQUILIBRIUM_THRESHOLD = 0.001;  // Converged when all velocities below this
 
@@ -73,13 +73,13 @@ export class ForceDirectedLayout {
   }
 
   /**
-   * Run force-directed layout simulation
-   * All node-node and edge forces are disabled - only sphere repulsion forces apply
+   * Run force-directed layout simulation with full physics:
+   * repulsion between all node pairs, attraction along edges, damping, convergence detection.
    */
   public simulate(iterations: number = 300): Map<string, Node> {
     const nodeArray = Array.from(this.nodes.values());
+    const nodeCount = nodeArray.length;
 
-    // Run simulation iterations - all forces disabled (handled by file sphere physics)
     for (let iter = 0; iter < iterations; iter++) {
       let maxVelocity = 0;
 
@@ -88,19 +88,29 @@ export class ForceDirectedLayout {
         node.velocity = { x: 0, y: 0, z: 0 };
       }
 
-      // No node-node repulsion forces
-      // No edge attractive forces
-      // No edge repulsion forces
-      // All layout forces disabled - only sphere repulsion applies via VRSceneManager
+      // Apply repulsive forces between all node pairs
+      for (let i = 0; i < nodeCount; i++) {
+        for (let j = i + 1; j < nodeCount; j++) {
+          this.applyRepulsiveForce(nodeArray[i], nodeArray[j]);
+        }
+      }
+
+      // Apply attractive forces along edges
+      const edgesToProcess = this.edgeFilter ? this.edges.filter(this.edgeFilter) : this.edges;
+      for (const edge of edgesToProcess) {
+        const sourceNode = this.nodes.get(edge.source);
+        const targetNode = this.nodes.get(edge.target);
+        if (sourceNode && targetNode) {
+          this.applyAttractiveForce(sourceNode, targetNode);
+        }
+      }
 
       // Update positions and apply damping
       for (const node of nodeArray) {
-        // Apply damping to velocity
         node.velocity.x *= this.DAMPING;
         node.velocity.y *= this.DAMPING;
         node.velocity.z *= this.DAMPING;
 
-        // Update position based on velocity
         node.position.x += node.velocity.x;
         node.position.y += node.velocity.y;
         node.position.z += node.velocity.z;
@@ -110,10 +120,13 @@ export class ForceDirectedLayout {
         node.position.y = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, node.position.y));
         node.position.z = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, node.position.z));
 
-        // Track max velocity for convergence check
         const speed = Math.sqrt(node.velocity.x ** 2 + node.velocity.y ** 2 + node.velocity.z ** 2);
         maxVelocity = Math.max(maxVelocity, speed);
       }
+
+      // Enforce minimum distance constraints
+      this.enforceAllPairsMinimumDistance();
+      this.enforceFileCrossConstraint();
 
       // Early exit if layout converged
       if (maxVelocity < this.EQUILIBRIUM_THRESHOLD) {

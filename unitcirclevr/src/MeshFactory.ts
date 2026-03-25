@@ -101,15 +101,13 @@ export class MeshFactory {
     node: GraphNode,
     position: BABYLON.Vector3,
     fileColor: BABYLON.Color3 | null,
-    indegree: number = 0,
+    _indegree: number = 0,
     onNodeInteraction: (mesh: BABYLON.Mesh, material: BABYLON.StandardMaterial, node: GraphNode) => void
   ): void {
-    // Scale box size based on number of incoming connections (indegree)
-    // Uses logarithmic scaling to keep size differences visible but not extreme
-    // Formula: base + log(indegree + 1) * scale_factor
-    const baseSize = SceneConfig.FUNCTION_BOX_SIZE;
-    const scaleFactor = 1.0;  // 1.0 unit increase per log step
-    const boxSize = baseSize + Math.log(Math.max(1, indegree + 1)) * scaleFactor;
+    // Keep both exported and internal function boxes large enough to see.
+    const boxSize = node.isExported
+      ? Math.max(6.0, SceneConfig.FUNCTION_BOX_SIZE)
+      : Math.max(1.0, SceneConfig.FUNCTION_BOX_SIZE);
 
     const box = BABYLON.MeshBuilder.CreateBox(`func_${node.id}`, { size: boxSize }, this.scene);
     box.position = position;
@@ -144,9 +142,22 @@ export class MeshFactory {
     material.specularPower = 16;
     material.wireframe = false;
     
-    // Show only exported function boxes, hide internal ones
-    material.alpha = node.isExported ? 0.7 : 0;
-    material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+    // Exported functions are highlighted; internal functions remain visible.
+    if (node.isExported) {
+      material.alpha = 1.0;
+      material.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
+      material.disableLighting = true;
+      material.emissiveColor = new BABYLON.Color3(0.95, 0.95, 1.0);
+      box.isVisible = true;
+      box.setEnabled(true);
+    } else {
+      material.alpha = 0.8;
+      material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+      material.disableLighting = false;
+      material.emissiveColor = new BABYLON.Color3(0.08, 0.08, 0.08);
+      box.isVisible = true;
+      box.setEnabled(true);
+    }
 
     box.material = material;
 
@@ -301,10 +312,10 @@ export class MeshFactory {
     this.edgeTubes.clear();
     this.edgeMetadata.clear();
 
-    // Create material for same-file edges
+    // Create material for same-file edges (visible but subtle and thin)
     const samFileEdgeMaterial = new BABYLON.StandardMaterial('sameFileEdgeMaterial', this.scene);
-    samFileEdgeMaterial.emissiveColor = new BABYLON.Color3(0.8, 0.8, 0.8);  // Gray
-    samFileEdgeMaterial.alpha = 0;  // Hidden
+    samFileEdgeMaterial.emissiveColor = new BABYLON.Color3(0.5, 0.5, 0.5);  // Dim gray
+    samFileEdgeMaterial.alpha = 0.4;
     samFileEdgeMaterial.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
 
     // Create material for cross-file edges
@@ -335,17 +346,21 @@ export class MeshFactory {
       // Check if the target node is an exported function
       const isExportedConnection = nodeExportedMap && nodeExportedMap.get(edge.to);
       
-      // Select material: exported connections get glowing yellow, otherwise use file-based material
+      // Select material: cross-file exported connections get glowing yellow;
+      // same-file edges (including to exported functions) use the internal style.
       let material = samFileEdgeMaterial;
-      if (isExportedConnection) {
+      if (isExportedConnection && isCrossFile) {
         material = exportedEdgeMaterial;
       } else if (isCrossFile) {
         material = crossFileEdgeMaterial;
       }
 
-      // Create a tall cylinder that will be scaled and rotated to connect the nodes
+      // Thinner cylinders for same-file (internal) edges, normal size for cross-file.
+      const edgeDiameter = isCrossFile
+        ? SceneConfig.EDGE_RADIUS * 2
+        : SceneConfig.INTERNAL_EDGE_RADIUS * 2;
       const cylinder = BABYLON.MeshBuilder.CreateCylinder(`edge_${edgeIndex}`, {
-        diameter: SceneConfig.EDGE_RADIUS * 2,
+        diameter: edgeDiameter,
         height: 1,  // Will be scaled based on distance
       }, this.scene);
       

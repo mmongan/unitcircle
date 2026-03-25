@@ -25,7 +25,7 @@ export class SceneConfig {
   static readonly GROUND_COLOR = new BABYLON.Color3(0.2, 0.7, 0.2);
 
   // Node Dimensions
-  static readonly FUNCTION_BOX_SIZE = 4.0;
+  static readonly FUNCTION_BOX_SIZE = 0.1;
   static readonly VARIABLE_SPHERE_DIAMETER = 1.5;
   static readonly EXTERNAL_CYLINDER_DIAMETER = 1.2;
   static readonly EXTERNAL_CYLINDER_HEIGHT = 2.0;
@@ -36,7 +36,7 @@ export class SceneConfig {
   static readonly POINT_LIGHT_POSITION = new BABYLON.Vector3(5, 10, 5);
 
   // Camera
-  static readonly CAMERA_POSITION = new BABYLON.Vector3(0, 60, -250);  // Much farther back for wider view
+  static readonly CAMERA_POSITION = new BABYLON.Vector3(0, 0, -20);
   static readonly CAMERA_INERTIA = 0.5;
   static readonly CAMERA_ANGULAR_SENSIBILITY = 1000;
 
@@ -59,7 +59,8 @@ export class SceneConfig {
   static readonly SIGNATURE_BORDER_COLOR = '#ffffff';
 
   // Edge Rendering
-  static readonly EDGE_RADIUS = 0.2;
+  static readonly EDGE_RADIUS = 0.2;          // Cross-file / exported edge radius
+  static readonly INTERNAL_EDGE_RADIUS = 0.05; // Same-file internal edge radius (thinner)
 
   // Physics Layout
   static readonly LAYOUT_ITERATIONS = 1; // Simple random placement requires minimal iterations

@@ -4,10 +4,12 @@
 
 Unit Circle VR visualizes code structure as an interactive 3D graph where:
 
-- **Functions** = Colored cubes (cyan/random/gray by hierarchy)
+- **Functions** = Colored cubes (file-color tinted; exported = bright white; internal = semi-transparent)
 - **Variables** = Gold or gray spheres
 - **External Modules** = Blue cylinders
-- **Function Calls** = Gray connection tubes
+- **File Boxes** = Transparent tinted glass containers (per file)
+- **Cross-file edges** = Golden cylinders (thicker)
+- **Same-file edges** = Gray cylinders (thinner, semi-transparent)
 
 The system automatically extracts TypeScript code, calculates positions using force-directed physics, and renders everything with Babylon.js in a VR-safe manner.
 
@@ -80,17 +82,22 @@ interface GraphData {
 **Color Encoding**:
 
 ```typescript
-// Function colors by hierarchy
-Exported:        Cyan     (0.2, 1.0, 0.8)
-With Calls:      Random   (5 color palette)
-Leaf Functions:  Gray     (0.8, 0.8, 0.8)
+// Function boxes
+Exported:          White      (0.95, 0.95, 1.0)  emissive, opaque
+Internal:          File color  semi-transparent (alpha 0.8)
 
-// Variable colors
-Exported:        Gold     (1.0, 0.8, 0.2)
-Internal:        Gray     (0.6, 0.6, 0.6)
+// Variable nodes
+Exported:          Gold       (file-color based)
+Internal:          Gray       subtle
 
 // External modules
-External:        Blue     (0.4, 0.8, 1.0)
+External:          Dim gray   subtle
+
+// Edges
+Cross-file:        Golden     (1.0, 0.84, 0.0)  radius EDGE_RADIUS
+Exported-target:   Bright yellow (1.0, 1.0, 0.0) radius EDGE_RADIUS
+Same-file internal: Dim gray  (0.5, 0.5, 0.5)  radius INTERNAL_EDGE_RADIUS (4× thinner)
+                               alpha 0.4 (semi-transparent)
 ```
 
 **Camera Setup**:
@@ -107,14 +114,18 @@ Sensitivity: 1000          // Reduced for precision
 Scene
 └── sceneRoot (TransformNode)
     ├── ground
-    ├── Function cubes (func_*)
-    ├── Variable spheres (var_*)
-    ├── External cylinders (ext_*)
-    ├── Connection tubes (edge_*)
-    └── Labels (label_*)
+   ├── filebox_<file> (Box, transparent glass, file-color tint)
+    │   ├── filelabel_<file> (Plane, billboard)
+    │   ├── func_<id>  (Box — exported function)
+    │   ├── func_<id>  (Box — internal function)
+    │   └── ...
+    ├── filebox_<file2> ...
+    ├── edge_0 … edge_N (Cylinder — repositioned each frame)
+    └── ext_<id>, var_<id> (external / variable nodes)
 ```
 
 All objects parented to `sceneRoot` for VR-safe animation that doesn't move camera.
+Function nodes are parented to their file box so they move with the box.
 
 **Animation Parameters**:
 
@@ -176,6 +187,65 @@ Target Z: -5 (top-down view below camera)
 }
 ```
 
+### Two-Level Layout System
+
+**Overview**: File boxes and function nodes are organised in a two-level hierarchy.
+
+**Level 1 — File layout**:
+
+- One node per source file in a `ForceDirectedLayout`.
+- Cross-file dependency edges attract connected files; all files repel each other.
+- Simulated once at startup (`fileLayout.simulate(600)`).
+- Result placed in a square grid via `positionFileBoxesInGrid()`.
+
+**Level 2 — File-internal layout**:
+
+- Each file has its own `ForceDirectedLayout` for the functions it contains.
+- Simulated once (`internalLayout.simulate(500)`) then frozen.
+- Positions are normalised to fit within ±0.40 in local space.
+
+**Pipeline Stages** (run once during `renderCodeGraph`):
+
+| Stage | Method | Purpose |
+| --- | --- | --- |
+| 1 | `prepareRenderState()` | Reset render state and cache graph nodes |
+| 2 | `buildFileNodeMaps()` | Build `nodeToFile` and `fileNodeIds` maps |
+| 3 | `createAndSettleInternalLayouts()` | Build/simulate per-file internal layouts (`simulate(500)`) |
+| 4 | `createAndSettleFileLevelLayout()` | Build/simulate file-level layout (`simulate(600)`) |
+| 5 | `applyFileLayoutPositions()` | Apply file-level positions to file boxes |
+| 6 | `fitAndSeparateFileBoxes()` | Autosize, clamp, grid place, and resolve collisions |
+| 7 | `populateCurrentEdges()` | Prepare edge lookup set for edge-routing passes |
+| 8 | `resolveEdgeObstructions(30)` | Push non-endpoint boxes away from cross-file edge paths |
+| 9 | `placeExportedFunctionsOnOptimalFace()` | Place exported functions on optimal face centres |
+
+Collision resolution is always run immediately after resize/reposition in `fitAndSeparateFileBoxes()`:
+
+- `resolveInitialFileBoxOverlaps(6)`
+- `enforceMinimumFileBoxGap(20.0, 6)`
+
+**`resolveEdgeObstructions(iterations)`**:
+
+For each unique cross-file edge A → B:
+
+```text
+For each non-endpoint file box C:
+  closest = nearest point on segment A→B to C (clamped outside endpoint spheres)
+  if distance(C, closest) < boundingSphereRadius(C) + 10:
+    push C perpendicularly away by the deficit
+  re-resolve AABB overlaps between all boxes
+```
+
+**`placeExportedFunctionsOnOptimalFace()`**:
+
+For each exported function node N in file box F:
+
+```text
+For each of the 6 face centres of F (±X, ±Y, ±Z):
+  worldFacePos = F.position + F.scaling ⊙ localFace
+  cost = Σ distance(worldFacePos, remoteNeighbour)
+Place N at the face centre with minimum cost (local position ±0.5 on winning axis)
+```
+
 ### ForceDirectedLayout (Physics Engine)
 
 **Purpose**: Position nodes in 3D space using physics simulation
@@ -183,31 +253,24 @@ Target Z: -5 (top-down view below camera)
 **Algorithm**:
 
 ```text
-For 100 iterations:
-  For each node:
-    Force = 0
-    
-    For each other node:
-      distance = calculateDistance(node1, node2)
-      if (connected):
-        Force += attractive(distance)    // Pull together
-      else:
-        Force += repulsive(distance)     // Push apart
-    
-    Constrain position within bounds
-    Apply force to node position
-    
-  Check stability (converged?)
+For each iteration (up to requested count, e.g. 500 internal / 600 file-level):
+   Reset node velocities
+   Apply repulsive forces between all node pairs
+   Apply attractive forces along graph edges
+   Apply damping and integrate position
+   Constrain positions to ±SPACE_SIZE bounds
+   Enforce minimum pair-separation constraints
+   Exit early when max velocity < EQUILIBRIUM_THRESHOLD
 ```
 
 **Configuration**:
 
 ```typescript
-Iterations: 100
-Attractive Force: 0.001 × distance
-Repulsive Force: 50 / distance²
-Damping: 0.85 (velocity reduction per iteration)
-Bounds: [-50, -50, -50] to [50, 50, 50]
+Internal simulation iterations: 500
+File-level simulation iterations: 600
+Internal minimum node separation: 90.0
+Damping: 0.92
+Bounds: [-SPACE_SIZE, -SPACE_SIZE, -SPACE_SIZE] to [SPACE_SIZE, SPACE_SIZE, SPACE_SIZE]
 ```
 
 **Performance**:

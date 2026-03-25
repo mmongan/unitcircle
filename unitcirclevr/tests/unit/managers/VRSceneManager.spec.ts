@@ -69,9 +69,14 @@ vi.mock('@babylonjs/core', () => {
     Engine: vi.fn(() => mockEngine),
     Scene: vi.fn(() => mockScene),
     Vector3: Object.assign(
-      vi.fn((x: number, y: number, z: number) => ({ x, y, z, add: vi.fn(), subtract: vi.fn(), clone: vi.fn() })),
+      vi.fn((x: number, y: number, z: number) => {
+        const v: any = { x, y, z, add: vi.fn(), subtract: vi.fn() };
+        v.clone = vi.fn(() => ({ x: v.x, y: v.y, z: v.z, add: vi.fn(), subtract: vi.fn(), clone: vi.fn() }));
+        return v;
+      }),
       {
-        Zero: vi.fn(() => ({ x: 0, y: 0, z: 0 })),
+        Zero: vi.fn(() => ({ x: 0, y: 0, z: 0, add: vi.fn(), subtract: vi.fn(), clone: vi.fn() })),
+        TransformCoordinates: vi.fn(() => ({ x: 0, y: 0, z: 0 })),
       }
     ),
     UniversalCamera: vi.fn(() => ({
@@ -564,6 +569,339 @@ describe('VRSceneManager', () => {
       manager = new VRSceneManager(canvas);
       await new Promise(resolve => setTimeout(resolve, 100));
       expect(manager).toBeDefined();
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // New layout-method tests
+  // ─────────────────────────────────────────────────────────────────────────
+
+  describe('File Box Overlap Resolution (resolveFileBoxOverlapsByMesh)', () => {
+    beforeEach(() => {
+      manager = new VRSceneManager(canvas);
+    });
+
+    it('should push two overlapping boxes apart to meet minimum separation', () => {
+      const boxA = { position: { x: 0, y: 0, z: 0 }, scaling: { x: 20, y: 20, z: 20 } };
+      const boxB = { position: { x: 5, y: 0, z: 0 }, scaling: { x: 20, y: 20, z: 20 } };
+      (manager as any).fileBoxMeshes.set('fileA', boxA);
+      (manager as any).fileBoxMeshes.set('fileB', boxB);
+
+      (manager as any).resolveFileBoxOverlapsByMesh(5);
+
+      // Required center-to-center: half1.x + half2.x + padding = 10 + 10 + 6 = 26
+      const separation = Math.abs(boxB.position.x - boxA.position.x);
+      expect(separation).toBeGreaterThanOrEqual(26);
+    });
+
+    it('should not move well-separated file boxes', () => {
+      const boxA = { position: { x: 0, y: 0, z: 0 }, scaling: { x: 20, y: 20, z: 20 } };
+      const boxB = { position: { x: 100, y: 0, z: 0 }, scaling: { x: 20, y: 20, z: 20 } };
+      (manager as any).fileBoxMeshes.set('fileA', boxA);
+      (manager as any).fileBoxMeshes.set('fileB', boxB);
+
+      (manager as any).resolveFileBoxOverlapsByMesh(5);
+
+      expect(boxA.position.x).toBe(0);
+      expect(boxB.position.x).toBe(100);
+    });
+
+    it('should handle an empty file box map without throwing', () => {
+      expect(() => (manager as any).resolveFileBoxOverlapsByMesh(3)).not.toThrow();
+    });
+
+    it('should converge three overlapping boxes to separated positions', () => {
+      const boxA = { position: { x: 0, y: 0, z: 0 }, scaling: { x: 20, y: 20, z: 20 } };
+      const boxB = { position: { x: 2, y: 0, z: 0 }, scaling: { x: 20, y: 20, z: 20 } };
+      const boxC = { position: { x: 4, y: 0, z: 0 }, scaling: { x: 20, y: 20, z: 20 } };
+      (manager as any).fileBoxMeshes.set('fileA', boxA);
+      (manager as any).fileBoxMeshes.set('fileB', boxB);
+      (manager as any).fileBoxMeshes.set('fileC', boxC);
+
+      (manager as any).resolveFileBoxOverlapsByMesh(20);
+
+      // All pairs must now be ~26+ units apart on their separation axis
+      const pairs = [['fileA', 'fileB'], ['fileA', 'fileC'], ['fileB', 'fileC']];
+      for (const [a, b] of pairs) {
+        const bA = (manager as any).fileBoxMeshes.get(a);
+        const bB = (manager as any).fileBoxMeshes.get(b);
+        const sepX = Math.abs(bB.position.x - bA.position.x);
+        expect(sepX).toBeGreaterThanOrEqual(26.0);
+      }
+    });
+  });
+
+  describe('Edge Obstruction Resolution (resolveEdgeObstructions)', () => {
+    beforeEach(() => {
+      manager = new VRSceneManager(canvas);
+    });
+
+    it('should push a non-endpoint box away from the edge path', () => {
+      // Edge: fileA(−100,0,0) → fileB(100,0,0). FileC sits almost on the path at y=5.
+      const boxA = { position: { x: -100, y: 0, z: 0 }, scaling: { x: 20, y: 20, z: 20 } };
+      const boxB = { position: { x: 100, y: 0, z: 0 }, scaling: { x: 20, y: 20, z: 20 } };
+      const boxC = { position: { x: 0, y: 5, z: 0 }, scaling: { x: 20, y: 20, z: 20 } };
+      (manager as any).fileBoxMeshes.set('src/fileA.ts', boxA);
+      (manager as any).fileBoxMeshes.set('src/fileB.ts', boxB);
+      (manager as any).fileBoxMeshes.set('src/fileC.ts', boxC);
+
+      // One cross-file edge between A and B
+      (manager as any).currentEdges.add('funcA@src/fileA.ts\u2192funcB@src/fileB.ts');
+      (manager as any).nodeToFile.set('funcA@src/fileA.ts', 'src/fileA.ts');
+      (manager as any).nodeToFile.set('funcB@src/fileB.ts', 'src/fileB.ts');
+
+      (manager as any).resolveEdgeObstructions(10);
+
+      // boxC must have been pushed perpendicularly away from the segment
+      // bounding-sphere radius ≈ √(10²×3) ≈ 17.3 + padding 10 = 27.3
+      expect(boxC.position.y).toBeGreaterThan(20);
+    });
+
+    it('should not move endpoint boxes during edge obstruction resolution', () => {
+      const boxA = { position: { x: -100, y: 0, z: 0 }, scaling: { x: 20, y: 20, z: 20 } };
+      const boxB = { position: { x: 100, y: 0, z: 0 }, scaling: { x: 20, y: 20, z: 20 } };
+      (manager as any).fileBoxMeshes.set('src/fileA.ts', boxA);
+      (manager as any).fileBoxMeshes.set('src/fileB.ts', boxB);
+
+      (manager as any).currentEdges.add('funcA@src/fileA.ts\u2192funcB@src/fileB.ts');
+      (manager as any).nodeToFile.set('funcA@src/fileA.ts', 'src/fileA.ts');
+      (manager as any).nodeToFile.set('funcB@src/fileB.ts', 'src/fileB.ts');
+
+      const origAx = boxA.position.x;
+      const origBx = boxB.position.x;
+
+      (manager as any).resolveEdgeObstructions(10);
+
+      // Endpoint boxes should not move in opposite directions – their X should remain unchanged
+      expect(boxA.position.x).toBe(origAx);
+      expect(boxB.position.x).toBe(origBx);
+    });
+
+    it('should handle zero cross-file edges without throwing', () => {
+      const boxA = { position: { x: 0, y: 0, z: 0 }, scaling: { x: 20, y: 20, z: 20 } };
+      (manager as any).fileBoxMeshes.set('src/fileA.ts', boxA);
+      // No edges added to currentEdges
+
+      expect(() => (manager as any).resolveEdgeObstructions(5)).not.toThrow();
+    });
+
+    it('should not move boxes already far from the edge path', () => {
+      const boxA = { position: { x: -100, y: 0, z: 0 }, scaling: { x: 20, y: 20, z: 20 } };
+      const boxB = { position: { x: 100, y: 0, z: 0 }, scaling: { x: 20, y: 20, z: 20 } };
+      const boxD = { position: { x: 0, y: 200, z: 0 }, scaling: { x: 20, y: 20, z: 20 } };
+      (manager as any).fileBoxMeshes.set('src/fileA.ts', boxA);
+      (manager as any).fileBoxMeshes.set('src/fileB.ts', boxB);
+      (manager as any).fileBoxMeshes.set('src/fileD.ts', boxD);
+
+      (manager as any).currentEdges.add('funcA@src/fileA.ts\u2192funcB@src/fileB.ts');
+      (manager as any).nodeToFile.set('funcA@src/fileA.ts', 'src/fileA.ts');
+      (manager as any).nodeToFile.set('funcB@src/fileB.ts', 'src/fileB.ts');
+
+      (manager as any).resolveEdgeObstructions(10);
+
+      // boxD is 200 units off the path – well beyond the bounding-sphere clearance
+      expect(boxD.position.y).toBeGreaterThan(100);
+    });
+  });
+
+  describe('Exported Function Face Placement (placeExportedFunctionsOnOptimalFace)', () => {
+    beforeEach(() => {
+      manager = new VRSceneManager(canvas);
+    });
+
+    it('should place an exported function on the face closest to cross-file neighbours', () => {
+      // File box at origin with uniform scaling 20
+      const fileBox = { position: { x: 0, y: 0, z: 0 }, scaling: { x: 20, y: 20, z: 20 } };
+      // Neighbour (remote function) is far to the right (+X at 200)
+      const remoteMesh = {
+        getAbsolutePosition: vi.fn(() => ({ x: 200, y: 0, z: 0, clone: vi.fn(() => ({ x: 200, y: 0, z: 0 })) })),
+      };
+
+      const exportedMesh: any = {
+        scaling: { x: 1, y: 1, z: 1 },
+        getAbsolutePosition: vi.fn(() => ({ x: 0, y: 0, z: 0, clone: vi.fn(() => ({ x: 0, y: 0, z: 0 })) })),
+      };
+      exportedMesh.position = { x: 0, y: 0, z: 0 };
+
+      (manager as any).fileBoxMeshes.set('src/fileA.ts', fileBox);
+      (manager as any).nodeMeshMap.set('funcA@src/fileA.ts', exportedMesh);
+      (manager as any).nodeMeshMap.set('funcB@src/fileB.ts', remoteMesh);
+      (manager as any).nodeToFile.set('funcA@src/fileA.ts', 'src/fileA.ts');
+      (manager as any).nodeToFile.set('funcB@src/fileB.ts', 'src/fileB.ts');
+      (manager as any).graphNodeMap.set('funcA@src/fileA.ts', {
+        id: 'funcA@src/fileA.ts',
+        name: 'funcA',
+        file: 'src/fileA.ts',
+        line: 1,
+        isExported: true,
+        type: 'function',
+      });
+      (manager as any).currentEdges.add('funcA@src/fileA.ts\u2192funcB@src/fileB.ts');
+
+      (manager as any).placeExportedFunctionsOnOptimalFace();
+
+      // +X protruding face target with fallback size/scaling is 0.5 + 3/20 + 0.01 = 0.66
+      expect(exportedMesh.position.x).toBeCloseTo(0.66);
+      expect(exportedMesh.position.y).toBeCloseTo(0);
+      expect(exportedMesh.position.z).toBeCloseTo(0);
+    });
+
+    it('should skip non-exported function nodes', () => {
+      const fileBox = { position: { x: 0, y: 0, z: 0 }, scaling: { x: 20, y: 20, z: 20 } };
+      const internalMesh: any = { position: { x: 0.1, y: 0.1, z: 0.1 }, scaling: { x: 1, y: 1, z: 1 } };
+
+      (manager as any).fileBoxMeshes.set('src/fileA.ts', fileBox);
+      (manager as any).nodeMeshMap.set('funcX@src/fileA.ts', internalMesh);
+      (manager as any).nodeToFile.set('funcX@src/fileA.ts', 'src/fileA.ts');
+      (manager as any).graphNodeMap.set('funcX@src/fileA.ts', {
+        id: 'funcX@src/fileA.ts',
+        name: 'funcX',
+        file: 'src/fileA.ts',
+        line: 5,
+        isExported: false,   // not exported
+        type: 'function',
+      });
+      (manager as any).currentEdges.add('funcX@src/fileA.ts\u2192funcY@src/fileB.ts');
+
+      const originalPos = { ...internalMesh.position };
+      (manager as any).placeExportedFunctionsOnOptimalFace();
+
+      // Position must not have changed
+      expect(internalMesh.position.x).toBe(originalPos.x);
+      expect(internalMesh.position.y).toBe(originalPos.y);
+    });
+
+    it('should still snap exported functions with no cross-file neighbours to an outside face', () => {
+      const fileBox = { position: { x: 0, y: 0, z: 0 }, scaling: { x: 20, y: 20, z: 20 } };
+      const exportedMesh: any = { position: { x: 0.1, y: 0.2, z: 0.3 }, scaling: { x: 1, y: 1, z: 1 } };
+
+      (manager as any).fileBoxMeshes.set('src/fileA.ts', fileBox);
+      (manager as any).nodeMeshMap.set('funcA@src/fileA.ts', exportedMesh);
+      (manager as any).nodeToFile.set('funcA@src/fileA.ts', 'src/fileA.ts');
+      (manager as any).graphNodeMap.set('funcA@src/fileA.ts', {
+        id: 'funcA@src/fileA.ts',
+        name: 'funcA',
+        file: 'src/fileA.ts',
+        line: 1,
+        isExported: true,
+        type: 'function',
+      });
+      // No cross-file edges in currentEdges
+
+      (manager as any).placeExportedFunctionsOnOptimalFace();
+
+      // Dominant local axis is +Z, so snap to outside +Z face.
+      expect(exportedMesh.position.x).toBeCloseTo(0);
+      expect(exportedMesh.position.y).toBeCloseTo(0);
+      expect(exportedMesh.position.z).toBeCloseTo(0.66);
+    });
+
+    it('should handle an empty graph without throwing', () => {
+      expect(() => (manager as any).placeExportedFunctionsOnOptimalFace()).not.toThrow();
+    });
+  });
+
+  describe('File Box Autosizing', () => {
+    beforeEach(() => {
+      manager = new VRSceneManager(canvas);
+    });
+
+    it('should keep exported functions on the surface and resize per axis', () => {
+      const exportedChild: any = {
+        name: 'node_exported',
+        position: { x: 0.5, y: 0.3, z: 0.1 },
+        scaling: { x: 1, y: 1, z: 1 },
+        getBoundingInfo: vi.fn(() => ({ boundingSphere: { radiusWorld: 1 } })),
+        nodeData: { id: 'exp@src/fileA.ts' },
+      };
+      const internalChildA: any = {
+        name: 'node_internalA',
+        position: { x: 0.45, y: 0.0, z: 0.0 },
+        scaling: { x: 1, y: 1, z: 1 },
+        getBoundingInfo: vi.fn(() => ({ boundingSphere: { radiusWorld: 1 } })),
+      };
+      const internalChildB: any = {
+        name: 'node_internalB',
+        position: { x: -0.45, y: 0.0, z: 0.0 },
+        scaling: { x: 1, y: 1, z: 1 },
+        getBoundingInfo: vi.fn(() => ({ boundingSphere: { radiusWorld: 1 } })),
+      };
+
+      const children = [exportedChild, internalChildA, internalChildB];
+      const fileBox: any = {
+        name: 'filebox_src/fileA.ts',
+        scaling: { x: 20, y: 20, z: 20 },
+        getChildren: vi.fn(() => children),
+      };
+
+      (manager as any).fileBoxMeshes.set('src/fileA.ts', fileBox);
+      (manager as any).graphNodeMap.set('exp@src/fileA.ts', {
+        id: 'exp@src/fileA.ts',
+        name: 'exp',
+        file: 'src/fileA.ts',
+        line: 1,
+        isExported: true,
+        type: 'function',
+      });
+
+      (manager as any).autosizeFileBoxes();
+
+      // Exported function should remain snapped to one face center.
+      expect(Math.abs(exportedChild.position.x)).toBe(0.5);
+      expect(exportedChild.position.y).toBe(0);
+      expect(exportedChild.position.z).toBe(0);
+
+      // Per-axis resizing should produce a non-uniform box for anisotropic content.
+      expect(fileBox.scaling.x).not.toBe(fileBox.scaling.y);
+      expect(fileBox.scaling.x).not.toBe(fileBox.scaling.z);
+    });
+  });
+
+  describe('Post-resize collision resolution pipeline', () => {
+    beforeEach(() => {
+      manager = new VRSceneManager(canvas);
+    });
+
+    it('should always resolve collisions after resizing file boxes', () => {
+      const autosizeSpy = vi.spyOn(manager as any, 'autosizeFileBoxes').mockImplementation(() => {});
+      const ensureParentSpy = vi.spyOn(manager as any, 'ensureExportedFunctionsParentedToFileBoxes').mockImplementation(() => {});
+      const clampSpy = vi.spyOn(manager as any, 'clampNodesInsideFileBoxes').mockImplementation(() => {});
+      const gridSpy = vi.spyOn(manager as any, 'positionFileBoxesInGrid').mockImplementation(() => {});
+      const overlapSpy = vi.spyOn(manager as any, 'resolveInitialFileBoxOverlaps').mockImplementation(() => {});
+      const gapSpy = vi.spyOn(manager as any, 'enforceMinimumFileBoxGap').mockImplementation(() => {});
+
+      (manager as any).fitAndSeparateFileBoxes();
+
+      expect(autosizeSpy).toHaveBeenCalledTimes(1);
+      expect(ensureParentSpy).toHaveBeenCalledTimes(1);
+      expect(clampSpy).toHaveBeenCalledTimes(1);
+      expect(gridSpy).toHaveBeenCalledTimes(1);
+      expect(overlapSpy).toHaveBeenCalledWith(6);
+      expect(gapSpy).toHaveBeenCalledWith(10.0, 6);
+    });
+
+    it('should run resize and collision steps in the expected order', () => {
+      const autosizeSpy = vi.spyOn(manager as any, 'autosizeFileBoxes').mockImplementation(() => {});
+      const ensureParentSpy = vi.spyOn(manager as any, 'ensureExportedFunctionsParentedToFileBoxes').mockImplementation(() => {});
+      const clampSpy = vi.spyOn(manager as any, 'clampNodesInsideFileBoxes').mockImplementation(() => {});
+      const gridSpy = vi.spyOn(manager as any, 'positionFileBoxesInGrid').mockImplementation(() => {});
+      const overlapSpy = vi.spyOn(manager as any, 'resolveInitialFileBoxOverlaps').mockImplementation(() => {});
+      const gapSpy = vi.spyOn(manager as any, 'enforceMinimumFileBoxGap').mockImplementation(() => {});
+
+      (manager as any).fitAndSeparateFileBoxes();
+
+      const autosizeOrder = (autosizeSpy as any).mock.invocationCallOrder[0];
+      const ensureParentOrder = (ensureParentSpy as any).mock.invocationCallOrder[0];
+      const clampOrder = (clampSpy as any).mock.invocationCallOrder[0];
+      const gridOrder = (gridSpy as any).mock.invocationCallOrder[0];
+      const overlapOrder = (overlapSpy as any).mock.invocationCallOrder[0];
+      const gapOrder = (gapSpy as any).mock.invocationCallOrder[0];
+
+      expect(autosizeOrder).toBeLessThan(ensureParentOrder);
+      expect(ensureParentOrder).toBeLessThan(clampOrder);
+      expect(clampOrder).toBeLessThan(gridOrder);
+      expect(gridOrder).toBeLessThan(overlapOrder);
+      expect(overlapOrder).toBeLessThan(gapOrder);
     });
   });
 });

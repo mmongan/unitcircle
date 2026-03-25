@@ -2,7 +2,7 @@
 
 ## Overview
 
-Unit Circle VR has comprehensive test coverage with **180 tests** and **72.89% code coverage**. Tests are organized by module with a mix of unit and integration tests.
+Unit Circle VR has comprehensive test coverage with **255 tests** across **8 test files**.
 
 ## Test Infrastructure
 
@@ -22,9 +22,9 @@ npm test
 Output:
 
 ```text
- Test Files  6 passed (6)
-      Tests  180 passed (180)
-   Duration  4.59s
+ Test Files  8 passed (8)
+  Tests  255 passed (255)
+   Duration  ~5s
 ```
 
 ### Run Specific Test File
@@ -59,7 +59,7 @@ Creates HTML report in `coverage/index.html`:
 
 ## Test Suites
 
-### VRSceneManager.spec.ts (74 tests)
+### VRSceneManager.spec.ts (89 tests)
 
 Tests the core 3D visualization engine using mocked Babylon.js.
 
@@ -80,18 +80,63 @@ Tests the core 3D visualization engine using mocked Babylon.js.
 | Lifecycle | 3 | run() and dispose() methods |
 | Graph Updates | 6 | Polling and refresh behavior |
 | Error Handling | 3 | WebXR failures, network errors |
+| File Box Overlap Resolution | 4 | AABB separation, convergence |
+| Edge Obstruction Resolution | 4 | Non-endpoint box avoidance |
+| Exported Function Face Placement | 4 | Optimal face selection |
+| File Box Autosizing | 1 | Exported surface preservation and per-axis resize |
+| Post-resize collision pipeline | 2 | Required collision passes and call order |
 
 **Babylon.js Mocking**:
 
-All Babylon.js objects are mocked to enable testing without WebGL context:
+All Babylon.js objects are mocked to enable testing without WebGL context.
+The `Vector3` mock includes a working `clone()` that returns a plain copy:
 
 ```typescript
-vi.mock('@babylonjs/core', () => ({
-  Engine: vi.fn(() => mockEngine),
-  Scene: vi.fn(() => mockScene),
-  Vector3: vi.fn((x, y, z) => ({ x, y, z, ... })),
-  // ... other mocks
-}));
+Vector3: vi.fn((x, y, z) => {
+  const v: any = { x, y, z, add: vi.fn(), subtract: vi.fn() };
+  v.clone = vi.fn(() => ({ x: v.x, y: v.y, z: v.z }));
+  return v;
+}),
+```
+
+Private layout methods (`resolveFileBoxOverlapsByMesh`, `resolveEdgeObstructions`,
+`placeExportedFunctionsOnOptimalFace`) are tested directly by populating internal
+maps (`fileBoxMeshes`, `currentEdges`, `nodeToFile`, `nodeMeshMap`, `graphNodeMap`)
+via `(manager as any)`.
+
+### SceneConfig.spec.ts (8 tests)
+
+Tests static configuration constants, including the new edge radius values.
+
+**Test Categories**:
+
+| Category | Tests | Focus |
+| --- | --- | --- |
+| Edge Radius Constants | 4 | `INTERNAL_EDGE_RADIUS`, `EDGE_RADIUS` values and relationship |
+| Other Constants | 4 | Box sizes, animation timing, poll interval |
+
+### MeshFactory.spec.ts (10 tests)
+
+Tests 3D mesh creation, focusing on edge cylinder diameter selection and material visibility.
+
+**Test Categories**:
+
+| Category | Tests | Focus |
+| --- | --- | --- |
+| Cylinder diameter | 4 | Same-file → `INTERNAL_EDGE_RADIUS×2`; cross-file/exported → `EDGE_RADIUS×2` |
+| Material visibility | 3 | Same-file material `alpha=0.4`; cross-file `alpha=0`; visible difference |
+| General behaviour | 3 | One cylinder per edge, empty list, clear before recreate |
+
+**Key test pattern**:
+
+```typescript
+factory.createEdges(
+  [{ from: 'funcA@src/file.ts', to: 'funcB@src/file.ts' }],
+  new Map()
+);
+// First StandardMaterial created = sameFileEdgeMaterial
+const mat = vi.mocked(BABYLON.StandardMaterial).mock.results[0].value;
+expect(mat.alpha).toBe(0.4);
 ```
 
 ### CodeParser.spec.ts (66 tests)
@@ -403,8 +448,8 @@ Tests run automatically on:
 
 ## Performance
 
-- **Test execution**: ~4.6 seconds (180 tests)
-- **Coverage generation**: ~10 seconds
+- **Test execution**: ~5 seconds (255 tests)
+- **Coverage generation**: ~12 seconds
 - **Watch mode rerun**: <1 second per file change
 
 ## Maintenance

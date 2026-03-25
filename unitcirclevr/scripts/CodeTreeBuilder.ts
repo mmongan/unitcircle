@@ -3,6 +3,8 @@
  * Uses TypeScript compiler API for accurate code analysis
  */
 
+/// <reference types="node" />
+
 import * as fs from 'fs';
 import * as path from 'path';
 import * as ts from 'typescript';
@@ -212,7 +214,7 @@ export class CodeTreeBuilder {
       const id = `${methodName}@${filePath}`;
       // Method is exported if it has export modifier OR if its parent class is exported
       const hasExportModifier = node.modifiers?.some(mod => mod.kind === ts.SyntaxKind.ExportKeyword) ?? false;
-      const isPublicOrDefault = !node.modifiers?.some(mod => mod.kind === ts.SyntaxKind.PrivateKeyword) ?? true;
+      const isPublicOrDefault = !(node.modifiers?.some(mod => mod.kind === ts.SyntaxKind.PrivateKeyword) ?? false);
       const parentClassExported = this.isMethodInExportedClass(node);
       const isExported = hasExportModifier || (parentClassExported && isPublicOrDefault);
 
@@ -233,7 +235,7 @@ export class CodeTreeBuilder {
       const id = `${methodName}@${filePath}`;
       // Property is exported if it has export modifier OR if its parent class is exported
       const hasExportModifier = node.modifiers?.some(mod => mod.kind === ts.SyntaxKind.ExportKeyword) ?? false;
-      const isPublicOrDefault = !node.modifiers?.some(mod => mod.kind === ts.SyntaxKind.PrivateKeyword) ?? true;
+      const isPublicOrDefault = !(node.modifiers?.some(mod => mod.kind === ts.SyntaxKind.PrivateKeyword) ?? false);
       const parentClassExported = this.isMethodInExportedClass(node);
       const isExported = hasExportModifier || (parentClassExported && isPublicOrDefault);
 
