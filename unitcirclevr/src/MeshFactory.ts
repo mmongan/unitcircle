@@ -290,7 +290,7 @@ export class MeshFactory {
    */
   createEdges(
     edges: Array<{ from: string; to: string }>,
-    layoutNodes: Map<string, any>,
+    _layoutNodes: Map<string, any>,  // Kept for API compatibility, actual positions from mesh.getAbsolutePosition()
     sceneRoot?: BABYLON.TransformNode,
     nodeExportedMap?: Map<string, boolean>  // Map of node IDs to isExported status
   ): void {
@@ -318,13 +318,8 @@ export class MeshFactory {
     // Create cylinder for each edge that will be repositioned each frame
     let edgeIndex = 0;
     for (const edge of edges) {
-      const sourceNode = layoutNodes.get(edge.from);
-      const targetNode = layoutNodes.get(edge.to);
-
-      if (!sourceNode || !targetNode) {
-        edgeIndex++;
-        continue;
-      }
+      // Note: We don't check layoutNodes because updateEdges() will use actual mesh positions
+      // This allows edges to be created before node meshes are fully positioned
 
       // Extract file paths to determine if cross-file
       const fromFile = edge.from.split('@')[1];

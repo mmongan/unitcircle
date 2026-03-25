@@ -214,35 +214,16 @@ export class VRSceneManager {
           this.fileLayout.updateFrame();
           const filePositions = this.fileLayout.getNodes();
           
-          // Debug: log available file positions on first frame
-          // (disabled - positions change every iteration)
+          // DO NOT update internal layouts during physics loop
+          // They are pre-converged in loadGraph and should remain stable
+          // Moving the file box automatically moves all child nodes
           
-          // Step 2: Update each file's internal layout (positions nodes within the file)
-          for (const [_file, internalLayout] of this.fileInternalLayouts.entries()) {
-            internalLayout.updateFrame();
-          }
-          
-          // Step 3: Position nodes based on composite positioning (file position + local position)
-          for (const [nodeId, mesh] of this.nodeMeshMap.entries()) {
-            const file = this.nodeToFile.get(nodeId);
-            if (!file) continue;
-            
-            const internalLayout = this.fileInternalLayouts.get(file);
-            if (!internalLayout) continue;
-            
-            const internalNode = internalLayout.getNodes().get(nodeId);
-            if (!internalNode) continue;
-            
-            const fileNode = filePositions.get(file);
-            if (!fileNode) continue;
-            
-            // Position is: file position + local position within file
-            mesh.position.x = fileNode.position.x + internalNode.position.x;
-            mesh.position.y = fileNode.position.y + internalNode.position.y;
-            mesh.position.z = fileNode.position.z + internalNode.position.z;
-          }
+          // Step 3: Update node positions within their file boxes (local positioning)
+          // Nodes are parented to file boxes, so local position = position within the box
+          // Positions are already set during renderNodes and shouldn't change
+          // Note: Nodes don't need updating here - they stay parented to their file boxes
 
-          // Step 3: Update file box positions and sizes based on file-level layout
+          // Step 3.5: Update file box positions and sizes based on file-level layout
           for (const [file, fileBox] of this.fileBoxMeshes.entries()) {
             const fileNode = filePositions.get(file);
             if (!fileNode) {
@@ -253,20 +234,8 @@ export class VRSceneManager {
             fileBox.position.y = fileNode.position.y;
             fileBox.position.z = fileNode.position.z;
             
-            // Update file box size to fit all its nodes
-            const nodeIds = this.fileNodeIds.get(file);
-            if (nodeIds && nodeIds.size > 0) {
-              const bounds = this.calculateNodeGroupBounds(nodeIds, file);
-              if (bounds) {
-                // Add padding to the bounds
-                const padding = 5.0;  // Extra space around nodes
-                const calculatedSize = Math.max(bounds.width, bounds.height, bounds.depth) + padding * 2;
-                // Scale the 1x1x1 box to the desired size - no hard minimum, let bounds decide
-                // Small files get small boxes, large files get large boxes
-                const size = Math.max(calculatedSize, 10.0);  // Tiny minimum to prevent zero-size boxes
-                fileBox.scaling = new BABYLON.Vector3(size, size, size);
-              }
-            }
+            // File box sizes are now pre-calculated from node bounds and don't change
+            // during physics simulation - they were set in renderFileBoxes()
           }
           
           // Step 3b: Apply repulsive forces to prevent file box intersections
@@ -581,16 +550,7 @@ export class VRSceneManager {
       }
     }
 
-    // Step 1: Create file-level layout
-    // Files are "nodes" positioned by cross-file reference edges
-    const files = Array.from(this.fileNodeIds.keys());
-    const crossFileEdges = this.buildCrossFileEdges(graph.edges, fileMap);
-    console.log(`📍 File-level layout: ${files.length} files, ${crossFileEdges.length} cross-file edges`);
-    console.log(`   Files: ${files.join(', ')}`);
-    console.log(`   Cross-file edges: ${crossFileEdges.map(e => `${e.source}->${e.target}`).join(', ')}`);
-    this.fileLayout = new ForceDirectedLayout(files, crossFileEdges);
-
-    // Step 2: Create file-internal layouts for each file
+    // Step 1: Create file-internal layouts for each file
     const allEdges = this.buildEdgeList(graph.edges);
     for (const [file, nodeIds] of this.fileNodeIds.entries()) {
       const nodeArray = Array.from(nodeIds);
@@ -607,22 +567,39 @@ export class VRSceneManager {
       this.fileInternalLayouts.set(file, internalLayout);
     }
 
+    // Step 2: Simulate internal layouts to convergence to get final node positions
+    // This allows us to calculate accurate file box sizes based on actual node bounds
+    for (const internalLayout of this.fileInternalLayouts.values()) {
+      internalLayout.simulate(500);  // Run full simulation to convergence
+    }
+
     // Step 3: Calculate indegree for visualization
     const indegreeMap = this.calculateIndegree(graph.edges);
 
-    // Step 4: Render nodes at initial positions from their file's internal layout
+    // Step 4: Create file box outlines FIRST (before nodes)
+    // Now with accurate sizes based on laid-out nodes
+    this.renderFileBoxes();
+
+    // Step 5: Create file-level layout AFTER file boxes exist (so we know file sizes)
+    // Files are positioned by cross-file reference edges
+    const files = Array.from(this.fileNodeIds.keys());
+    const crossFileEdges = this.buildCrossFileEdges(graph.edges, fileMap);
+    console.log(`📍 File-level layout: ${files.length} files, ${crossFileEdges.length} cross-file edges`);
+    console.log(`   Files: ${files.join(', ')}`);
+    console.log(`   Cross-file edges: ${crossFileEdges.map(e => `${e.source}->${e.target}`).join(', ')}`);
+    this.fileLayout = new ForceDirectedLayout(files, crossFileEdges);
+
+    // Step 6: Render nodes at initial positions from their file's internal layout
+    // Nodes will be parented to their file boxes for automatic movement
     this.renderNodes(graph.nodes, indegreeMap);
 
-    // Step 4: Populate edge list and create edges
+    // Step 7: Populate edge list and create edges
     this.currentEdges.clear();
     for (const edge of graph.edges) {
       this.currentEdges.add(`${edge.from}→${edge.to}`);
     }
     this.renderEdges();
     this.meshFactory.updateEdges();
-
-    // Step 4.5: Create file box outlines
-    this.renderFileBoxes();
 
     // Step 5: Start physics updates
     this.physicsActive = true;
@@ -710,7 +687,7 @@ export class VRSceneManager {
       const file = node.file || 'external';
       const fileLayout = this.fileInternalLayouts.get(file);
       
-      // Get position from file's internal layout
+      // Get position from file's internal layout (local position relative to file box)
       let position: BABYLON.Vector3;
       if (fileLayout) {
         const layoutNode = fileLayout.getNodes().get(node.id);
@@ -735,6 +712,15 @@ export class VRSceneManager {
         this.setupNodeInteraction(mesh, material, n);
         // Track mesh for physics updates
         this.nodeMeshMap.set(node.id, mesh);
+        
+        // Parent node to its file box for automatic movement
+        // This ensures nodes move with their file when file positions change
+        if (file !== 'external') {
+          const fileBox = this.fileBoxMeshes.get(file);
+          if (fileBox) {
+            mesh.parent = fileBox;
+          }
+        }
       });
     }
   }
@@ -934,45 +920,6 @@ export class VRSceneManager {
   /**
    * Calculate bounding box dimensions for a group of nodes in world coordinates
    */
-  private calculateNodeGroupBounds(nodeIds: Set<string>, file: string): { width: number; height: number; depth: number } | null {
-    // Get file position in world space
-    const fileNode = this.fileLayout?.getNodes().get(file);
-    if (!fileNode) return null;
-
-    const fileWorldPos = new BABYLON.Vector3(fileNode.position.x, fileNode.position.y, fileNode.position.z);
-
-    let minX = Infinity, maxX = -Infinity;
-    let minY = Infinity, maxY = -Infinity;
-    let minZ = Infinity, maxZ = -Infinity;
-    let hasNodes = false;
-
-    // Calculate bounds in world coordinates, relative to file center
-    for (const nodeId of nodeIds) {
-      const mesh = this.nodeMeshMap.get(nodeId);
-      if (mesh) {
-        hasNodes = true;
-        const nodeWorldPos = mesh.getAbsolutePosition();
-        const posRelativeToFile = nodeWorldPos.subtract(fileWorldPos);
-        const halfSize = SceneConfig.FUNCTION_BOX_SIZE / 2;
-        
-        minX = Math.min(minX, posRelativeToFile.x - halfSize);
-        maxX = Math.max(maxX, posRelativeToFile.x + halfSize);
-        minY = Math.min(minY, posRelativeToFile.y - halfSize);
-        maxY = Math.max(maxY, posRelativeToFile.y + halfSize);
-        minZ = Math.min(minZ, posRelativeToFile.z - halfSize);
-        maxZ = Math.max(maxZ, posRelativeToFile.z + halfSize);
-      }
-    }
-
-    if (!hasNodes) return null;
-
-    return {
-      width: maxX - minX,
-      height: maxY - minY,
-      depth: maxZ - minZ
-    };
-  }
-
   /**
    * Apply repulsive forces between file boxes to prevent intersections
    */
@@ -981,7 +928,7 @@ export class VRSceneManager {
 
     const files = Array.from(this.fileNodeIds.keys());
     const fileNodes = layout.getNodes();
-    const minSeparationPadding = 150.0;  // Large padding to keep boxes well separated
+    const minSeparationPadding = 200.0;  // Reduced back since files now spread naturally without spring forces
 
     // Check all pairs of files for intersection
     for (let i = 0; i < files.length; i++) {
@@ -1015,8 +962,14 @@ export class VRSceneManager {
           const direction = pos2.subtract(pos1).normalize();
           const tooCloseFactor = 1.0 - (distance / requiredDistance);  // 0 when at required distance, 1 when touching
           
-          // Proactive velocity-based repulsion that increases as boxes get closer
-          const repulsionStrength = 600.0 * tooCloseFactor;  // Increases as boxes approach
+          // Debug on early iterations
+          if (this.physicsIterationCount < 3) {
+            console.log(`  🔄 Collision: ${file1} <-> ${file2}: dist=${distance.toFixed(1)}, required=${requiredDistance.toFixed(1)}, factor=${tooCloseFactor.toFixed(3)}`);
+          }
+          
+          // Strong proactive velocity-based repulsion that increases as boxes get closer
+          // Use a much higher repulsion strength to overcome attractive forces and larger box sizes
+          const repulsionStrength = 2500.0 * tooCloseFactor;  // Reduced back now that springs are weaker
           
           const repulsionVelocity1 = direction.scale(-repulsionStrength);
           node1.velocity.x += repulsionVelocity1.x;
@@ -1027,6 +980,22 @@ export class VRSceneManager {
           node2.velocity.x += repulsionVelocity2.x;
           node2.velocity.y += repulsionVelocity2.y;
           node2.velocity.z += repulsionVelocity2.z;
+          
+          // If boxes are actually overlapping (not just close), apply a HARD constraint as safety net
+          const actualOverlap = distance < (radius1 + radius2);
+          if (actualOverlap) {
+            // Minimal hard push just to prevent penetration
+            const overlapAmount = (radius1 + radius2) - distance;
+            const safeguardMove = overlapAmount + 1.0;  // Move by overlap amount plus small buffer
+            
+            node1.position.x -= direction.x * safeguardMove;
+            node1.position.y -= direction.y * safeguardMove;
+            node1.position.z -= direction.z * safeguardMove;
+            
+            node2.position.x += direction.x * safeguardMove;
+            node2.position.y += direction.y * safeguardMove;
+            node2.position.z += direction.z * safeguardMove;
+          }
         }
       }
     }
@@ -1034,18 +1003,26 @@ export class VRSceneManager {
 
   /**
    * Create wireframe boxes to outline each file's containing region
+   * Sizes are calculated from actual laid-out node positions
    */
   private renderFileBoxes(): void {
     for (const file of this.fileNodeIds.keys()) {
       // Skip external modules
       if (file === 'external') continue;
       
+      // Calculate bounding box from actual node positions in the internal layout
+      const internalLayout = this.fileInternalLayouts.get(file);
+      const boxSize = this.calculateFileBoxSize(file, internalLayout);
+      
       // Create a wireframe box for this file
       const boxMesh = BABYLON.MeshBuilder.CreateBox(
         `filebox_${file}`,
-        { size: 1 },  // Start with unit box, will be scaled by physics loop
+        { size: 1 },  // Unit box, will be scaled based on calculated size
         this.scene
       );
+      
+      // Set scale to the calculated size (box starts at size 1, so scale = desired size)
+      boxMesh.scaling = new BABYLON.Vector3(boxSize, boxSize, boxSize);
       
       // Get file color and create glass material
       const fileColor = this.getFileColor(file);
@@ -1054,7 +1031,7 @@ export class VRSceneManager {
       material.specularColor = new BABYLON.Color3(1, 1, 1);
       material.specularPower = 64;
       material.backFaceCulling = false;
-      material.alpha = 0.15;
+      material.alpha = 0.05;
       
       boxMesh.material = material;
       boxMesh.parent = this.sceneRoot;
@@ -1065,6 +1042,42 @@ export class VRSceneManager {
       // Store reference for updates
       this.fileBoxMeshes.set(file, boxMesh);
     }
+  }
+
+  /**
+   * Calculate file box size from actual node positions
+   */
+  private calculateFileBoxSize(_file: string, internalLayout: ForceDirectedLayout | undefined): number {
+    if (!internalLayout) {
+      return 120.0;  // Default size if no layout
+    }
+
+    const nodes = internalLayout.getNodes();
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    let minZ = Infinity, maxZ = -Infinity;
+
+    // Find bounds of all nodes in this file
+    for (const node of nodes.values()) {
+      minX = Math.min(minX, node.position.x);
+      maxX = Math.max(maxX, node.position.x);
+      minY = Math.min(minY, node.position.y);
+      maxY = Math.max(maxY, node.position.y);
+      minZ = Math.min(minZ, node.position.z);
+      maxZ = Math.max(maxZ, node.position.z);
+    }
+
+    // Calculate dimensions
+    const width = maxX === -Infinity ? 0 : maxX - minX;
+    const height = maxY === -Infinity ? 0 : maxY - minY;
+    const depth = maxZ === -Infinity ? 0 : maxZ - minZ;
+
+    // Find max dimension and add padding
+    const maxDim = Math.max(width, height, depth);
+    const padding = 30.0;  // Extra space around nodes
+    const boxSize = Math.max(120.0, maxDim + padding);  // Minimum 120 units
+
+    return boxSize;
   }
 
   private renderEdges(): void {

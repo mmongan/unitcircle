@@ -26,10 +26,10 @@ export class ForceDirectedLayout {
   private nodes: Map<string, Node>;
   private edges: Edge[];
   private edgeFilter?: (edge: Edge) => boolean;  // Optional filter for which edges to use
-  private readonly SPACE_SIZE = 250;
+  private readonly SPACE_SIZE: number;  // Will be set based on layout type
   private readonly C_REPULSIVE = 2.0;      // Repulsive force for same-file nodes
   private readonly C_REPULSIVE_CROSS_FILE = 20.0;  // Much stronger repulsion for cross-file nodes (10x stronger)
-  private readonly C_ATTRACTIVE = 0.05;    // Attractive force strength for cross-file edges
+  private readonly C_ATTRACTIVE = 0.0002;    // 5x weaker to minimize pulling files together
   private readonly C_ATTRACTIVE_SAME_FILE = 0.30;  // 6x stronger attraction for same-file connected nodes
   private readonly DAMPING = 0.92;         // Velocity damping per iteration
   private readonly MIN_DISTANCE = 1.0;     // Minimum distance to prevent singularity in force calculations
@@ -42,11 +42,18 @@ export class ForceDirectedLayout {
     this.edgeFilter = edgeFilter;
     this.nodes = new Map();
 
+    // Use smaller space for internal layouts (when nodeFileMap is provided), larger for file-level
+    // Internal layouts need to fit within file boxes (~120-300 units), so use proportional space
+    // File-level layouts need to spread files far apart, so use 1250 unit space
+    this.SPACE_SIZE = nodeFileMap ? 150 : 1250;
+
     // Initialize nodes with random positions close to center
     // Nodes will spread apart due to sphere repulsion forces
     for (const id of nodeIds) {
-      // Generate random position near center at radius ~5-15 units
-      const radius = 5 + Math.random() * 10;  // 5-15 units from center
+      // Generate random position near center, scaled to layout space
+      // For smaller spaces (internal layouts), use proportionally smaller initial radius
+      const maxInitialRadius = this.SPACE_SIZE * 0.15;  // 15% of space size
+      const radius = (this.SPACE_SIZE * 0.05) + Math.random() * maxInitialRadius;  // 5-20% of space size
       const theta = Math.random() * Math.PI * 2;  // azimuth angle: 0-2π
       const phi = Math.acos(Math.random() * 2 - 1);  // polar angle: uniform distribution on sphere
 
