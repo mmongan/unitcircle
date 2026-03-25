@@ -144,8 +144,8 @@ export class MeshFactory {
     material.specularPower = 16;
     material.wireframe = false;
     
-    // Hide cube faces (fully transparent)
-    material.alpha = 0;
+    // Show only exported function boxes, hide internal ones
+    material.alpha = node.isExported ? 0.7 : 0;
     material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
 
     box.material = material;
@@ -318,7 +318,7 @@ export class MeshFactory {
     exportedEdgeMaterial.emissiveColor = new BABYLON.Color3(1.0, 1.0, 0.0);  // Bright yellow
     exportedEdgeMaterial.specularColor = new BABYLON.Color3(1.0, 1.0, 0.8);
     exportedEdgeMaterial.specularPower = 32;
-    exportedEdgeMaterial.alpha = 0;  // Hidden
+    exportedEdgeMaterial.alpha = 1.0;  // Visible
     exportedEdgeMaterial.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
 
     // Create cylinder for each edge that will be repositioned each frame
