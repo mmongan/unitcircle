@@ -118,9 +118,11 @@ export class MeshFactory {
     // Apply signature texture with file color background
     const signatureTexture = this.createSignatureTexture(node, fileColor);
     signatureTexture.uScale = 1.0;
-    signatureTexture.vScale = 1.0;
+    // Babylon box UVs render dynamic textures upside down by default.
+    // Flip V so function signatures are upright.
+    signatureTexture.vScale = -1.0;
     signatureTexture.uOffset = 0;
-    signatureTexture.vOffset = 0;
+    signatureTexture.vOffset = 1.0;
     
     // Keep signature texture on both diffuse and emissive channels so text remains
     // readable even when a node is in shadow or lit at a grazing angle.
