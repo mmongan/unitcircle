@@ -1468,6 +1468,26 @@ export class VRSceneManager {
       // Store reference for updates
       this.fileBoxMeshes.set(file, boxMesh);
 
+      // Hover tooltip for file box – shows file name when not hovering a function
+      const originalEmissive = material.emissiveColor.clone();
+      boxMesh.actionManager = new BABYLON.ActionManager(this.scene);
+      boxMesh.actionManager.registerAction(
+        new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPointerOverTrigger, () => {
+          material.emissiveColor = new BABYLON.Color3(
+            fileColor.r * 0.25,
+            fileColor.g * 0.25,
+            fileColor.b * 0.25
+          );
+          this.showTooltip({ name: file });
+        })
+      );
+      boxMesh.actionManager.registerAction(
+        new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPointerOutTrigger, () => {
+          material.emissiveColor = originalEmissive.clone();
+          this.hideTooltip();
+        })
+      );
+
       // Add a readable file-name plaque on each file box.
       this.createFileBoxLabel(file, boxMesh);
     }
