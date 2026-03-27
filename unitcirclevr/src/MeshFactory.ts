@@ -231,7 +231,7 @@ export class MeshFactory {
     for (const face of faces) {
       const labelPlane = BABYLON.MeshBuilder.CreatePlane(
         `func_label_${node.id}_${face.suffix}`,
-        { width: planeSize, height: planeSize, sideOrientation: BABYLON.Mesh.FRONTSIDE },
+        { width: planeSize, height: planeSize, sideOrientation: BABYLON.Mesh.BACKSIDE },
         this.scene
       );
       labelPlane.parent = parentBox;
@@ -264,6 +264,12 @@ export class MeshFactory {
     );
     dynamicTexture.hasAlpha = false;
     const ctx = dynamicTexture.getContext() as any;
+
+    // BACKSIDE orientation makes the visible label side horizontally mirrored;
+    // pre-flip the canvas so rendered text reads forward in-world.
+    ctx.save();
+    ctx.translate(textureSize, 0);
+    ctx.scale(-1, 1);
 
     // Use an opaque dark plaque background to keep label rendering stable.
     if (backgroundColor) {
@@ -311,6 +317,8 @@ export class MeshFactory {
     ctx.fillStyle = '#ffffff';
     yOffset = panelY + panelPadding;
     ctx.fillText(lines[0], textureSize / 2, yOffset);
+
+    ctx.restore();
 
     dynamicTexture.update();
     return dynamicTexture;
