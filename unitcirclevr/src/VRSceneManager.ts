@@ -710,6 +710,9 @@ export class VRSceneManager {
     // Always resolve collisions immediately after any resize/reposition.
     this.resolveInitialFileBoxOverlaps(6);
     this.enforceMinimumFileBoxGap(10.0, 6);
+
+    // Pull boxes toward their mutual centroid to minimise total bounding volume.
+    this.compactFileBoxLayout(80, 10.0);
   }
 
   private populateCurrentEdges(graph: GraphData): void {
@@ -2769,6 +2772,109 @@ export class VRSceneManager {
   /**
    * Place file boxes in a deterministic visible grid near the origin.
    */
+  /**
+   * Minimise the total bounding volume of the file-box layout by iteratively
+   * nudging each box toward the group centroid.  A candidate move is only
+   * applied when the AABB gap to every other box remains ≥ minGap, so boxes
+   * never collide or crowd one another.
+   */
+  private compactFileBoxLayout(iterations: number = 80, minGap: number = 10.0): void {
+    if (!this.fileLayout) return;
+
+    const files = Array.from(this.fileNodeIds.keys());
+    if (files.length < 2) return;
+
+    const fileNodes = this.fileLayout.getNodes();
+
+    // AABB overlap test using per-axis half-extents + gap.
+    const overlaps = (
+      pos1: { x: number; y: number; z: number },
+      pos2: { x: number; y: number; z: number },
+      box1: BABYLON.Mesh,
+      box2: BABYLON.Mesh
+    ): boolean => {
+      const dx = Math.abs(pos2.x - pos1.x);
+      const dy = Math.abs(pos2.y - pos1.y);
+      const dz = Math.abs(pos2.z - pos1.z);
+      return (
+        dx < box1.scaling.x / 2 + box2.scaling.x / 2 + minGap &&
+        dy < box1.scaling.y / 2 + box2.scaling.y / 2 + minGap &&
+        dz < box1.scaling.z / 2 + box2.scaling.z / 2 + minGap
+      );
+    };
+
+    for (let iter = 0; iter < iterations; iter++) {
+      // Compute centroid of all file-box centres.
+      let cx = 0, cy = 0, cz = 0, count = 0;
+      for (const file of files) {
+        const n = fileNodes.get(file);
+        if (!n) continue;
+        cx += n.position.x;
+        cy += n.position.y;
+        cz += n.position.z;
+        count++;
+      }
+      if (count === 0) break;
+      cx /= count;
+      cy /= count;
+      cz /= count;
+
+      let movedAny = false;
+
+      for (const file of files) {
+        const node = fileNodes.get(file);
+        const box = this.fileBoxMeshes.get(file);
+        if (!node || !box) continue;
+
+        const dirX = cx - node.position.x;
+        const dirY = cy - node.position.y;
+        const dirZ = cz - node.position.z;
+        const dist = Math.sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ);
+        if (dist < 0.5) continue; // Already close enough to centroid.
+
+        // Attempt a step of 10 % of remaining distance (min 0.5 units).
+        const step = Math.max(0.5, dist * 0.10);
+        const scale = step / dist;
+        const candidate = {
+          x: node.position.x + dirX * scale,
+          y: node.position.y + dirY * scale,
+          z: node.position.z + dirZ * scale,
+        };
+
+        // Accept move only if it preserves gap with every other box.
+        let safe = true;
+        for (const other of files) {
+          if (other === file) continue;
+          const otherNode = fileNodes.get(other);
+          const otherBox = this.fileBoxMeshes.get(other);
+          if (!otherNode || !otherBox) continue;
+          if (overlaps(candidate, otherNode.position, box, otherBox)) {
+            safe = false;
+            break;
+          }
+        }
+
+        if (safe) {
+          node.position.x = candidate.x;
+          node.position.y = candidate.y;
+          node.position.z = candidate.z;
+          movedAny = true;
+        }
+      }
+
+      if (!movedAny) break;
+    }
+
+    // Sync compacted positions to file-box meshes.
+    for (const [file, fileBox] of this.fileBoxMeshes.entries()) {
+      const fileNode = fileNodes.get(file);
+      if (!fileNode) continue;
+      fileBox.position.x = fileNode.position.x;
+      fileBox.position.y = fileNode.position.y;
+      fileBox.position.z = fileNode.position.z;
+    }
+  }
+
   private positionFileBoxesInGrid(): void {
     const files = Array.from(this.fileBoxMeshes.keys()).sort();
     if (files.length === 0) {

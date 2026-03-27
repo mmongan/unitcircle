@@ -948,7 +948,7 @@
       "id": "populateCurrentEdges@src\\VRSceneManager.ts",
       "name": "populateCurrentEdges",
       "file": "VRSceneManager.ts",
-      "line": 715,
+      "line": 718,
       "isExported": false,
       "type": "function"
     },
@@ -956,7 +956,7 @@
       "id": "updateCodeGraph@src\\VRSceneManager.ts",
       "name": "updateCodeGraph",
       "file": "VRSceneManager.ts",
-      "line": 726,
+      "line": 729,
       "isExported": false,
       "type": "function"
     },
@@ -964,7 +964,7 @@
       "id": "clearScene@src\\VRSceneManager.ts",
       "name": "clearScene",
       "file": "VRSceneManager.ts",
-      "line": 733,
+      "line": 736,
       "isExported": false,
       "type": "function"
     },
@@ -972,7 +972,7 @@
       "id": "buildEdgeList@src\\VRSceneManager.ts",
       "name": "buildEdgeList",
       "file": "VRSceneManager.ts",
-      "line": 759,
+      "line": 762,
       "isExported": false,
       "type": "function"
     },
@@ -980,7 +980,7 @@
       "id": "buildCrossFileEdges@src\\VRSceneManager.ts",
       "name": "buildCrossFileEdges",
       "file": "VRSceneManager.ts",
-      "line": 767,
+      "line": 770,
       "isExported": false,
       "type": "function"
     },
@@ -988,7 +988,7 @@
       "id": "renderNodes@src\\VRSceneManager.ts",
       "name": "renderNodes",
       "file": "VRSceneManager.ts",
-      "line": 792,
+      "line": 795,
       "isExported": false,
       "type": "function"
     },
@@ -996,7 +996,7 @@
       "id": "applyChildScaleCompensation@src\\VRSceneManager.ts",
       "name": "applyChildScaleCompensation",
       "file": "VRSceneManager.ts",
-      "line": 861,
+      "line": 864,
       "isExported": false,
       "type": "function"
     },
@@ -1004,7 +1004,7 @@
       "id": "setupNodeInteraction@src\\VRSceneManager.ts",
       "name": "setupNodeInteraction",
       "file": "VRSceneManager.ts",
-      "line": 868,
+      "line": 871,
       "isExported": false,
       "type": "function"
     },
@@ -1012,7 +1012,7 @@
       "id": "isInXR@src\\VRSceneManager.ts",
       "name": "isInXR",
       "file": "VRSceneManager.ts",
-      "line": 893,
+      "line": 896,
       "isExported": false,
       "type": "function"
     },
@@ -1020,7 +1020,7 @@
       "id": "flyToWorldPosition@src\\VRSceneManager.ts",
       "name": "flyToWorldPosition",
       "file": "VRSceneManager.ts",
-      "line": 900,
+      "line": 903,
       "isExported": false,
       "type": "function"
     },
@@ -1028,7 +1028,7 @@
       "id": "flyToViaCamera@src\\VRSceneManager.ts",
       "name": "flyToViaCamera",
       "file": "VRSceneManager.ts",
-      "line": 912,
+      "line": 915,
       "isExported": false,
       "type": "function"
     },
@@ -1036,7 +1036,7 @@
       "id": "flyToViaSceneRoot@src\\VRSceneManager.ts",
       "name": "flyToViaSceneRoot",
       "file": "VRSceneManager.ts",
-      "line": 970,
+      "line": 973,
       "isExported": false,
       "type": "function"
     },
@@ -1044,7 +1044,7 @@
       "id": "slideFaceView@src\\VRSceneManager.ts",
       "name": "slideFaceView",
       "file": "VRSceneManager.ts",
-      "line": 1002,
+      "line": 1005,
       "isExported": false,
       "type": "function"
     },
@@ -1052,7 +1052,7 @@
       "id": "calculateIndegree@src\\VRSceneManager.ts",
       "name": "calculateIndegree",
       "file": "VRSceneManager.ts",
-      "line": 1078,
+      "line": 1081,
       "isExported": false,
       "type": "function"
     },
@@ -1060,7 +1060,7 @@
       "id": "applyFileBoxRepulsion@src\\VRSceneManager.ts",
       "name": "applyFileBoxRepulsion",
       "file": "VRSceneManager.ts",
-      "line": 1092,
+      "line": 1095,
       "isExported": false,
       "type": "function"
     },
@@ -1068,7 +1068,7 @@
       "id": "resolveInitialFileBoxOverlaps@src\\VRSceneManager.ts",
       "name": "resolveInitialFileBoxOverlaps",
       "file": "VRSceneManager.ts",
-      "line": 1189,
+      "line": 1192,
       "isExported": false,
       "type": "function"
     },
@@ -1076,7 +1076,7 @@
       "id": "enforceMinimumFileBoxGap@src\\VRSceneManager.ts",
       "name": "enforceMinimumFileBoxGap",
       "file": "VRSceneManager.ts",
-      "line": 1288,
+      "line": 1291,
       "isExported": false,
       "type": "function"
     },
@@ -1084,7 +1084,7 @@
       "id": "recenterInternalLayouts@src\\VRSceneManager.ts",
       "name": "recenterInternalLayouts",
       "file": "VRSceneManager.ts",
-      "line": 1385,
+      "line": 1388,
       "isExported": false,
       "type": "function"
     },
@@ -1092,7 +1092,7 @@
       "id": "clampNodesInsideFileBoxes@src\\VRSceneManager.ts",
       "name": "clampNodesInsideFileBoxes",
       "file": "VRSceneManager.ts",
-      "line": 1446,
+      "line": 1449,
       "isExported": true,
       "type": "function"
     },
@@ -1100,7 +1100,7 @@
       "id": "renderFileBoxes@src\\VRSceneManager.ts",
       "name": "renderFileBoxes",
       "file": "VRSceneManager.ts",
-      "line": 1485,
+      "line": 1488,
       "isExported": false,
       "type": "function"
     },
@@ -1108,7 +1108,7 @@
       "id": "createFileBoxLabel@src\\VRSceneManager.ts",
       "name": "createFileBoxLabel",
       "file": "VRSceneManager.ts",
-      "line": 1567,
+      "line": 1570,
       "isExported": false,
       "type": "function"
     },
@@ -1116,7 +1116,7 @@
       "id": "updateFileBoxLabelTransform@src\\VRSceneManager.ts",
       "name": "updateFileBoxLabelTransform",
       "file": "VRSceneManager.ts",
-      "line": 1614,
+      "line": 1617,
       "isExported": false,
       "type": "function"
     },
@@ -1124,7 +1124,7 @@
       "id": "calculateFileBoxSize@src\\VRSceneManager.ts",
       "name": "calculateFileBoxSize",
       "file": "VRSceneManager.ts",
-      "line": 1627,
+      "line": 1630,
       "isExported": true,
       "type": "function"
     },
@@ -1132,7 +1132,7 @@
       "id": "autosizeFileBoxes@src\\VRSceneManager.ts",
       "name": "autosizeFileBoxes",
       "file": "VRSceneManager.ts",
-      "line": 1663,
+      "line": 1666,
       "isExported": true,
       "type": "function"
     },
@@ -1140,7 +1140,7 @@
       "id": "ensureExportedFunctionsParentedToFileBoxes@src\\VRSceneManager.ts",
       "name": "ensureExportedFunctionsParentedToFileBoxes",
       "file": "VRSceneManager.ts",
-      "line": 1784,
+      "line": 1787,
       "isExported": true,
       "type": "function"
     },
@@ -1148,7 +1148,7 @@
       "id": "placeExportedFunctionsOnOptimalFace@src\\VRSceneManager.ts",
       "name": "placeExportedFunctionsOnOptimalFace",
       "file": "VRSceneManager.ts",
-      "line": 1842,
+      "line": 1845,
       "isExported": false,
       "type": "function"
     },
@@ -1156,7 +1156,7 @@
       "id": "getExportedFaceLocalTarget@src\\VRSceneManager.ts",
       "name": "getExportedFaceLocalTarget",
       "file": "VRSceneManager.ts",
-      "line": 1977,
+      "line": 1980,
       "isExported": false,
       "type": "function"
     },
@@ -1164,7 +1164,7 @@
       "id": "resolveEdgeObstructions@src\\VRSceneManager.ts",
       "name": "resolveEdgeObstructions",
       "file": "VRSceneManager.ts",
-      "line": 2028,
+      "line": 2031,
       "isExported": false,
       "type": "function"
     },
@@ -1172,7 +1172,7 @@
       "id": "resolveFileBoxOverlapsByMesh@src\\VRSceneManager.ts",
       "name": "resolveFileBoxOverlapsByMesh",
       "file": "VRSceneManager.ts",
-      "line": 2152,
+      "line": 2155,
       "isExported": false,
       "type": "function"
     },
@@ -1180,7 +1180,7 @@
       "id": "pullInternalNodesToExportedFace@src\\VRSceneManager.ts",
       "name": "pullInternalNodesToExportedFace",
       "file": "VRSceneManager.ts",
-      "line": 2212,
+      "line": 2215,
       "isExported": false,
       "type": "function"
     },
@@ -1188,7 +1188,7 @@
       "id": "resolveInternalNodeCollisions@src\\VRSceneManager.ts",
       "name": "resolveInternalNodeCollisions",
       "file": "VRSceneManager.ts",
-      "line": 2383,
+      "line": 2386,
       "isExported": false,
       "type": "function"
     },
@@ -1196,7 +1196,7 @@
       "id": "resolveExportedFaceEdgeObstructions@src\\VRSceneManager.ts",
       "name": "resolveExportedFaceEdgeObstructions",
       "file": "VRSceneManager.ts",
-      "line": 2449,
+      "line": 2452,
       "isExported": false,
       "type": "function"
     },
@@ -1204,7 +1204,7 @@
       "id": "resolveNodeEdgeObstructions@src\\VRSceneManager.ts",
       "name": "resolveNodeEdgeObstructions",
       "file": "VRSceneManager.ts",
-      "line": 2578,
+      "line": 2581,
       "isExported": false,
       "type": "function"
     },
@@ -1212,7 +1212,7 @@
       "id": "renderEdges@src\\VRSceneManager.ts",
       "name": "renderEdges",
       "file": "VRSceneManager.ts",
-      "line": 2681,
+      "line": 2684,
       "isExported": false,
       "type": "function"
     },
@@ -1220,7 +1220,15 @@
       "id": "frameCameraToExportedFunctions@src\\VRSceneManager.ts",
       "name": "frameCameraToExportedFunctions",
       "file": "VRSceneManager.ts",
-      "line": 2703,
+      "line": 2706,
+      "isExported": false,
+      "type": "function"
+    },
+    {
+      "id": "compactFileBoxLayout@src\\VRSceneManager.ts",
+      "name": "compactFileBoxLayout",
+      "file": "VRSceneManager.ts",
+      "line": 2781,
       "isExported": false,
       "type": "function"
     },
@@ -1228,7 +1236,7 @@
       "id": "positionFileBoxesInGrid@src\\VRSceneManager.ts",
       "name": "positionFileBoxesInGrid",
       "file": "VRSceneManager.ts",
-      "line": 2772,
+      "line": 2878,
       "isExported": false,
       "type": "function"
     },
@@ -1236,7 +1244,7 @@
       "id": "showTooltip@src\\VRSceneManager.ts",
       "name": "showTooltip",
       "file": "VRSceneManager.ts",
-      "line": 2814,
+      "line": 2920,
       "isExported": false,
       "type": "function"
     },
@@ -1244,7 +1252,7 @@
       "id": "hideTooltip@src\\VRSceneManager.ts",
       "name": "hideTooltip",
       "file": "VRSceneManager.ts",
-      "line": 2844,
+      "line": 2950,
       "isExported": false,
       "type": "function"
     },
@@ -1252,7 +1260,7 @@
       "id": "setupWebXR@src\\VRSceneManager.ts",
       "name": "setupWebXR",
       "file": "VRSceneManager.ts",
-      "line": 2849,
+      "line": 2955,
       "isExported": false,
       "type": "function"
     },
@@ -1260,7 +1268,7 @@
       "id": "handleGripGesture@src\\VRSceneManager.ts",
       "name": "handleGripGesture",
       "file": "VRSceneManager.ts",
-      "line": 2884,
+      "line": 2990,
       "isExported": false,
       "type": "function"
     },
@@ -1268,7 +1276,7 @@
       "id": "navigateToFunctionMesh@src\\VRSceneManager.ts",
       "name": "navigateToFunctionMesh",
       "file": "VRSceneManager.ts",
-      "line": 2920,
+      "line": 3026,
       "isExported": false,
       "type": "function"
     },
@@ -1276,7 +1284,7 @@
       "id": "attemptTeleportToFunction@src\\VRSceneManager.ts",
       "name": "attemptTeleportToFunction",
       "file": "VRSceneManager.ts",
-      "line": 2947,
+      "line": 3053,
       "isExported": false,
       "type": "function"
     },
@@ -1284,7 +1292,7 @@
       "id": "attemptGrabObject@src\\VRSceneManager.ts",
       "name": "attemptGrabObject",
       "file": "VRSceneManager.ts",
-      "line": 2977,
+      "line": 3083,
       "isExported": false,
       "type": "function"
     },
@@ -1292,7 +1300,7 @@
       "id": "releaseHeldObjects@src\\VRSceneManager.ts",
       "name": "releaseHeldObjects",
       "file": "VRSceneManager.ts",
-      "line": 3001,
+      "line": 3107,
       "isExported": false,
       "type": "function"
     },
@@ -1300,7 +1308,7 @@
       "id": "updateHeldObjectPositions@src\\VRSceneManager.ts",
       "name": "updateHeldObjectPositions",
       "file": "VRSceneManager.ts",
-      "line": 3014,
+      "line": 3120,
       "isExported": false,
       "type": "function"
     },
@@ -1308,7 +1316,7 @@
       "id": "run@src\\VRSceneManager.ts",
       "name": "run",
       "file": "VRSceneManager.ts",
-      "line": 3034,
+      "line": 3140,
       "isExported": true,
       "type": "function"
     },
@@ -1316,7 +1324,7 @@
       "id": "dispose@src\\VRSceneManager.ts",
       "name": "dispose",
       "file": "VRSceneManager.ts",
-      "line": 3042,
+      "line": 3148,
       "isExported": true,
       "type": "function"
     },
@@ -1824,6 +1832,10 @@
       "to": "enforceMinimumFileBoxGap@src\\VRSceneManager.ts"
     },
     {
+      "from": "fitAndSeparateFileBoxes@src\\VRSceneManager.ts",
+      "to": "compactFileBoxLayout@src\\VRSceneManager.ts"
+    },
+    {
       "from": "updateCodeGraph@src\\VRSceneManager.ts",
       "to": "clearScene@src\\VRSceneManager.ts"
     },
@@ -1964,6 +1976,10 @@
       "to": "createEdges@src\\MeshFactory.ts"
     },
     {
+      "from": "compactFileBoxLayout@src\\VRSceneManager.ts",
+      "to": "getNodes@src\\ForceDirectedLayout.ts"
+    },
+    {
       "from": "setupWebXR@src\\VRSceneManager.ts",
       "to": "initializeFromXRInput@src\\Quest3GripController.ts"
     },
@@ -2048,5 +2064,5 @@
       "to": "render@src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-27T04:12:15.038Z"
+  "lastUpdated": "2026-03-27T04:16:14.527Z"
 }
