@@ -856,14 +856,19 @@ export class VRSceneManager {
     );
   }
 
-  private sceneRootFlyTo(targetPosition: BABYLON.Vector3): void {
+  private sceneRootFlyTo(targetLocalPosition: BABYLON.Vector3): void {
     // Stop any existing animation on the scene root
     this.scene.stopAnimation(this.sceneRoot);
     
-    // Move sceneRoot so the target mesh appears at the camera's look-at point
-    // (the origin). Camera is fixed at CAMERA_POSITION looking at (0,0,0),
-    // so placing the mesh at origin centres it in view.
-    const targetSceneRootPosition = targetPosition.negate();
+    // Move sceneRoot so the target mesh ends up at where the camera is looking.
+    // Camera target may have been changed by frameCameraToContent, so read it
+    // dynamically rather than assuming origin.
+    const cameraTarget = this.camera.target.clone();
+    // targetLocalPosition is the mesh position relative to sceneRoot.
+    // After animation: worldPos = sceneRoot.position + targetLocalPosition
+    // We want worldPos == cameraTarget, so:
+    //   sceneRoot.position = cameraTarget - targetLocalPosition
+    const targetSceneRootPosition = cameraTarget.subtract(targetLocalPosition);
 
     // Create smooth position animation without vertical bounce.
     const positionAnimation = new BABYLON.Animation(
