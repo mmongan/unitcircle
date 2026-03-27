@@ -281,9 +281,9 @@ export class MeshFactory {
 
     // Draw a fully-opaque background strip behind the text so there are no
     // semi-transparent pixels that can sort/flicker against the box face.
-    const stripHeight = SceneConfig.SIGNATURE_FONT_SIZE_PX * 1.4;
+    const stripHeight = SceneConfig.SIGNATURE_FONT_SIZE_PX * 1.6;
     const stripY = (textureSize - stripHeight) / 2;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.82)';
+    ctx.fillStyle = 'rgb(0, 0, 0)';
     ctx.fillRect(0, stripY, textureSize, stripHeight);
 
     // Draw white text directly (no stroke) – fully opaque pixels only.
