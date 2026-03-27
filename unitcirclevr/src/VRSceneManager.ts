@@ -91,27 +91,29 @@ export class VRSceneManager {
       if (pointerEvent.type === BABYLON.PointerEventTypes.POINTERDOWN && !this.isAnimating) {
         const pickResult = this.scene.pick(this.scene.pointerX, this.scene.pointerY);
         if (pickResult && pickResult.hit && pickResult.pickedMesh) {
-          const clickedNode = (pickResult.pickedMesh as any).nodeData as GraphNode;
+          const mesh = pickResult.pickedMesh;
+          const clickedNode = (mesh as any).nodeData as GraphNode;
+
+          let faceNormal = (pickResult as any).normal || new BABYLON.Vector3(0, 0, 1);
           if (clickedNode) {
-            let faceNormal = (pickResult as any).normal || new BABYLON.Vector3(0, 0, 1);
             const pickedPoint = (pickResult as any).pickedPoint as BABYLON.Vector3;
-            const cubePosition = pickResult.pickedMesh.position;
-            
-            // Check if click is near an edge (within 10% of cube size) and get adjacent face if so
+            const cubePosition = mesh.position;
             const adjacentFaceNormal = this.getAdjacentFaceIfNearEdge(pickedPoint, cubePosition, faceNormal);
             if (adjacentFaceNormal) {
               faceNormal = adjacentFaceNormal;
             }
-            
-            try {
-              // Browser click should always fly directly to the selected object.
-              this.currentFunctionId = clickedNode.id;
-              this.currentFaceNormal = faceNormal.clone();
-              this.sceneRootFlyTo(pickResult.pickedMesh.position);
-            } catch (error) {
-              console.error('Error during animation setup:', error);
-              this.isAnimating = false;  // Reset on error
-            }
+            this.currentFunctionId = clickedNode.id;
+          }
+
+          try {
+            // Fly to any clicked object (function box, file box, etc.)
+            this.currentFaceNormal = faceNormal.clone();
+            // Use the mesh's world position (accounts for parenting)
+            const worldPos = mesh.getAbsolutePosition();
+            this.sceneRootFlyTo(worldPos);
+          } catch (error) {
+            console.error('Error during animation setup:', error);
+            this.isAnimating = false;
           }
         }
       }
