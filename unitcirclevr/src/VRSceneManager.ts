@@ -15,6 +15,7 @@ export class VRSceneManager {
   private graphLoader: GraphLoader;
   private currentEdges: Set<string> = new Set();
   private isAnimating: boolean = false;
+  private flyObserver: BABYLON.Observer<BABYLON.Scene> | null = null;
   private fileColorMap: Map<string, BABYLON.Color3> = new Map();
   private currentFunctionId: string | null = null;
   private currentFaceNormal: BABYLON.Vector3 | null = null;
@@ -88,7 +89,7 @@ export class VRSceneManager {
    */
   private setupClickHandler(): void {
     this.scene.onPointerObservable.add((pointerEvent) => {
-      if (pointerEvent.type === BABYLON.PointerEventTypes.POINTERDOWN && !this.isAnimating) {
+      if (pointerEvent.type === BABYLON.PointerEventTypes.POINTERDOWN) {
         const hits = this.scene.multiPick(this.scene.pointerX, this.scene.pointerY) || [];
         const validHits = hits.filter((h) => h?.hit && h.pickedMesh);
         const prioritizedHit = validHits.find((h) => ((h.pickedMesh as any).nodeData as GraphNode | undefined) !== undefined)
@@ -875,43 +876,57 @@ export class VRSceneManager {
    * Camera ends up a short distance in front of the target, looking at it.
    */
   private flyToViaCamera(targetWorldPos: BABYLON.Vector3, targetMesh?: BABYLON.AbstractMesh): void {
+    // Cancel any in-progress fly animation before starting a new one.
     this.scene.stopAnimation(this.camera);
+    if (this.flyObserver) {
+      this.scene.onBeforeRenderObservable.remove(this.flyObserver);
+      this.flyObserver = null;
+    }
+    this.isAnimating = false;
 
-    // Fly the camera to a point offset from the target along the current
-    // camera-to-target direction so the object stays visible.
     const currentDir = this.camera.target.subtract(this.camera.position).normalize();
-    // Keep a safe distance based on object size so we don't land inside file boxes.
     const radius = targetMesh?.getBoundingInfo()?.boundingSphere?.radiusWorld ?? 0;
     const standoffDistance = Math.max(2, radius + 1.5);
     const newCamPos = targetWorldPos.subtract(currentDir.scale(standoffDistance));
-    const newCamTarget = targetWorldPos.clone();
 
     const fps = SceneConfig.FLY_TO_ANIMATION_FPS;
     const totalFrames = (SceneConfig.FLY_TO_ANIMATION_TIME_MS / 1000) * fps;
 
+    // Only animate position — never animate camera.target directly on a
+    // UniversalCamera as it corrupts internal rotation state and breaks
+    // mouse look after the animation ends.
     const posAnim = new BABYLON.Animation('camFlyPos', 'position', fps, BABYLON.Animation.ANIMATIONTYPE_VECTOR3);
-    const tgtAnim = new BABYLON.Animation('camFlyTgt', 'target', fps, BABYLON.Animation.ANIMATIONTYPE_VECTOR3);
-
     const startPos = this.camera.position.clone();
     const startTgt = this.camera.target.clone();
     const posKeys: { frame: number; value: BABYLON.Vector3 }[] = [];
-    const tgtKeys: { frame: number; value: BABYLON.Vector3 }[] = [];
 
     for (let i = 0; i <= totalFrames; i++) {
       const t = i / totalFrames;
       const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
       posKeys.push({ frame: i, value: BABYLON.Vector3.Lerp(startPos, newCamPos, e) });
-      tgtKeys.push({ frame: i, value: BABYLON.Vector3.Lerp(startTgt, newCamTarget, e) });
     }
     posAnim.setKeys(posKeys);
-    tgtAnim.setKeys(tgtKeys);
 
-    this.isAnimating = true;
-    this.scene.beginDirectAnimation(this.camera, [posAnim, tgtAnim], 0, totalFrames, false, 1, () => {
-      this.isAnimating = false;
+    // Drive camera.setTarget() each frame via an observer so rotation state
+    // stays consistent and mouse look works after landing.
+    const animStart = performance.now();
+    const durationMs = SceneConfig.FLY_TO_ANIMATION_TIME_MS;
+    this.flyObserver = this.scene.onBeforeRenderObservable.add(() => {
+      const elapsed = performance.now() - animStart;
+      const t = Math.min(elapsed / durationMs, 1);
+      const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      this.camera.setTarget(BABYLON.Vector3.Lerp(startTgt, targetWorldPos, e));
+      if (t >= 1) {
+        this.scene.onBeforeRenderObservable.remove(this.flyObserver!);
+        this.flyObserver = null;
+        this.isAnimating = false;
+      }
     });
 
-    setTimeout(() => { this.isAnimating = false; }, SceneConfig.FLY_TO_ANIMATION_TIME_MS + 200);
+    this.isAnimating = true;
+    this.scene.beginDirectAnimation(this.camera, [posAnim], 0, totalFrames, false, 1, () => {
+      this.isAnimating = false;
+    });
   }
 
   /**
