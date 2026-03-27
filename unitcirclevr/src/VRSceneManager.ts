@@ -4,6 +4,7 @@ import type { GraphData, GraphNode } from './types';
 import { MeshFactory } from './MeshFactory';
 import { GraphLoader } from './GraphLoader';
 import { SceneConfig } from './SceneConfig';
+import { Quest3GripController, type GripState, type GripGesture } from './Quest3GripController';
 
 export class VRSceneManager {
   private engine: BABYLON.Engine;
@@ -18,6 +19,7 @@ export class VRSceneManager {
   private currentFunctionId: string | null = null;
   private currentFaceNormal: BABYLON.Vector3 | null = null;
   private xrExperience: BABYLON.WebXRDefaultExperience | null = null;
+  private gripController: Quest3GripController | null = null;
   
   // Flight controls
   private flightSpeed = 100;  // Units per second
@@ -2777,8 +2779,20 @@ export class VRSceneManager {
       this.xrExperience = await this.scene.createDefaultXRExperienceAsync();
       console.log('WebXR experience created successfully');
 
+      // Initialize Quest 3 Grip Controller
+      this.gripController = new Quest3GripController(this.scene);
+      
       // Setup VR controller input
       const xrInput = this.xrExperience.input;
+      
+      // Initialize grip controller from XR input
+      this.gripController.initializeFromXRInput(xrInput);
+      
+      // Register grip gesture callback
+      this.gripController.onGripGesture((gesture) => {
+        this.handleGripGesture(gesture);
+      });
+
       xrInput.onControllerAddedObservable.add((controller) => {
         // Track motion controller for raycasting
         controller.onMotionControllerInitObservable.add((motionController) => {
@@ -2863,6 +2877,97 @@ export class VRSceneManager {
           console.error('Error during VR animation setup:', error);
           this.isAnimating = false;
         }
+      }
+    }
+  }
+
+  /**
+   * Handle grip gestures from Quest 3 controllers
+   */
+  private handleGripGesture(gesture: GripGesture): void {
+    console.log(`🎮 Grip Gesture: ${gesture.hand} - ${gesture.type} (intensity: ${gesture.intensity})`);
+    
+    if (!this.gripController) return;
+    
+    const gripState = this.gripController.getGripState(gesture.hand);
+    
+    switch (gesture.type) {
+      case 'grab':
+        // On grip press, try to grab a nearby object
+        this.attemptGrabObject(gesture.hand, gripState);
+        break;
+        
+      case 'release':
+        // On grip release, release any held objects
+        this.releaseHeldObjects(gesture.hand);
+        break;
+        
+      case 'manipulate':
+        // On grip pressure change, update held object positions
+        this.updateHeldObjectPositions(gesture.hand, gripState);
+        break;
+        
+      default:
+        break;
+    }
+  }
+
+  /**
+   * Attempt to grab an object with a hand based on grip ray
+   */
+  private attemptGrabObject(hand: 'left' | 'right', gripState: GripState): void {
+    // Cast a ray from the grip position forward
+    const origin = gripState.position;
+    const direction = gripState.direction;
+    const length = this.gripController?.getMaxGripDistance() || 5.0;
+    
+    const ray = new BABYLON.Ray(origin, direction, length);
+    
+    // Pick objects that can be grabbed
+    const hit = this.scene.pickWithRay(ray, (mesh) => {
+      const nodeData = (mesh as any).nodeData as GraphNode | undefined;
+      return mesh.isPickable && nodeData !== undefined;
+    });
+    
+    if (hit && hit.hit && hit.pickedMesh) {
+      const mesh = hit.pickedMesh as BABYLON.Mesh;
+      this.gripController?.grabObject(hand, mesh);
+      console.log(`✋ Grabbed object: ${mesh.name} (${hand})`);
+    }
+  }
+
+  /**
+   * Release objects held by a hand
+   */
+  private releaseHeldObjects(hand: 'left' | 'right'): void {
+    if (!this.gripController) return;
+    
+    const heldObjects = this.gripController.getHeldObjects(hand);
+    if (heldObjects.size > 0) {
+      console.log(`🔓 Released ${heldObjects.size} object(s) from ${hand} hand`);
+      this.gripController.releaseObject(hand);
+    }
+  }
+
+  /**
+   * Update positions of held objects based on grip movement
+   */
+  private updateHeldObjectPositions(hand: 'left' | 'right', gripState: GripState): void {
+    if (!this.gripController) return;
+    
+    const heldObjects = this.gripController.getHeldObjects(hand);
+    if (heldObjects.size === 0) return;
+    
+    const gripVelocity = this.gripController.getGripVelocity(hand);
+    
+    for (const mesh of heldObjects) {
+      // Move held object with the grip position
+      mesh.position = gripState.position.clone();
+      
+      // Apply grip velocity for physics-based interaction
+      if ((mesh as any).physicsImpostor) {
+        const newVel = gripVelocity.scale(0.01); // Scale down for reasonable physics
+        (mesh as any).physicsImpostor.setLinearVelocity(newVel);
       }
     }
   }
