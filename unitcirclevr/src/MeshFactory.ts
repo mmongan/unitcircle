@@ -182,7 +182,7 @@ export class MeshFactory {
   private createFunctionFaceDescriptionPlanes(
     node: GraphNode,
     parentBox: BABYLON.Mesh,
-    _fileColor: BABYLON.Color3 | null,
+    fileColor: BABYLON.Color3 | null,
     boxSize: number
   ): void {
     // Single texture shared across all faces — each plane is placed facing
@@ -190,7 +190,7 @@ export class MeshFactory {
     // outside.  No per-face texture flip is needed because the UV layout is
     // aligned correctly for each outward-facing orientation.
     // Keep most of the face transparent so the cube's base color remains visible.
-    const texture = this.createSignatureTexture(node);
+    const texture = this.createSignatureTexture(node, fileColor);
     const half = boxSize / 2;
     const offset = half + 0.08;
     const planeSize = boxSize;
@@ -254,9 +254,10 @@ export class MeshFactory {
   }
 
   /**
-   * Create a dynamic texture with function signature information
+   * Create a dynamic texture with function signature information.
+   * Uses the file color for the label background, ensuring visual consistency.
    */
-  private createSignatureTexture(node: GraphNode): BABYLON.DynamicTexture {
+  private createSignatureTexture(node: GraphNode, fileColor: BABYLON.Color3 | null): BABYLON.DynamicTexture {
     const textureSize = SceneConfig.SIGNATURE_TEXTURE_SIZE;
     const dynamicTexture = new BABYLON.DynamicTexture(
       `signatureTexture_${node.id}`,
@@ -275,8 +276,15 @@ export class MeshFactory {
     // Clear to fully transparent so box color shows through.
     ctx.clearRect(0, 0, textureSize, textureSize);
 
-    // Draw a solid black background for entire texture — ensures white text is always visible.
-    ctx.fillStyle = 'rgb(0, 0, 0)';
+    // Draw background using the file color, darkened for contrast with white text.
+    let bgColor = 'rgb(0, 0, 0)';
+    if (fileColor) {
+      const r = Math.max(0, Math.floor(fileColor.r * 200));
+      const g = Math.max(0, Math.floor(fileColor.g * 200));
+      const b = Math.max(0, Math.floor(fileColor.b * 200));
+      bgColor = `rgb(${r}, ${g}, ${b})`;
+    }
+    ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, textureSize, textureSize);
 
     // Function boxes should display only the function signature.

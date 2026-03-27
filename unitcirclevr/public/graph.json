@@ -460,7 +460,7 @@
       "id": "createSignatureTexture@src\\MeshFactory.ts",
       "name": "createSignatureTexture",
       "file": "MeshFactory.ts",
-      "line": 259,
+      "line": 260,
       "isExported": false,
       "type": "function"
     },
@@ -468,7 +468,7 @@
       "id": "createLabel@src\\MeshFactory.ts",
       "name": "createLabel",
       "file": "MeshFactory.ts",
-      "line": 300,
+      "line": 308,
       "isExported": false,
       "type": "function"
     },
@@ -476,7 +476,7 @@
       "id": "createEdges@src\\MeshFactory.ts",
       "name": "createEdges",
       "file": "MeshFactory.ts",
-      "line": 346,
+      "line": 354,
       "isExported": true,
       "type": "function"
     },
@@ -484,7 +484,7 @@
       "id": "removeMeshReference@src\\MeshFactory.ts",
       "name": "removeMeshReference",
       "file": "MeshFactory.ts",
-      "line": 436,
+      "line": 444,
       "isExported": true,
       "type": "function"
     },
@@ -492,7 +492,7 @@
       "id": "updateEdges@src\\MeshFactory.ts",
       "name": "updateEdges",
       "file": "MeshFactory.ts",
-      "line": 445,
+      "line": 453,
       "isExported": true,
       "type": "function"
     },
@@ -2064,5 +2064,5 @@
       "to": "render@src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-27T04:28:40.081Z"
+  "lastUpdated": "2026-03-27T04:32:36.347Z"
 }
