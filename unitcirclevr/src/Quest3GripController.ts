@@ -146,8 +146,18 @@ export class Quest3GripController {
     component: BABYLON.WebXRControllerComponent
   ): void {
     const gripState = handedness === 'left' ? this.leftGripState : this.rightGripState;
+    const wasPressed = gripState.triggerPressed;
     gripState.triggerPressed = component.pressed;
     gripState.triggerPressure = component.value ?? (component.pressed ? 1 : 0);
+
+    // Trigger press is used for function teleport selection in VR.
+    if (gripState.triggerPressed && !wasPressed) {
+      this.emitGripGesture({
+        type: 'press',
+        hand: handedness,
+        intensity: gripState.triggerPressure,
+      });
+    }
   }
 
   /**

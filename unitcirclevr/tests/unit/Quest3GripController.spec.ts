@@ -89,6 +89,48 @@ describe('Quest3GripController', () => {
         expect(type).toBeDefined();
       }
     });
+
+    it('should emit a press gesture when trigger is newly pressed', () => {
+      const callback = vi.fn();
+      controller.onGripGesture(callback);
+
+      const triggerComponent = {
+        pressed: true,
+        value: 0.8,
+      } as any;
+
+      (controller as any).updateTriggerState('left', triggerComponent);
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(callback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'press',
+          hand: 'left',
+          intensity: 0.8,
+        })
+      );
+    });
+
+    it('should not emit duplicate press gestures while trigger stays pressed', () => {
+      const callback = vi.fn();
+      controller.onGripGesture(callback);
+
+      const triggerComponent = {
+        pressed: true,
+        value: 1,
+      } as any;
+
+      (controller as any).updateTriggerState('right', triggerComponent);
+      (controller as any).updateTriggerState('right', triggerComponent);
+
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(callback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'press',
+          hand: 'right',
+          intensity: 1,
+        })
+      );
+    });
   });
 
   describe('object grabbing', () => {

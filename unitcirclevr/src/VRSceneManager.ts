@@ -103,23 +103,8 @@ export class VRSceneManager {
               faceNormal = adjacentFaceNormal;
             }
             
-            const isSameFunction = clickedNode.id === this.currentFunctionId;
-            const isSameFace = isSameFunction && this.isFaceNormalEqual(faceNormal, this.currentFaceNormal);
-            
             try {
-              if (isSameFace) {
-                // Same face clicked again - slide to show that face
-                this.slideFaceView(pickResult.pickedMesh.position, faceNormal);
-              } else if (isSameFunction) {
-                // Different face of same function - slide to new face
-                this.currentFaceNormal = faceNormal.clone();
-                this.slideFaceView(pickResult.pickedMesh.position, faceNormal);
-              } else {
-                // Different function - jump to it
-                this.currentFunctionId = clickedNode.id;
-                this.currentFaceNormal = faceNormal.clone();  // Preserve the face we're landing on
-                this.sceneRootFlyTo(pickResult.pickedMesh.position);
-              }
+              this.navigateToFunctionMesh(pickResult.pickedMesh as BABYLON.Mesh, faceNormal);
             } catch (error) {
               console.error('Error during animation setup:', error);
               this.isAnimating = false;  // Reset on error
@@ -2821,6 +2806,11 @@ export class VRSceneManager {
         // On grip press, try to grab a nearby object
         this.attemptGrabObject(gesture.hand, gripState);
         break;
+
+      case 'press':
+        // Trigger press teleports to the targeted function mesh.
+        this.attemptTeleportToFunction(gesture.hand, gripState);
+        break;
         
       case 'release':
         // On grip release, release any held objects
@@ -2835,6 +2825,63 @@ export class VRSceneManager {
       default:
         break;
     }
+  }
+
+  /**
+   * Navigate to a function mesh with face-aware logic used by desktop and VR.
+   */
+  private navigateToFunctionMesh(targetMesh: BABYLON.Mesh, faceNormal: BABYLON.Vector3): void {
+    const clickedNode = (targetMesh as any).nodeData as GraphNode | undefined;
+    if (!clickedNode) {
+      return;
+    }
+
+    const isSameFunction = clickedNode.id === this.currentFunctionId;
+    const isSameFace = isSameFunction && this.isFaceNormalEqual(faceNormal, this.currentFaceNormal);
+
+    if (isSameFace) {
+      // Same face clicked again - slide to show that face
+      this.slideFaceView(targetMesh.position, faceNormal);
+    } else if (isSameFunction) {
+      // Different face of same function - slide to new face
+      this.currentFaceNormal = faceNormal.clone();
+      this.slideFaceView(targetMesh.position, faceNormal);
+    } else {
+      // Different function - jump to it
+      this.currentFunctionId = clickedNode.id;
+      this.currentFaceNormal = faceNormal.clone();
+      this.sceneRootFlyTo(targetMesh.position);
+    }
+  }
+
+  /**
+   * Teleport to the function mesh currently targeted by the VR controller ray.
+   */
+  private attemptTeleportToFunction(_hand: 'left' | 'right', gripState: GripState): void {
+    if (this.isAnimating) {
+      return;
+    }
+
+    const ray = new BABYLON.Ray(gripState.position, gripState.direction, 2000);
+    const hit = this.scene.pickWithRay(ray, (mesh) => {
+      const nodeData = (mesh as any).nodeData as GraphNode | undefined;
+      return mesh.isPickable && nodeData !== undefined;
+    });
+
+    if (!hit || !hit.hit || !hit.pickedMesh) {
+      return;
+    }
+
+    const pickedMesh = hit.pickedMesh as BABYLON.Mesh;
+    const pickedPoint = hit.pickedPoint || pickedMesh.getAbsolutePosition();
+    let faceNormal = hit.getNormal(true) || new BABYLON.Vector3(0, 0, 1);
+
+    const adjacentFaceNormal = this.getAdjacentFaceIfNearEdge(pickedPoint, pickedMesh.position, faceNormal);
+    if (adjacentFaceNormal) {
+      faceNormal = adjacentFaceNormal;
+    }
+
+    this.navigateToFunctionMesh(pickedMesh, faceNormal);
   }
 
   /**
