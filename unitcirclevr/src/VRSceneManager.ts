@@ -104,7 +104,10 @@ export class VRSceneManager {
             }
             
             try {
-              this.navigateToFunctionMesh(pickResult.pickedMesh as BABYLON.Mesh, faceNormal);
+              // Browser click should always fly directly to the selected object.
+              this.currentFunctionId = clickedNode.id;
+              this.currentFaceNormal = faceNormal.clone();
+              this.sceneRootFlyTo(pickResult.pickedMesh.position);
             } catch (error) {
               console.error('Error during animation setup:', error);
               this.isAnimating = false;  // Reset on error
@@ -867,7 +870,7 @@ export class VRSceneManager {
       .add(downwardViewOffset)
       .subtract(landingPosition);
 
-    // Create parabolic position animation
+    // Create smooth position animation without vertical bounce.
     const positionAnimation = new BABYLON.Animation(
       'sceneRootFlyPosition',
       'position',
@@ -877,22 +880,18 @@ export class VRSceneManager {
     
     const startPos = this.sceneRoot.position.clone();
     const totalFrames = (SceneConfig.FLY_TO_ANIMATION_TIME_MS / 1000) * SceneConfig.FLY_TO_ANIMATION_FPS;
-    const peakHeight = 15;  // Maximum height above starting point
     
-    // Create keyframes along parabolic path
+    // Create keyframes with ease-in-out interpolation.
     const keys = [];
     for (let i = 0; i <= totalFrames; i++) {
       const t = i / totalFrames;  // 0 to 1
+      const easeT = t < 0.5
+        ? 2 * t * t
+        : 1 - Math.pow(-2 * t + 2, 2) / 2;
       
-      // Linear interpolation for X and Z
-      const x = startPos.x + (targetSceneRootPosition.x - startPos.x) * t;
-      const z = startPos.z + (targetSceneRootPosition.z - startPos.z) * t;
-      
-      // Parabolic path for Y: peak at t=0.5, reach target at t=1
-      // Formula: y = startY + gravity_arc + (targetY - startY) * t
-      // where gravity_arc = -peakHeight * (1 - 4*(t-0.5)²) creates upward arc
-      const gravityArc = -peakHeight * Math.max(0, 1 - 4 * Math.pow(t - 0.5, 2));
-      const y = startPos.y + (targetSceneRootPosition.y - startPos.y) * t + gravityArc;
+      const x = startPos.x + (targetSceneRootPosition.x - startPos.x) * easeT;
+      const y = startPos.y + (targetSceneRootPosition.y - startPos.y) * easeT;
+      const z = startPos.z + (targetSceneRootPosition.z - startPos.z) * easeT;
       
       keys.push({
         frame: i,
