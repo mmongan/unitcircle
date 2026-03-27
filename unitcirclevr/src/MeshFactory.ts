@@ -185,17 +185,16 @@ export class MeshFactory {
     fileColor: BABYLON.Color3 | null,
     boxSize: number
   ): void {
-    // The back face uses rotation (0, π, 0) which flips the plane's local X
-    // axis, making the same texture appear mirror-reversed. We need a
-    // horizontally-flipped variant for that face so text reads correctly
-    // from both front and back.
-    const texture = this.createSignatureTexture(node, fileColor, false);
-    const textureFlipped = this.createSignatureTexture(node, fileColor, true);
+    // Single texture shared across all faces — each plane is placed facing
+    // outward and uses backFaceCulling=true so it's only visible from the
+    // outside.  No per-face texture flip is needed because the UV layout is
+    // aligned correctly for each outward-facing orientation.
+    const texture = this.createSignatureTexture(node, fileColor);
     const half = boxSize / 2;
     const offset = half + 0.02;
     const planeSize = Math.max(0.75, boxSize * 0.9);
 
-    const faces: Array<{ suffix: string; position: BABYLON.Vector3; rotation: BABYLON.Vector3; flipTexture?: boolean }> = [
+    const faces: Array<{ suffix: string; position: BABYLON.Vector3; rotation: BABYLON.Vector3 }> = [
       {
         suffix: 'front',
         position: new BABYLON.Vector3(0, 0, offset),
@@ -205,7 +204,6 @@ export class MeshFactory {
         suffix: 'back',
         position: new BABYLON.Vector3(0, 0, -offset),
         rotation: new BABYLON.Vector3(0, Math.PI, 0),
-        flipTexture: true,
       },
       {
         suffix: 'right',
@@ -230,7 +228,6 @@ export class MeshFactory {
     ];
 
     for (const face of faces) {
-      const faceTexture = face.flipTexture ? textureFlipped : texture;
       const labelPlane = BABYLON.MeshBuilder.CreatePlane(
         `func_label_${node.id}_${face.suffix}`,
         { width: planeSize, height: planeSize },
@@ -242,12 +239,12 @@ export class MeshFactory {
       labelPlane.isPickable = false;
 
       const labelMaterial = new BABYLON.StandardMaterial(`func_label_mat_${node.id}_${face.suffix}`, this.scene);
-      labelMaterial.diffuseTexture = faceTexture;
-      labelMaterial.emissiveTexture = faceTexture;
+      labelMaterial.diffuseTexture = texture;
+      labelMaterial.emissiveTexture = texture;
       labelMaterial.diffuseColor = new BABYLON.Color3(1, 1, 1);
       labelMaterial.emissiveColor = new BABYLON.Color3(0.95, 0.95, 0.95);
       labelMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
-      labelMaterial.backFaceCulling = false;
+      labelMaterial.backFaceCulling = true;
       labelMaterial.disableLighting = true;
       labelPlane.material = labelMaterial;
     }
@@ -256,7 +253,7 @@ export class MeshFactory {
   /**
    * Create a dynamic texture with function signature information
    */
-  private createSignatureTexture(node: GraphNode, backgroundColor: BABYLON.Color3 | null = null, flipHorizontal = false): BABYLON.DynamicTexture {
+  private createSignatureTexture(node: GraphNode, backgroundColor: BABYLON.Color3 | null = null): BABYLON.DynamicTexture {
     const textureSize = SceneConfig.SIGNATURE_TEXTURE_SIZE;
     const dynamicTexture = new BABYLON.DynamicTexture(
       `signatureTexture_${node.id}`,
@@ -264,14 +261,6 @@ export class MeshFactory {
       this.scene
     );
     const ctx = dynamicTexture.getContext() as any;
-
-    // Mirror the canvas horizontally for faces where the plane's local X axis
-    // is flipped by its rotation (e.g. the back face rotated by (0, π, 0)).
-    if (flipHorizontal) {
-      ctx.save();
-      ctx.translate(textureSize, 0);
-      ctx.scale(-1, 1);
-    }
 
     // Draw background with file color or transparent
     if (backgroundColor) {
@@ -322,10 +311,6 @@ export class MeshFactory {
     ctx.fillStyle = '#ffffff';
     yOffset = panelY + panelPadding;
     ctx.fillText(lines[0], textureSize / 2, yOffset);
-
-    if (flipHorizontal) {
-      ctx.restore();
-    }
 
     dynamicTexture.update();
     return dynamicTexture;
