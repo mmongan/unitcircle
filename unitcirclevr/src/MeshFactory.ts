@@ -193,7 +193,7 @@ export class MeshFactory {
     const texture = this.createSignatureTexture(node, null);
     const half = boxSize / 2;
     const offset = half + 0.02;
-    const planeSize = Math.max(0.6, boxSize * 0.45);
+    const planeSize = boxSize;
 
     const faces: Array<{ suffix: string; position: BABYLON.Vector3; rotation: BABYLON.Vector3 }> = [
       {
