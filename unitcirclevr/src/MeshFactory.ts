@@ -192,7 +192,7 @@ export class MeshFactory {
     // Keep most of the face transparent so the cube's base color remains visible.
     const texture = this.createSignatureTexture(node, fileColor);
     const half = boxSize / 2;
-    const offset = half + 0.08;
+    const offset = half + 0.01;
     const planeSize = boxSize;
 
     const faces: Array<{ suffix: string; position: BABYLON.Vector3; rotation: BABYLON.Vector3 }> = [
