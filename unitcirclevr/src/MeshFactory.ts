@@ -122,9 +122,10 @@ export class MeshFactory {
     signatureTexture.uOffset = 0;
     signatureTexture.vOffset = 0;
     
-    // Use texture as diffuse (primary visual) for proper lighting response
+    // Keep signature texture on both diffuse and emissive channels so text remains
+    // readable even when a node is in shadow or lit at a grazing angle.
     material.diffuseTexture = signatureTexture;
-    // Keep diffuse color neutral so file color from texture shows through
+    material.emissiveTexture = signatureTexture;
     material.diffuseColor = new BABYLON.Color3(1, 1, 1);
     
     // Subtle emissive glow based on file color
@@ -138,7 +139,7 @@ export class MeshFactory {
       material.emissiveColor = new BABYLON.Color3(0.05, 0.05, 0.05);
     }
     
-    material.specularColor = new BABYLON.Color3(0.2, 0.2, 0.2);
+    material.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
     material.specularPower = 16;
     material.wireframe = false;
     
@@ -146,15 +147,23 @@ export class MeshFactory {
     if (node.isExported) {
       material.alpha = 1.0;
       material.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
-      material.disableLighting = true;
-      material.emissiveColor = new BABYLON.Color3(0.95, 0.95, 1.0);
+      material.disableLighting = false;
+      material.emissiveColor = new BABYLON.Color3(0.95, 0.95, 0.95);
       box.isVisible = true;
       box.setEnabled(true);
     } else {
-      material.alpha = 0.8;
-      material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+      material.alpha = 1.0;
+      material.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
       material.disableLighting = false;
-      material.emissiveColor = new BABYLON.Color3(0.08, 0.08, 0.08);
+      if (fileColor) {
+        material.emissiveColor = new BABYLON.Color3(
+          0.25 + (fileColor.r * 0.25),
+          0.25 + (fileColor.g * 0.25),
+          0.25 + (fileColor.b * 0.25)
+        );
+      } else {
+        material.emissiveColor = new BABYLON.Color3(0.35, 0.35, 0.35);
+      }
       box.isVisible = true;
       box.setEnabled(true);
     }
