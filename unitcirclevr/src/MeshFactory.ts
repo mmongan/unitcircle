@@ -245,7 +245,8 @@ export class MeshFactory {
       labelMaterial.diffuseColor = new BABYLON.Color3(1, 1, 1);
       labelMaterial.emissiveColor = new BABYLON.Color3(0.9, 0.9, 0.9);
       labelMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
-      labelMaterial.backFaceCulling = true;
+      // Keep labels visible regardless of plane normal orientation.
+      labelMaterial.backFaceCulling = false;
       labelMaterial.disableLighting = true;
       labelPlane.material = labelMaterial;
     }
