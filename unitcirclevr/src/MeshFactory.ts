@@ -193,7 +193,7 @@ export class MeshFactory {
     const texture = this.createSignatureTexture(node, null);
     const half = boxSize / 2;
     const offset = half + 0.02;
-    const planeSize = Math.max(0.75, boxSize * 0.9);
+    const planeSize = Math.max(0.6, boxSize * 0.45);
 
     const faces: Array<{ suffix: string; position: BABYLON.Vector3; rotation: BABYLON.Vector3 }> = [
       {
@@ -242,11 +242,8 @@ export class MeshFactory {
       const labelMaterial = new BABYLON.StandardMaterial(`func_label_mat_${node.id}_${face.suffix}`, this.scene);
       labelMaterial.diffuseTexture = texture;
       labelMaterial.emissiveTexture = texture;
-      // Respect texture alpha so transparent regions don't appear as white planes.
-      labelMaterial.opacityTexture = texture;
-      labelMaterial.useAlphaFromDiffuseTexture = true;
-      labelMaterial.diffuseColor = new BABYLON.Color3(0, 0, 0);
-      labelMaterial.emissiveColor = new BABYLON.Color3(1, 1, 1);
+      labelMaterial.diffuseColor = new BABYLON.Color3(1, 1, 1);
+      labelMaterial.emissiveColor = new BABYLON.Color3(0.9, 0.9, 0.9);
       labelMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
       labelMaterial.backFaceCulling = true;
       labelMaterial.disableLighting = true;
@@ -264,22 +261,19 @@ export class MeshFactory {
       textureSize,
       this.scene
     );
-    dynamicTexture.hasAlpha = true;
+    dynamicTexture.hasAlpha = false;
     const ctx = dynamicTexture.getContext() as any;
 
-    // Draw background with file color or transparent
+    // Use an opaque dark plaque background to keep label rendering stable.
     if (backgroundColor) {
-      // Convert color to RGB hex and fill background
       const r = Math.floor(backgroundColor.r * 255);
       const g = Math.floor(backgroundColor.g * 255);
       const b = Math.floor(backgroundColor.b * 255);
-      ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
-      ctx.fillRect(0, 0, textureSize, textureSize);
+      ctx.fillStyle = `rgb(${Math.max(0, r - 120)}, ${Math.max(0, g - 120)}, ${Math.max(0, b - 120)})`;
     } else {
-      // Transparent background if no color provided
-      ctx.fillStyle = 'rgba(0, 0, 0, 0)';
-      ctx.fillRect(0, 0, textureSize, textureSize);
+      ctx.fillStyle = 'rgb(22, 22, 22)';
     }
+    ctx.fillRect(0, 0, textureSize, textureSize);
 
     // Draw border frame in white for contrast
     ctx.strokeStyle = '#ffffff';
