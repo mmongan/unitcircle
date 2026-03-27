@@ -192,7 +192,7 @@ export class MeshFactory {
     // Keep most of the face transparent so the cube's base color remains visible.
     const texture = this.createSignatureTexture(node);
     const half = boxSize / 2;
-    const offset = half + 0.02;
+    const offset = half + 0.08;
     const planeSize = boxSize;
 
     const faces: Array<{ suffix: string; position: BABYLON.Vector3; rotation: BABYLON.Vector3 }> = [
@@ -240,12 +240,11 @@ export class MeshFactory {
       labelPlane.isPickable = false;
 
       const labelMaterial = new BABYLON.StandardMaterial(`func_label_mat_${node.id}_${face.suffix}`, this.scene);
-      labelMaterial.diffuseTexture = texture;
       labelMaterial.emissiveTexture = texture;
-      labelMaterial.useAlphaFromDiffuseTexture = true;
-      labelMaterial.diffuseColor = new BABYLON.Color3(1, 1, 1);
+      labelMaterial.opacityTexture = texture;
       labelMaterial.emissiveColor = new BABYLON.Color3(1, 1, 1);
       labelMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
+      labelMaterial.diffuseColor = new BABYLON.Color3(0, 0, 0);
       // Cull back faces so we only see the intended front of each label.
       labelMaterial.backFaceCulling = true;
       labelMaterial.disableLighting = true;
@@ -280,12 +279,14 @@ export class MeshFactory {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    // Draw black outline for readability against any background.
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 6;
-    ctx.strokeText(node.name, textureSize / 2, textureSize / 2);
+    // Draw a fully-opaque background strip behind the text so there are no
+    // semi-transparent pixels that can sort/flicker against the box face.
+    const stripHeight = SceneConfig.SIGNATURE_FONT_SIZE_PX * 1.4;
+    const stripY = (textureSize - stripHeight) / 2;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.82)';
+    ctx.fillRect(0, stripY, textureSize, stripHeight);
 
-    // Draw white text.
+    // Draw white text directly (no stroke) – fully opaque pixels only.
     ctx.fillStyle = '#ffffff';
     ctx.fillText(node.name, textureSize / 2, textureSize / 2);
 
