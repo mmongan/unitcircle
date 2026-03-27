@@ -85,39 +85,73 @@ export class VRSceneManager {
   }
 
   /**
-   * Add a single scene-level observer for all mesh clicks
+   * Add a single scene-level observer for all mesh clicks.
+   * Distinguishes a static click (no drag) from mouse-drag look-around:
+   * flyTo is only triggered on POINTERUP when the pointer barely moved since
+   * POINTERDOWN, so dragging the mouse to rotate the camera always works.
    */
   private setupClickHandler(): void {
+    let downX = 0;
+    let downY = 0;
+    // Record mesh info on POINTERDOWN so the hit is from the initial press,
+    // not from wherever the cursor ends up after a drag.
+    let pendingMesh: BABYLON.AbstractMesh | null = null;
+    let pendingFaceNormal: BABYLON.Vector3 = new BABYLON.Vector3(0, 0, 1);
+    let pendingNodeId: string | null = null;
+
     this.scene.onPointerObservable.add((pointerEvent) => {
       if (pointerEvent.type === BABYLON.PointerEventTypes.POINTERDOWN) {
-        const hits = this.scene.multiPick(this.scene.pointerX, this.scene.pointerY) || [];
+        downX = this.scene.pointerX;
+        downY = this.scene.pointerY;
+        pendingMesh = null;
+
+        const hits = this.scene.multiPick(downX, downY) || [];
         const validHits = hits.filter((h) => h?.hit && h.pickedMesh);
-        const prioritizedHit = validHits.find((h) => ((h.pickedMesh as any).nodeData as GraphNode | undefined) !== undefined)
+        const prioritizedHit =
+          validHits.find((h) => ((h.pickedMesh as any).nodeData as GraphNode | undefined) !== undefined)
           || validHits[0];
+
         if (prioritizedHit && prioritizedHit.pickedMesh) {
           const mesh = prioritizedHit.pickedMesh;
           const clickedNode = (mesh as any).nodeData as GraphNode;
-
           let faceNormal = (prioritizedHit as any).normal || new BABYLON.Vector3(0, 0, 1);
           if (clickedNode) {
             const pickedPoint = (prioritizedHit as any).pickedPoint as BABYLON.Vector3;
-            const cubePosition = mesh.position;
-            const adjacentFaceNormal = this.getAdjacentFaceIfNearEdge(pickedPoint, cubePosition, faceNormal);
+            const adjacentFaceNormal = this.getAdjacentFaceIfNearEdge(pickedPoint, mesh.position, faceNormal);
             if (adjacentFaceNormal) {
               faceNormal = adjacentFaceNormal;
             }
-            this.currentFunctionId = clickedNode.id;
+            pendingNodeId = clickedNode.id;
+          } else {
+            pendingNodeId = null;
           }
-
-          try {
-            this.currentFaceNormal = faceNormal.clone();
-            const targetWorldPos = mesh.getAbsolutePosition();
-            this.flyToWorldPosition(targetWorldPos, mesh);
-          } catch (error) {
-            console.error('Error during animation setup:', error);
-            this.isAnimating = false;
-          }
+          pendingMesh = mesh;
+          pendingFaceNormal = faceNormal.clone();
         }
+      }
+
+      if (pointerEvent.type === BABYLON.PointerEventTypes.POINTERUP) {
+        if (!pendingMesh) return;
+        // Ignore if the pointer moved more than 5px — that was a drag, not a click.
+        const dx = this.scene.pointerX - downX;
+        const dy = this.scene.pointerY - downY;
+        if (Math.sqrt(dx * dx + dy * dy) > 5) {
+          pendingMesh = null;
+          return;
+        }
+
+        if (pendingNodeId !== null) {
+          this.currentFunctionId = pendingNodeId;
+        }
+        try {
+          this.currentFaceNormal = pendingFaceNormal.clone();
+          const targetWorldPos = pendingMesh.getAbsolutePosition();
+          this.flyToWorldPosition(targetWorldPos, pendingMesh);
+        } catch (error) {
+          console.error('Error during animation setup:', error);
+          this.isAnimating = false;
+        }
+        pendingMesh = null;
       }
     });
   }
