@@ -145,7 +145,7 @@ export class MeshFactory {
       material.alpha = 1.0;
       material.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
       material.disableLighting = false;
-      material.emissiveColor = new BABYLON.Color3(0.95, 0.95, 0.95);
+      material.emissiveColor = new BABYLON.Color3(0.22, 0.22, 0.22);
       box.isVisible = true;
       box.setEnabled(true);
     } else {
@@ -154,12 +154,12 @@ export class MeshFactory {
       material.disableLighting = false;
       if (fileColor) {
         material.emissiveColor = new BABYLON.Color3(
-          0.25 + (fileColor.r * 0.25),
-          0.25 + (fileColor.g * 0.25),
-          0.25 + (fileColor.b * 0.25)
+          0.08 + (fileColor.r * 0.10),
+          0.08 + (fileColor.g * 0.10),
+          0.08 + (fileColor.b * 0.10)
         );
       } else {
-        material.emissiveColor = new BABYLON.Color3(0.35, 0.35, 0.35);
+        material.emissiveColor = new BABYLON.Color3(0.12, 0.12, 0.12);
       }
       box.isVisible = true;
       box.setEnabled(true);
@@ -182,14 +182,15 @@ export class MeshFactory {
   private createFunctionFaceDescriptionPlanes(
     node: GraphNode,
     parentBox: BABYLON.Mesh,
-    fileColor: BABYLON.Color3 | null,
+    _fileColor: BABYLON.Color3 | null,
     boxSize: number
   ): void {
     // Single texture shared across all faces — each plane is placed facing
     // outward and uses backFaceCulling=true so it's only visible from the
     // outside.  No per-face texture flip is needed because the UV layout is
     // aligned correctly for each outward-facing orientation.
-    const texture = this.createSignatureTexture(node, fileColor);
+    // Keep most of the face transparent so the cube's base color remains visible.
+    const texture = this.createSignatureTexture(node, null);
     const half = boxSize / 2;
     const offset = half + 0.02;
     const planeSize = Math.max(0.75, boxSize * 0.9);
