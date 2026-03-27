@@ -89,14 +89,17 @@ export class VRSceneManager {
   private setupClickHandler(): void {
     this.scene.onPointerObservable.add((pointerEvent) => {
       if (pointerEvent.type === BABYLON.PointerEventTypes.POINTERDOWN && !this.isAnimating) {
-        const pickResult = this.scene.pick(this.scene.pointerX, this.scene.pointerY);
-        if (pickResult && pickResult.hit && pickResult.pickedMesh) {
-          const mesh = pickResult.pickedMesh;
+        const hits = this.scene.multiPick(this.scene.pointerX, this.scene.pointerY) || [];
+        const validHits = hits.filter((h) => h?.hit && h.pickedMesh);
+        const prioritizedHit = validHits.find((h) => ((h.pickedMesh as any).nodeData as GraphNode | undefined) !== undefined)
+          || validHits[0];
+        if (prioritizedHit && prioritizedHit.pickedMesh) {
+          const mesh = prioritizedHit.pickedMesh;
           const clickedNode = (mesh as any).nodeData as GraphNode;
 
-          let faceNormal = (pickResult as any).normal || new BABYLON.Vector3(0, 0, 1);
+          let faceNormal = (prioritizedHit as any).normal || new BABYLON.Vector3(0, 0, 1);
           if (clickedNode) {
-            const pickedPoint = (pickResult as any).pickedPoint as BABYLON.Vector3;
+            const pickedPoint = (prioritizedHit as any).pickedPoint as BABYLON.Vector3;
             const cubePosition = mesh.position;
             const adjacentFaceNormal = this.getAdjacentFaceIfNearEdge(pickedPoint, cubePosition, faceNormal);
             if (adjacentFaceNormal) {
@@ -108,7 +111,7 @@ export class VRSceneManager {
           try {
             this.currentFaceNormal = faceNormal.clone();
             const targetWorldPos = mesh.getAbsolutePosition();
-            this.flyToWorldPosition(targetWorldPos);
+            this.flyToWorldPosition(targetWorldPos, mesh);
           } catch (error) {
             console.error('Error during animation setup:', error);
             this.isAnimating = false;
@@ -859,11 +862,11 @@ export class VRSceneManager {
   /**
    * Fly camera (desktop) or move sceneRoot (XR) so the target is centred in view.
    */
-  private flyToWorldPosition(targetWorldPos: BABYLON.Vector3): void {
+  private flyToWorldPosition(targetWorldPos: BABYLON.Vector3, targetMesh?: BABYLON.AbstractMesh): void {
     if (this.isInXR()) {
       this.flyToViaSceneRoot(targetWorldPos);
     } else {
-      this.flyToViaCamera(targetWorldPos);
+      this.flyToViaCamera(targetWorldPos, targetMesh);
     }
   }
 
@@ -871,13 +874,15 @@ export class VRSceneManager {
    * Desktop: animate camera position and target to the clicked object.
    * Camera ends up a short distance in front of the target, looking at it.
    */
-  private flyToViaCamera(targetWorldPos: BABYLON.Vector3): void {
+  private flyToViaCamera(targetWorldPos: BABYLON.Vector3, targetMesh?: BABYLON.AbstractMesh): void {
     this.scene.stopAnimation(this.camera);
 
     // Fly the camera to a point offset from the target along the current
     // camera-to-target direction so the object stays visible.
     const currentDir = this.camera.target.subtract(this.camera.position).normalize();
-    const standoffDistance = 2; // units in front of the object
+    // Keep a safe distance based on object size so we don't land inside file boxes.
+    const radius = targetMesh?.getBoundingInfo()?.boundingSphere?.radiusWorld ?? 0;
+    const standoffDistance = Math.max(2, radius + 1.5);
     const newCamPos = targetWorldPos.subtract(currentDir.scale(standoffDistance));
     const newCamTarget = targetWorldPos.clone();
 
@@ -2883,7 +2888,7 @@ export class VRSceneManager {
       // Different function - jump to it
       this.currentFunctionId = clickedNode.id;
       this.currentFaceNormal = faceNormal.clone();
-      this.flyToWorldPosition(targetMesh.getAbsolutePosition());
+      this.flyToWorldPosition(targetMesh.getAbsolutePosition(), targetMesh);
     }
   }
 
