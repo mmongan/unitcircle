@@ -282,16 +282,6 @@ export class MeshFactory {
     }
     ctx.fillRect(0, 0, textureSize, textureSize);
 
-    // Draw border frame in white for contrast
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(
-      SceneConfig.SIGNATURE_TEXTURE_BORDER_SIZE,
-      SceneConfig.SIGNATURE_TEXTURE_BORDER_SIZE,
-      textureSize - 2 * SceneConfig.SIGNATURE_TEXTURE_BORDER_SIZE,
-      textureSize - 2 * SceneConfig.SIGNATURE_TEXTURE_BORDER_SIZE
-    );
-
     // Function boxes should display only the function signature.
     const lines: string[] = [node.name];
 
