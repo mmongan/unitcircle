@@ -857,20 +857,11 @@ export class VRSceneManager {
   private sceneRootFlyTo(targetPosition: BABYLON.Vector3): void {
     // Stop any existing animation on the scene root
     this.scene.stopAnimation(this.sceneRoot);
-
-    const cameraPosition = SceneConfig.CAMERA_POSITION;
     
-    // Landing position: directly on top of the object like a platform
-    // Position camera high enough above the object to look down at it
-    const platformHeight = SceneConfig.FUNCTION_BOX_SIZE / 2 + 8;  // Land on top with 8 unit offset for platform view
-    const landingPosition = targetPosition.add(new BABYLON.Vector3(0, platformHeight, 0));
-    
-    // Scene root position: camera at (0,0,-70) + offset pointing down from above
-    // We want camera looking down at the landing position
-    const downwardViewOffset = new BABYLON.Vector3(0, 0, 0);  // No additional offset, look straight down
-    const targetSceneRootPosition = cameraPosition
-      .add(downwardViewOffset)
-      .subtract(landingPosition);
+    // Move sceneRoot so the target mesh appears at the camera's look-at point
+    // (the origin). Camera is fixed at CAMERA_POSITION looking at (0,0,0),
+    // so placing the mesh at origin centres it in view.
+    const targetSceneRootPosition = targetPosition.negate();
 
     // Create smooth position animation without vertical bounce.
     const positionAnimation = new BABYLON.Animation(
