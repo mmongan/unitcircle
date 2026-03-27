@@ -231,7 +231,7 @@ export class MeshFactory {
     for (const face of faces) {
       const labelPlane = BABYLON.MeshBuilder.CreatePlane(
         `func_label_${node.id}_${face.suffix}`,
-        { width: planeSize, height: planeSize, sideOrientation: BABYLON.Mesh.BACKSIDE },
+        { width: planeSize, height: planeSize, sideOrientation: BABYLON.Mesh.FRONTSIDE },
         this.scene
       );
       labelPlane.parent = parentBox;
