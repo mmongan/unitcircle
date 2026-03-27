@@ -106,13 +106,9 @@ export class VRSceneManager {
           }
 
           try {
-            // Fly to any clicked object (function box, file box, etc.)
             this.currentFaceNormal = faceNormal.clone();
-            // Compute mesh position relative to sceneRoot (not world position)
-            // so the negate in sceneRootFlyTo yields a stable target.
-            const worldPos = mesh.getAbsolutePosition();
-            const localPos = worldPos.subtract(this.sceneRoot.position);
-            this.sceneRootFlyTo(localPos);
+            const targetWorldPos = mesh.getAbsolutePosition();
+            this.flyToWorldPosition(targetWorldPos);
           } catch (error) {
             console.error('Error during animation setup:', error);
             this.isAnimating = false;
@@ -856,76 +852,94 @@ export class VRSceneManager {
     );
   }
 
-  private sceneRootFlyTo(targetLocalPosition: BABYLON.Vector3): void {
-    // Stop any existing animation on the scene root
-    this.scene.stopAnimation(this.sceneRoot);
-    
-    // Move sceneRoot so the target mesh ends up at where the camera is looking.
-    // Camera target may have been changed by frameCameraToContent, so read it
-    // dynamically rather than assuming origin.
-    const cameraTarget = this.camera.target.clone();
-    // targetLocalPosition is the mesh position relative to sceneRoot.
-    // After animation: worldPos = sceneRoot.position + targetLocalPosition
-    // We want worldPos == cameraTarget, so:
-    //   sceneRoot.position = cameraTarget - targetLocalPosition
-    const targetSceneRootPosition = cameraTarget.subtract(targetLocalPosition);
+  private isInXR(): boolean {
+    return this.xrExperience?.baseExperience?.state === BABYLON.WebXRState.IN_XR;
+  }
 
-    // Create smooth position animation without vertical bounce.
-    const positionAnimation = new BABYLON.Animation(
-      'sceneRootFlyPosition',
-      'position',
-      SceneConfig.FLY_TO_ANIMATION_FPS,
-      BABYLON.Animation.ANIMATIONTYPE_VECTOR3
-    );
-    
-    const startPos = this.sceneRoot.position.clone();
-    const totalFrames = (SceneConfig.FLY_TO_ANIMATION_TIME_MS / 1000) * SceneConfig.FLY_TO_ANIMATION_FPS;
-    
-    // Create keyframes with ease-in-out interpolation.
-    const keys = [];
+  /**
+   * Fly camera (desktop) or move sceneRoot (XR) so the target is centred in view.
+   */
+  private flyToWorldPosition(targetWorldPos: BABYLON.Vector3): void {
+    if (this.isInXR()) {
+      this.flyToViaSceneRoot(targetWorldPos);
+    } else {
+      this.flyToViaCamera(targetWorldPos);
+    }
+  }
+
+  /**
+   * Desktop: animate camera position and target to the clicked object.
+   * Camera ends up a short distance in front of the target, looking at it.
+   */
+  private flyToViaCamera(targetWorldPos: BABYLON.Vector3): void {
+    this.scene.stopAnimation(this.camera);
+
+    // Fly the camera to a point offset from the target along the current
+    // camera-to-target direction so the object stays visible.
+    const currentDir = this.camera.target.subtract(this.camera.position).normalize();
+    const standoffDistance = 2; // units in front of the object
+    const newCamPos = targetWorldPos.subtract(currentDir.scale(standoffDistance));
+    const newCamTarget = targetWorldPos.clone();
+
+    const fps = SceneConfig.FLY_TO_ANIMATION_FPS;
+    const totalFrames = (SceneConfig.FLY_TO_ANIMATION_TIME_MS / 1000) * fps;
+
+    const posAnim = new BABYLON.Animation('camFlyPos', 'position', fps, BABYLON.Animation.ANIMATIONTYPE_VECTOR3);
+    const tgtAnim = new BABYLON.Animation('camFlyTgt', 'target', fps, BABYLON.Animation.ANIMATIONTYPE_VECTOR3);
+
+    const startPos = this.camera.position.clone();
+    const startTgt = this.camera.target.clone();
+    const posKeys: { frame: number; value: BABYLON.Vector3 }[] = [];
+    const tgtKeys: { frame: number; value: BABYLON.Vector3 }[] = [];
+
     for (let i = 0; i <= totalFrames; i++) {
-      const t = i / totalFrames;  // 0 to 1
-      const easeT = t < 0.5
-        ? 2 * t * t
-        : 1 - Math.pow(-2 * t + 2, 2) / 2;
-      
-      const x = startPos.x + (targetSceneRootPosition.x - startPos.x) * easeT;
-      const y = startPos.y + (targetSceneRootPosition.y - startPos.y) * easeT;
-      const z = startPos.z + (targetSceneRootPosition.z - startPos.z) * easeT;
-      
-      keys.push({
-        frame: i,
-        value: new BABYLON.Vector3(x, y, z),
-      });
+      const t = i / totalFrames;
+      const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      posKeys.push({ frame: i, value: BABYLON.Vector3.Lerp(startPos, newCamPos, e) });
+      tgtKeys.push({ frame: i, value: BABYLON.Vector3.Lerp(startTgt, newCamTarget, e) });
     }
-    positionAnimation.setKeys(keys);
-    
-    const animationDurationMs = SceneConfig.FLY_TO_ANIMATION_TIME_MS;
-    let animationStarted = false;
-    
-    this.scene.beginDirectAnimation(
-      this.sceneRoot,
-      [positionAnimation],
-      0,
-      totalFrames,
-      false,
-      1,
-      () => {
-        // Animation completed - allow next click
-        this.isAnimating = false;
-      }
-    );
-    animationStarted = true;
+    posAnim.setKeys(posKeys);
+    tgtAnim.setKeys(tgtKeys);
 
-    // Set flag only after animation successfully started
-    if (animationStarted) {
-      this.isAnimating = true;
-    }
-    
-    // Safety timeout to reset animation flag (2 second absolute maximum)
-    setTimeout(() => {
+    this.isAnimating = true;
+    this.scene.beginDirectAnimation(this.camera, [posAnim, tgtAnim], 0, totalFrames, false, 1, () => {
       this.isAnimating = false;
-    }, Math.max(animationDurationMs + 100, 2000));
+    });
+
+    setTimeout(() => { this.isAnimating = false; }, SceneConfig.FLY_TO_ANIMATION_TIME_MS + 200);
+  }
+
+  /**
+   * XR: move sceneRoot so the target ends up at the camera's look-at point.
+   * Camera must not be moved in XR (headset controls it).
+   */
+  private flyToViaSceneRoot(targetWorldPos: BABYLON.Vector3): void {
+    this.scene.stopAnimation(this.sceneRoot);
+
+    const localPos = targetWorldPos.subtract(this.sceneRoot.position);
+    const cameraTarget = this.camera.target.clone();
+    const targetSceneRootPosition = cameraTarget.subtract(localPos);
+
+    const fps = SceneConfig.FLY_TO_ANIMATION_FPS;
+    const totalFrames = (SceneConfig.FLY_TO_ANIMATION_TIME_MS / 1000) * fps;
+
+    const posAnim = new BABYLON.Animation('srFlyPos', 'position', fps, BABYLON.Animation.ANIMATIONTYPE_VECTOR3);
+    const startPos = this.sceneRoot.position.clone();
+    const keys: { frame: number; value: BABYLON.Vector3 }[] = [];
+
+    for (let i = 0; i <= totalFrames; i++) {
+      const t = i / totalFrames;
+      const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      keys.push({ frame: i, value: BABYLON.Vector3.Lerp(startPos, targetSceneRootPosition, e) });
+    }
+    posAnim.setKeys(keys);
+
+    this.isAnimating = true;
+    this.scene.beginDirectAnimation(this.sceneRoot, [posAnim], 0, totalFrames, false, 1, () => {
+      this.isAnimating = false;
+    });
+
+    setTimeout(() => { this.isAnimating = false; }, SceneConfig.FLY_TO_ANIMATION_TIME_MS + 200);
   }
 
   /**
@@ -2869,7 +2883,7 @@ export class VRSceneManager {
       // Different function - jump to it
       this.currentFunctionId = clickedNode.id;
       this.currentFaceNormal = faceNormal.clone();
-      this.sceneRootFlyTo(targetMesh.position);
+      this.flyToWorldPosition(targetMesh.getAbsolutePosition());
     }
   }
 
