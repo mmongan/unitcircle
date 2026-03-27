@@ -231,7 +231,7 @@ export class MeshFactory {
     for (const face of faces) {
       const labelPlane = BABYLON.MeshBuilder.CreatePlane(
         `func_label_${node.id}_${face.suffix}`,
-        { width: planeSize, height: planeSize },
+        { width: planeSize, height: planeSize, sideOrientation: BABYLON.Mesh.BACKSIDE },
         this.scene
       );
       labelPlane.parent = parentBox;
@@ -245,8 +245,8 @@ export class MeshFactory {
       labelMaterial.diffuseColor = new BABYLON.Color3(1, 1, 1);
       labelMaterial.emissiveColor = new BABYLON.Color3(0.9, 0.9, 0.9);
       labelMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
-      // Keep labels visible regardless of plane normal orientation.
-      labelMaterial.backFaceCulling = false;
+      // Cull back faces so we only see the intended front of each label.
+      labelMaterial.backFaceCulling = true;
       labelMaterial.disableLighting = true;
       labelPlane.material = labelMaterial;
     }

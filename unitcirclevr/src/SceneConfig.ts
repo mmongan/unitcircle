@@ -53,7 +53,7 @@ export class SceneConfig {
   // Texture
   static readonly SIGNATURE_TEXTURE_SIZE = 1024;
   static readonly SIGNATURE_TEXTURE_BORDER_SIZE = 20;
-  static readonly SIGNATURE_FONT_SIZE_PX = 64;
+  static readonly SIGNATURE_FONT_SIZE_PX = 84;
   static readonly SIGNATURE_FONT_FAMILY = 'monospace';
   static readonly SIGNATURE_TEXT_COLOR = '#ffffff';
   static readonly SIGNATURE_BORDER_COLOR = '#ffffff';
