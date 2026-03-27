@@ -204,22 +204,22 @@ export class MeshFactory {
       {
         suffix: 'right',
         position: new BABYLON.Vector3(offset, 0, 0),
-        rotation: new BABYLON.Vector3(0, -Math.PI / 2, 0),
+        rotation: new BABYLON.Vector3(0, Math.PI / 2, 0),
       },
       {
         suffix: 'left',
         position: new BABYLON.Vector3(-offset, 0, 0),
-        rotation: new BABYLON.Vector3(0, Math.PI / 2, 0),
+        rotation: new BABYLON.Vector3(0, -Math.PI / 2, 0),
       },
       {
         suffix: 'top',
         position: new BABYLON.Vector3(0, offset, 0),
-        rotation: new BABYLON.Vector3(Math.PI / 2, 0, Math.PI),
+        rotation: new BABYLON.Vector3(-Math.PI / 2, 0, Math.PI),
       },
       {
         suffix: 'bottom',
         position: new BABYLON.Vector3(0, -offset, 0),
-        rotation: new BABYLON.Vector3(-Math.PI / 2, 0, 0),
+        rotation: new BABYLON.Vector3(Math.PI / 2, 0, 0),
       },
     ];
 
@@ -282,34 +282,20 @@ export class MeshFactory {
       textureSize - 2 * SceneConfig.SIGNATURE_TEXTURE_BORDER_SIZE
     );
 
-    // Draw text with dark background panel for legibility
+    // Function boxes should display only the function signature.
     const lines: string[] = [node.name];
-    if (node.isExported) {
-      lines.push('Exported');
-    } else {
-      lines.push('Internal');
-    }
-    if (node.file) {
-      lines.push(node.file);
-    }
-    if (node.line) {
-      lines.push(`Line ${node.line}`);
-    }
-    const typeLabel =
-      node.type === 'function' ? 'Function' : node.type === 'variable' ? 'Variable' : 'External';
-    lines.push(typeLabel);
 
     ctx.font = `bold ${SceneConfig.SIGNATURE_FONT_SIZE_PX}px ${SceneConfig.SIGNATURE_FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
 
     const lineHeight = SceneConfig.SIGNATURE_FONT_SIZE_PX * 1.5;
-    let yOffset = lineHeight + 20;
+    let yOffset = (textureSize - lineHeight) / 2;
     
     // Calculate panel dimensions
     const panelPadding = 15;
     const panelWidth = textureSize - 4 * SceneConfig.SIGNATURE_TEXTURE_BORDER_SIZE;
-    const panelHeight = lines.length * lineHeight + 2 * panelPadding;
+    const panelHeight = lineHeight + 2 * panelPadding;
     const panelX = (textureSize - panelWidth) / 2;
     const panelY = yOffset - panelPadding;
 
@@ -317,13 +303,10 @@ export class MeshFactory {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.95)';
     ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
 
-    // Draw white text on the dark panel
-    ctx.fillStyle = '#ffffff';  // White text for maximum contrast
+    // Draw white signature text centered on the panel.
+    ctx.fillStyle = '#ffffff';
     yOffset = panelY + panelPadding;
-    for (const line of lines) {
-      ctx.fillText(line, textureSize / 2, yOffset);
-      yOffset += lineHeight;
-    }
+    ctx.fillText(lines[0], textureSize / 2, yOffset);
 
     dynamicTexture.update();
     return dynamicTexture;
