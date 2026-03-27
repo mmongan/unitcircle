@@ -449,10 +449,18 @@
       "type": "function"
     },
     {
+      "id": "createFunctionFaceDescriptionPlanes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
+      "name": "createFunctionFaceDescriptionPlanes",
+      "file": "MeshFactory.ts",
+      "line": 182,
+      "isExported": false,
+      "type": "function"
+    },
+    {
       "id": "createSignatureTexture@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "createSignatureTexture",
       "file": "MeshFactory.ts",
-      "line": 184,
+      "line": 252,
       "isExported": false,
       "type": "function"
     },
@@ -460,7 +468,7 @@
       "id": "createLabel@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "createLabel",
       "file": "MeshFactory.ts",
-      "line": 267,
+      "line": 335,
       "isExported": false,
       "type": "function"
     },
@@ -468,7 +476,7 @@
       "id": "createEdges@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "createEdges",
       "file": "MeshFactory.ts",
-      "line": 313,
+      "line": 381,
       "isExported": true,
       "type": "function"
     },
@@ -476,7 +484,7 @@
       "id": "removeMeshReference@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "removeMeshReference",
       "file": "MeshFactory.ts",
-      "line": 403,
+      "line": 471,
       "isExported": true,
       "type": "function"
     },
@@ -484,7 +492,7 @@
       "id": "updateEdges@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "updateEdges",
       "file": "MeshFactory.ts",
-      "line": 412,
+      "line": 480,
       "isExported": true,
       "type": "function"
     },
@@ -1525,6 +1533,10 @@
     },
     {
       "from": "createFunctionMesh@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
+      "to": "createFunctionFaceDescriptionPlanes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts"
+    },
+    {
+      "from": "createFunctionFaceDescriptionPlanes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "to": "createSignatureTexture@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts"
     },
     {
@@ -1992,5 +2004,5 @@
       "to": "render@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-27T01:42:02.614Z"
+  "lastUpdated": "2026-03-27T01:45:32.626Z"
 }

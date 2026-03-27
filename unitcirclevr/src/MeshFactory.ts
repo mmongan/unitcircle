@@ -115,20 +115,15 @@ export class MeshFactory {
 
     const material = new BABYLON.StandardMaterial(`mat_${node.id}`, this.scene);
 
-    // Apply signature texture with file color background
-    const signatureTexture = this.createSignatureTexture(node, fileColor);
-    signatureTexture.uScale = 1.0;
-    // Babylon box UVs render dynamic textures upside down by default.
-    // Flip V so function signatures are upright.
-    signatureTexture.vScale = -1.0;
-    signatureTexture.uOffset = 0;
-    signatureTexture.vOffset = 1.0;
-    
-    // Keep signature texture on both diffuse and emissive channels so text remains
-    // readable even when a node is in shadow or lit at a grazing angle.
-    material.diffuseTexture = signatureTexture;
-    material.emissiveTexture = signatureTexture;
-    material.diffuseColor = new BABYLON.Color3(1, 1, 1);
+    // Use a solid base on the cube and render signature text as planes on each face.
+    // This avoids inconsistent UV orientation across cube faces.
+    material.diffuseColor = fileColor
+      ? new BABYLON.Color3(
+        0.35 + (fileColor.r * 0.35),
+        0.35 + (fileColor.g * 0.35),
+        0.35 + (fileColor.b * 0.35)
+      )
+      : new BABYLON.Color3(0.6, 0.6, 0.6);
     
     // Subtle emissive glow based on file color
     if (fileColor) {
@@ -175,7 +170,80 @@ export class MeshFactory {
     // Store reference to this mesh for raycasting during edge creation
     this.nodeMeshes.set(node.id, box);
 
+    this.createFunctionFaceDescriptionPlanes(node, box, fileColor, boxSize);
+
     onNodeInteraction(box as BABYLON.Mesh, material, node);
+  }
+
+  /**
+   * Create one description plane per face so text orientation is controlled
+   * explicitly instead of relying on cube UV orientation.
+   */
+  private createFunctionFaceDescriptionPlanes(
+    node: GraphNode,
+    parentBox: BABYLON.Mesh,
+    fileColor: BABYLON.Color3 | null,
+    boxSize: number
+  ): void {
+    const texture = this.createSignatureTexture(node, fileColor);
+    const half = boxSize / 2;
+    const offset = half + 0.02;
+    const planeSize = Math.max(0.75, boxSize * 0.9);
+
+    const faces: Array<{ suffix: string; position: BABYLON.Vector3; rotation: BABYLON.Vector3 }> = [
+      {
+        suffix: 'front',
+        position: new BABYLON.Vector3(0, 0, offset),
+        rotation: new BABYLON.Vector3(0, 0, 0),
+      },
+      {
+        suffix: 'back',
+        position: new BABYLON.Vector3(0, 0, -offset),
+        rotation: new BABYLON.Vector3(0, Math.PI, 0),
+      },
+      {
+        suffix: 'right',
+        position: new BABYLON.Vector3(offset, 0, 0),
+        rotation: new BABYLON.Vector3(0, -Math.PI / 2, 0),
+      },
+      {
+        suffix: 'left',
+        position: new BABYLON.Vector3(-offset, 0, 0),
+        rotation: new BABYLON.Vector3(0, Math.PI / 2, 0),
+      },
+      {
+        suffix: 'top',
+        position: new BABYLON.Vector3(0, offset, 0),
+        rotation: new BABYLON.Vector3(Math.PI / 2, 0, Math.PI),
+      },
+      {
+        suffix: 'bottom',
+        position: new BABYLON.Vector3(0, -offset, 0),
+        rotation: new BABYLON.Vector3(-Math.PI / 2, 0, 0),
+      },
+    ];
+
+    for (const face of faces) {
+      const labelPlane = BABYLON.MeshBuilder.CreatePlane(
+        `func_label_${node.id}_${face.suffix}`,
+        { width: planeSize, height: planeSize },
+        this.scene
+      );
+      labelPlane.parent = parentBox;
+      labelPlane.position = face.position;
+      labelPlane.rotation = face.rotation;
+      labelPlane.isPickable = false;
+
+      const labelMaterial = new BABYLON.StandardMaterial(`func_label_mat_${node.id}_${face.suffix}`, this.scene);
+      labelMaterial.diffuseTexture = texture;
+      labelMaterial.emissiveTexture = texture;
+      labelMaterial.diffuseColor = new BABYLON.Color3(1, 1, 1);
+      labelMaterial.emissiveColor = new BABYLON.Color3(0.95, 0.95, 0.95);
+      labelMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
+      labelMaterial.backFaceCulling = false;
+      labelMaterial.disableLighting = true;
+      labelPlane.material = labelMaterial;
+    }
   }
 
   /**
