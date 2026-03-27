@@ -240,11 +240,12 @@ export class MeshFactory {
       labelPlane.isPickable = false;
 
       const labelMaterial = new BABYLON.StandardMaterial(`func_label_mat_${node.id}_${face.suffix}`, this.scene);
-      labelMaterial.emissiveTexture = texture;
-      labelMaterial.opacityTexture = texture;
-      labelMaterial.emissiveColor = new BABYLON.Color3(1, 1, 1);
+      labelMaterial.diffuseColor = new BABYLON.Color3(1, 1, 1);
+      labelMaterial.diffuseTexture = texture;
+      labelMaterial.emissiveColor = new BABYLON.Color3(0.95, 0.95, 0.95);
       labelMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
-      labelMaterial.diffuseColor = new BABYLON.Color3(0, 0, 0);
+      labelMaterial.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+      labelMaterial.useAlphaFromDiffuseTexture = true;
       // Cull back faces so we only see the intended front of each label.
       labelMaterial.backFaceCulling = true;
       labelMaterial.disableLighting = true;
@@ -274,19 +275,16 @@ export class MeshFactory {
     // Clear to fully transparent so box color shows through.
     ctx.clearRect(0, 0, textureSize, textureSize);
 
+    // Draw a solid black background for entire texture — ensures white text is always visible.
+    ctx.fillStyle = 'rgb(0, 0, 0)';
+    ctx.fillRect(0, 0, textureSize, textureSize);
+
     // Function boxes should display only the function signature.
     ctx.font = `bold ${SceneConfig.SIGNATURE_FONT_SIZE_PX}px ${SceneConfig.SIGNATURE_FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    // Draw a fully-opaque background strip behind the text so there are no
-    // semi-transparent pixels that can sort/flicker against the box face.
-    const stripHeight = SceneConfig.SIGNATURE_FONT_SIZE_PX * 1.6;
-    const stripY = (textureSize - stripHeight) / 2;
-    ctx.fillStyle = 'rgb(0, 0, 0)';
-    ctx.fillRect(0, stripY, textureSize, stripHeight);
-
-    // Draw white text directly (no stroke) – fully opaque pixels only.
+    // Draw white text directly – fully opaque pixels only.
     ctx.fillStyle = '#ffffff';
     ctx.fillText(node.name, textureSize / 2, textureSize / 2);
 
