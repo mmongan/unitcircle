@@ -190,7 +190,7 @@ export class MeshFactory {
     // outside.  No per-face texture flip is needed because the UV layout is
     // aligned correctly for each outward-facing orientation.
     // Keep most of the face transparent so the cube's base color remains visible.
-    const texture = this.createSignatureTexture(node, null);
+    const texture = this.createSignatureTexture(node);
     const half = boxSize / 2;
     const offset = half + 0.02;
     const planeSize = boxSize;
@@ -242,8 +242,9 @@ export class MeshFactory {
       const labelMaterial = new BABYLON.StandardMaterial(`func_label_mat_${node.id}_${face.suffix}`, this.scene);
       labelMaterial.diffuseTexture = texture;
       labelMaterial.emissiveTexture = texture;
+      labelMaterial.useAlphaFromDiffuseTexture = true;
       labelMaterial.diffuseColor = new BABYLON.Color3(1, 1, 1);
-      labelMaterial.emissiveColor = new BABYLON.Color3(0.9, 0.9, 0.9);
+      labelMaterial.emissiveColor = new BABYLON.Color3(1, 1, 1);
       labelMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
       // Cull back faces so we only see the intended front of each label.
       labelMaterial.backFaceCulling = true;
@@ -255,14 +256,14 @@ export class MeshFactory {
   /**
    * Create a dynamic texture with function signature information
    */
-  private createSignatureTexture(node: GraphNode, backgroundColor: BABYLON.Color3 | null = null): BABYLON.DynamicTexture {
+  private createSignatureTexture(node: GraphNode): BABYLON.DynamicTexture {
     const textureSize = SceneConfig.SIGNATURE_TEXTURE_SIZE;
     const dynamicTexture = new BABYLON.DynamicTexture(
       `signatureTexture_${node.id}`,
       textureSize,
       this.scene
     );
-    dynamicTexture.hasAlpha = false;
+    dynamicTexture.hasAlpha = true;
     const ctx = dynamicTexture.getContext() as any;
 
     // BACKSIDE orientation makes the visible label side horizontally mirrored;
@@ -271,42 +272,22 @@ export class MeshFactory {
     ctx.translate(textureSize, 0);
     ctx.scale(-1, 1);
 
-    // Use an opaque dark plaque background to keep label rendering stable.
-    if (backgroundColor) {
-      const r = Math.floor(backgroundColor.r * 255);
-      const g = Math.floor(backgroundColor.g * 255);
-      const b = Math.floor(backgroundColor.b * 255);
-      ctx.fillStyle = `rgb(${Math.max(0, r - 120)}, ${Math.max(0, g - 120)}, ${Math.max(0, b - 120)})`;
-    } else {
-      ctx.fillStyle = 'rgb(22, 22, 22)';
-    }
-    ctx.fillRect(0, 0, textureSize, textureSize);
+    // Clear to fully transparent so box color shows through.
+    ctx.clearRect(0, 0, textureSize, textureSize);
 
     // Function boxes should display only the function signature.
-    const lines: string[] = [node.name];
-
     ctx.font = `bold ${SceneConfig.SIGNATURE_FONT_SIZE_PX}px ${SceneConfig.SIGNATURE_FONT_FAMILY}`;
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
+    ctx.textBaseline = 'middle';
 
-    const lineHeight = SceneConfig.SIGNATURE_FONT_SIZE_PX * 1.5;
-    let yOffset = (textureSize - lineHeight) / 2;
-    
-    // Calculate panel dimensions
-    const panelPadding = 15;
-    const panelWidth = textureSize - 4 * SceneConfig.SIGNATURE_TEXTURE_BORDER_SIZE;
-    const panelHeight = lineHeight + 2 * panelPadding;
-    const panelX = (textureSize - panelWidth) / 2;
-    const panelY = yOffset - panelPadding;
+    // Draw black outline for readability against any background.
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 6;
+    ctx.strokeText(node.name, textureSize / 2, textureSize / 2);
 
-    // Draw dark semi-transparent background panel
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.95)';
-    ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
-
-    // Draw white signature text centered on the panel.
+    // Draw white text.
     ctx.fillStyle = '#ffffff';
-    yOffset = panelY + panelPadding;
-    ctx.fillText(lines[0], textureSize / 2, yOffset);
+    ctx.fillText(node.name, textureSize / 2, textureSize / 2);
 
     ctx.restore();
 
