@@ -108,9 +108,11 @@ export class VRSceneManager {
           try {
             // Fly to any clicked object (function box, file box, etc.)
             this.currentFaceNormal = faceNormal.clone();
-            // Use the mesh's world position (accounts for parenting)
+            // Compute mesh position relative to sceneRoot (not world position)
+            // so the negate in sceneRootFlyTo yields a stable target.
             const worldPos = mesh.getAbsolutePosition();
-            this.sceneRootFlyTo(worldPos);
+            const localPos = worldPos.subtract(this.sceneRoot.position);
+            this.sceneRootFlyTo(localPos);
           } catch (error) {
             console.error('Error during animation setup:', error);
             this.isAnimating = false;
