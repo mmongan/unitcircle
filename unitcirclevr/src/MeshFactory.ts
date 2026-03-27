@@ -241,8 +241,11 @@ export class MeshFactory {
       const labelMaterial = new BABYLON.StandardMaterial(`func_label_mat_${node.id}_${face.suffix}`, this.scene);
       labelMaterial.diffuseTexture = texture;
       labelMaterial.emissiveTexture = texture;
-      labelMaterial.diffuseColor = new BABYLON.Color3(1, 1, 1);
-      labelMaterial.emissiveColor = new BABYLON.Color3(0.95, 0.95, 0.95);
+      // Respect texture alpha so transparent regions don't appear as white planes.
+      labelMaterial.opacityTexture = texture;
+      labelMaterial.useAlphaFromDiffuseTexture = true;
+      labelMaterial.diffuseColor = new BABYLON.Color3(0, 0, 0);
+      labelMaterial.emissiveColor = new BABYLON.Color3(1, 1, 1);
       labelMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
       labelMaterial.backFaceCulling = true;
       labelMaterial.disableLighting = true;
@@ -260,6 +263,7 @@ export class MeshFactory {
       textureSize,
       this.scene
     );
+    dynamicTexture.hasAlpha = true;
     const ctx = dynamicTexture.getContext() as any;
 
     // Draw background with file color or transparent
