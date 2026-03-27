@@ -1225,18 +1225,10 @@
       "type": "function"
     },
     {
-      "id": "handleVRControllerClick@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "name": "handleVRControllerClick",
-      "file": "VRSceneManager.ts",
-      "line": 2825,
-      "isExported": false,
-      "type": "function"
-    },
-    {
       "id": "handleGripGesture@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "handleGripGesture",
       "file": "VRSceneManager.ts",
-      "line": 2887,
+      "line": 2812,
       "isExported": false,
       "type": "function"
     },
@@ -1244,7 +1236,7 @@
       "id": "attemptGrabObject@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "attemptGrabObject",
       "file": "VRSceneManager.ts",
-      "line": 2918,
+      "line": 2843,
       "isExported": false,
       "type": "function"
     },
@@ -1252,7 +1244,7 @@
       "id": "releaseHeldObjects@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "releaseHeldObjects",
       "file": "VRSceneManager.ts",
-      "line": 2942,
+      "line": 2867,
       "isExported": false,
       "type": "function"
     },
@@ -1260,7 +1252,7 @@
       "id": "updateHeldObjectPositions@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "updateHeldObjectPositions",
       "file": "VRSceneManager.ts",
-      "line": 2955,
+      "line": 2880,
       "isExported": false,
       "type": "function"
     },
@@ -1268,7 +1260,7 @@
       "id": "run@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "run",
       "file": "VRSceneManager.ts",
-      "line": 2975,
+      "line": 2900,
       "isExported": true,
       "type": "function"
     },
@@ -1276,7 +1268,7 @@
       "id": "dispose@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "dispose",
       "file": "VRSceneManager.ts",
-      "line": 2983,
+      "line": 2908,
       "isExported": true,
       "type": "function"
     },
@@ -1916,26 +1908,6 @@
       "to": "handleGripGesture@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
     },
     {
-      "from": "setupWebXR@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "to": "handleVRControllerClick@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
-    },
-    {
-      "from": "handleVRControllerClick@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "to": "getAdjacentFaceIfNearEdge@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
-    },
-    {
-      "from": "handleVRControllerClick@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "to": "isFaceNormalEqual@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
-    },
-    {
-      "from": "handleVRControllerClick@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "to": "slideFaceView@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
-    },
-    {
-      "from": "handleVRControllerClick@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "to": "sceneRootFlyTo@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts"
-    },
-    {
       "from": "handleGripGesture@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "to": "getGripState@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\Quest3GripController.ts"
     },
@@ -1984,5 +1956,5 @@
       "to": "render@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts"
     }
   ],
-  "lastUpdated": "2026-03-27T00:12:09.994Z"
+  "lastUpdated": "2026-03-27T00:21:18.806Z"
 }
