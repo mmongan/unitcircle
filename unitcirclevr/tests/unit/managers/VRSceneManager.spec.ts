@@ -454,6 +454,44 @@ describe('VRSceneManager', () => {
     });
   });
 
+  describe('Breadcrumb Navigation', () => {
+    beforeEach(() => {
+      manager = new VRSceneManager(canvas);
+    });
+
+    it('should resolve a parent breadcrumb to the exact parent directory label', () => {
+      const rootDirectoryLabel = { name: 'root-directory-label' } as any;
+      const parentDirectoryLabel = { name: 'src-utils-label' } as any;
+      const clickedChip = { name: 'clicked-chip' } as any;
+
+      (manager as any).directoryLabelLookup = new Map([
+        ['src', rootDirectoryLabel],
+        ['src/utils', parentDirectoryLabel],
+      ]);
+
+      const resolved = (manager as any).resolveBreadcrumbNavigationTarget('directory', 'src/utils', clickedChip);
+
+      expect(resolved).toBe(parentDirectoryLabel);
+    });
+
+    it('should prefer the file label over the file box for a file breadcrumb', () => {
+      const fileLabel = { name: 'file-label' } as any;
+      const fileBox = { name: 'file-box' } as any;
+      const clickedChip = { name: 'clicked-chip' } as any;
+
+      (manager as any).fileLabelLookup = new Map([
+        ['src/VRSceneManager.ts', fileLabel],
+      ]);
+      (manager as any).fileBoxMeshes = new Map([
+        ['src/VRSceneManager.ts', fileBox],
+      ]);
+
+      const resolved = (manager as any).resolveBreadcrumbNavigationTarget('file', 'src/VRSceneManager.ts', clickedChip);
+
+      expect(resolved).toBe(fileLabel);
+    });
+  });
+
   describe('Tooltip Management', () => {
     beforeEach(() => {
       manager = new VRSceneManager(canvas);

@@ -1,6 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
-import * as path from 'path';
 
 // Note: CodeTreeBuilder is a build-time utility and can't be easily imported in tests
 // This test suite verifies the expected behavior through file operations
@@ -8,6 +7,24 @@ import * as path from 'path';
 
 describe('CodeTreeBuilder Integration', () => {
   const graphPath = './public/graph.json';
+  const readGraph = (): any => JSON.parse(fs.readFileSync(graphPath, 'utf-8'));
+
+  const findFunctionNodeId = (graph: any, functionName: string, fileSuffix: string): string => {
+    const fn = graph.nodes.find((n: any) => {
+      if (n.type !== 'function') {
+        return false;
+      }
+      const filePath = (n.file || '').replace(/\\/g, '/');
+      return n.name === functionName && filePath.endsWith(fileSuffix);
+    });
+
+    expect(fn).toBeDefined();
+    return fn.id;
+  };
+
+  const hasEdge = (graph: any, from: string, to: string): boolean => {
+    return graph.edges.some((e: any) => e.from === from && e.to === to);
+  };
 
   describe('Graph Output Structure', () => {
     it('should generate a valid graph.json file', () => {
@@ -15,24 +32,21 @@ describe('CodeTreeBuilder Integration', () => {
     });
 
     it('should contain nodes array', () => {
-      const content = fs.readFileSync(graphPath, 'utf-8');
-      const graph = JSON.parse(content);
+      const graph = readGraph();
       
       expect(graph.nodes).toBeDefined();
       expect(Array.isArray(graph.nodes)).toBe(true);
     });
 
     it('should contain edges array', () => {
-      const content = fs.readFileSync(graphPath, 'utf-8');
-      const graph = JSON.parse(content);
+      const graph = readGraph();
       
       expect(graph.edges).toBeDefined();
       expect(Array.isArray(graph.edges)).toBe(true);
     });
 
     it('should contain lastUpdated timestamp', () => {
-      const content = fs.readFileSync(graphPath, 'utf-8');
-      const graph = JSON.parse(content);
+      const graph = readGraph();
       
       expect(graph.lastUpdated).toBeDefined();
       expect(typeof graph.lastUpdated).toBe('string');
@@ -41,16 +55,14 @@ describe('CodeTreeBuilder Integration', () => {
 
   describe('Function Nodes', () => {
     it('should contain function type nodes', () => {
-      const content = fs.readFileSync(graphPath, 'utf-8');
-      const graph = JSON.parse(content);
+      const graph = readGraph();
       
       const functions = graph.nodes.filter((n: any) => n.type === 'function');
       expect(functions.length).toBeGreaterThan(0);
     });
 
     it('function nodes should have required properties', () => {
-      const content = fs.readFileSync(graphPath, 'utf-8');
-      const graph = JSON.parse(content);
+      const graph = readGraph();
       
       const func = graph.nodes.find((n: any) => n.type === 'function');
       expect(func).toBeDefined();
@@ -62,8 +74,7 @@ describe('CodeTreeBuilder Integration', () => {
     });
 
     it('should have both exported and non-exported functions', () => {
-      const content = fs.readFileSync(graphPath, 'utf-8');
-      const graph = JSON.parse(content);
+      const graph = readGraph();
       
       const functions = graph.nodes.filter((n: any) => n.type === 'function');
       const exported = functions.filter((f: any) => f.isExported);
@@ -76,16 +87,14 @@ describe('CodeTreeBuilder Integration', () => {
 
   describe('Global Variables', () => {
     it('should contain variable type nodes', () => {
-      const content = fs.readFileSync(graphPath, 'utf-8');
-      const graph = JSON.parse(content);
+      const graph = readGraph();
       
       const variables = graph.nodes.filter((n: any) => n.type === 'variable');
       expect(variables.length).toBeGreaterThanOrEqual(0);
     });
 
     it('variable nodes should have required properties', () => {
-      const content = fs.readFileSync(graphPath, 'utf-8');
-      const graph = JSON.parse(content);
+      const graph = readGraph();
       
       const variable = graph.nodes.find((n: any) => n.type === 'variable');
       if (variable) {
@@ -100,16 +109,14 @@ describe('CodeTreeBuilder Integration', () => {
 
   describe('External Modules', () => {
     it('should contain external type nodes', () => {
-      const content = fs.readFileSync(graphPath, 'utf-8');
-      const graph = JSON.parse(content);
+      const graph = readGraph();
       
       const externals = graph.nodes.filter((n: any) => n.type === 'external');
       expect(externals.length).toBeGreaterThanOrEqual(0);
     });
 
     it('external nodes should have required properties', () => {
-      const content = fs.readFileSync(graphPath, 'utf-8');
-      const graph = JSON.parse(content);
+      const graph = readGraph();
       
       const external = graph.nodes.find((n: any) => n.type === 'external');
       if (external) {
@@ -120,8 +127,7 @@ describe('CodeTreeBuilder Integration', () => {
     });
 
     it('should detect @babylonjs/core as external module', () => {
-      const content = fs.readFileSync(graphPath, 'utf-8');
-      const graph = JSON.parse(content);
+      const graph = readGraph();
       
       const babylon = graph.nodes.find((n: any) => n.name === '@babylonjs/core');
       expect(babylon).toBeDefined();
@@ -131,15 +137,13 @@ describe('CodeTreeBuilder Integration', () => {
 
   describe('Function Calls (Edges)', () => {
     it('should contain edge definitions', () => {
-      const content = fs.readFileSync(graphPath, 'utf-8');
-      const graph = JSON.parse(content);
+      const graph = readGraph();
       
       expect(graph.edges.length).toBeGreaterThanOrEqual(0);
     });
 
     it('edges should have from and to properties', () => {
-      const content = fs.readFileSync(graphPath, 'utf-8');
-      const graph = JSON.parse(content);
+      const graph = readGraph();
       
       if (graph.edges.length > 0) {
         const edge = graph.edges[0];
@@ -148,6 +152,43 @@ describe('CodeTreeBuilder Integration', () => {
         expect(typeof edge.from).toBe('string');
         expect(typeof edge.to).toBe('string');
       }
+    });
+
+    it('contains factorialRecursive in the generated call graph', () => {
+      const graph = readGraph();
+      const factorialId = findFunctionNodeId(graph, 'factorialRecursive', 'src/CallCycleExamples.ts');
+
+      const connectedEdges = graph.edges.filter((e: any) => e.from === factorialId || e.to === factorialId);
+      expect(connectedEdges.length).toBeGreaterThan(0);
+    });
+
+    it('contains mutual recursion edges between isEvenMutual and isOddMutual', () => {
+      const graph = readGraph();
+      const evenId = findFunctionNodeId(graph, 'isEvenMutual', 'src/CallCycleExamples.ts');
+      const oddId = findFunctionNodeId(graph, 'isOddMutual', 'src/CallCycleExamples.ts');
+
+      expect(hasEdge(graph, evenId, oddId)).toBe(true);
+      expect(hasEdge(graph, oddId, evenId)).toBe(true);
+    });
+
+    it('contains a 4-function cycle across cycleA -> cycleB -> cycleC -> cycleD -> cycleA', () => {
+      const graph = readGraph();
+      const aId = findFunctionNodeId(graph, 'cycleA', 'src/CallCycleExamples.ts');
+      const bId = findFunctionNodeId(graph, 'cycleB', 'src/CallCycleExamples.ts');
+      const cId = findFunctionNodeId(graph, 'cycleC', 'src/CallCycleExamples.ts');
+      const dId = findFunctionNodeId(graph, 'cycleD', 'src/CallCycleExamples.ts');
+
+      expect(hasEdge(graph, aId, bId)).toBe(true);
+      expect(hasEdge(graph, bId, cId)).toBe(true);
+      expect(hasEdge(graph, cId, dId)).toBe(true);
+      expect(hasEdge(graph, dId, aId)).toBe(true);
+    });
+
+    it('does not treat object.dispose() as self-recursion in VRSceneManager.dispose', () => {
+      const graph = readGraph();
+      const disposeId = findFunctionNodeId(graph, 'dispose', 'src/VRSceneManager.ts');
+
+      expect(hasEdge(graph, disposeId, disposeId)).toBe(false);
     });
   });
 });

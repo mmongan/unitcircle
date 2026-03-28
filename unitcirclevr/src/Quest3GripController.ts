@@ -19,7 +19,7 @@ export interface GripState {
 }
 
 export interface GripGesture {
-  type: 'grab' | 'release' | 'press' | 'manipulate';
+  type: 'grab' | 'release' | 'press' | 'manipulate' | 'menu';
   hand: 'left' | 'right';
   intensity: number; // 0-1
   heldObject?: BABYLON.Mesh;
@@ -36,6 +36,8 @@ export class Quest3GripController {
   private maxGripDistance = 5.0; // Maximum distance to grab objects
   private onGripGestureCallback: ((gesture: GripGesture) => void) | null = null;
   private onGripPressureChangeCallback: ((hand: 'left' | 'right', pressure: number) => void) | null = null;
+  private trackedControllers: Set<string> = new Set();
+  private controllerFrameObservers: Map<string, BABYLON.Observer<BABYLON.Scene>> = new Map();
 
   constructor(scene: BABYLON.Scene) {
     this.scene = scene;
@@ -48,6 +50,12 @@ export class Quest3GripController {
    */
   public initializeFromXRInput(xrInput: BABYLON.WebXRInput): void {
     xrInput.onControllerAddedObservable.add((controller) => {
+      const controllerKey = this.getControllerKey(controller);
+      if (this.trackedControllers.has(controllerKey)) {
+        return;
+      }
+      this.trackedControllers.add(controllerKey);
+
       controller.onMotionControllerInitObservable.add((motionController) => {
         const handedness = controller.inputSource.handedness as 'left' | 'right';
         console.log(`Quest 3 ${handedness} controller initialized`);
@@ -73,7 +81,17 @@ export class Quest3GripController {
         if (primaryComponent) {
           primaryComponent.onButtonStateChangedObservable.add(() => {
             const gripState = handedness === 'left' ? this.leftGripState : this.rightGripState;
+            const wasPressed = gripState.primaryButtonPressed;
             gripState.primaryButtonPressed = primaryComponent.pressed;
+
+            // Support Quest 3 X (left primary) as an alternate menu toggle.
+            if (handedness === 'left' && gripState.primaryButtonPressed && !wasPressed) {
+              this.emitGripGesture({
+                type: 'menu',
+                hand: handedness,
+                intensity: primaryComponent.value ?? 1,
+              });
+            }
           });
         }
 
@@ -82,7 +100,17 @@ export class Quest3GripController {
         if (secondaryComponent) {
           secondaryComponent.onButtonStateChangedObservable.add(() => {
             const gripState = handedness === 'left' ? this.leftGripState : this.rightGripState;
+            const wasPressed = gripState.secondaryButtonPressed;
             gripState.secondaryButtonPressed = secondaryComponent.pressed;
+
+            // Secondary/menu button toggles UI state on press edge.
+            if (gripState.secondaryButtonPressed && !wasPressed) {
+              this.emitGripGesture({
+                type: 'menu',
+                hand: handedness,
+                intensity: secondaryComponent.value ?? 1,
+              });
+            }
           });
         }
 
@@ -98,10 +126,28 @@ export class Quest3GripController {
       });
 
       // Update position and direction every frame
-      this.scene.onBeforeRenderObservable.add(() => {
+      const frameObserver = this.scene.onBeforeRenderObservable.add(() => {
         this.updateGripPositions(controller);
       });
+      this.controllerFrameObservers.set(controllerKey, frameObserver);
     });
+
+    xrInput.onControllerRemovedObservable.add((controller) => {
+      const controllerKey = this.getControllerKey(controller);
+      this.trackedControllers.delete(controllerKey);
+
+      const observer = this.controllerFrameObservers.get(controllerKey);
+      if (observer) {
+        this.scene.onBeforeRenderObservable.remove(observer);
+        this.controllerFrameObservers.delete(controllerKey);
+      }
+    });
+  }
+
+  private getControllerKey(controller: BABYLON.WebXRInputSource): string {
+    const handedness = controller.inputSource.handedness || 'unknown';
+    const unique = (controller as any).uniqueId as string | undefined;
+    return unique && unique.length > 0 ? unique : handedness;
   }
 
   /**

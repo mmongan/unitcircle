@@ -4,12 +4,15 @@
 import * as BABYLON from '@babylonjs/core';
 import type { GraphNode } from './types';
 import { SceneConfig } from './SceneConfig';
+import { toProjectRelativePath } from './PathUtils';
 
 export class MeshFactory {
   private scene: BABYLON.Scene;
   private nodeMeshes: Map<string, BABYLON.Mesh> = new Map();  // Track meshes for raycasting
   private edgeTubes: Map<string, BABYLON.Mesh> = new Map();   // Simple tube storage
-  private edgeMetadata: Map<string, { from: string; to: string; isCrossFile: boolean }> = new Map();
+  private edgeArrows: Map<string, BABYLON.Mesh> = new Map();  // Arrowhead cones at target end
+  private edgeMetadata: Map<string, { from: string; to: string; isCrossFile: boolean; isSelfLoop: boolean; bidirectionalOffsetSign: number }> = new Map();
+  private edgeMaterials: Set<BABYLON.StandardMaterial> = new Set();
 
   constructor(scene: BABYLON.Scene) {
     this.scene = scene;
@@ -35,35 +38,93 @@ export class MeshFactory {
   }
 
   /**
-   * Create an external module cylinder mesh
+   * Create an external module pyramid mesh
    */
   private createExternalModuleMesh(
     node: GraphNode,
     position: BABYLON.Vector3,
     onNodeInteraction: (mesh: BABYLON.Mesh, material: BABYLON.StandardMaterial, node: GraphNode) => void
   ): void {
-    const cylinder = BABYLON.MeshBuilder.CreateCylinder(
+    const pyramid = BABYLON.MeshBuilder.CreateCylinder(
       `ext_${node.id}`,
       {
-        height: SceneConfig.EXTERNAL_CYLINDER_HEIGHT,
-        diameterTop: SceneConfig.EXTERNAL_CYLINDER_DIAMETER,
-        diameterBottom: SceneConfig.EXTERNAL_CYLINDER_DIAMETER,
+        height: SceneConfig.EXTERNAL_PYRAMID_HEIGHT,
+        diameterTop: 0,
+        diameterBottom: SceneConfig.EXTERNAL_PYRAMID_BASE,
+        tessellation: 4,
       },
       this.scene
     );
-    cylinder.position = position;
-    cylinder.isPickable = true;
+    pyramid.position = position;
+    pyramid.isPickable = true;
 
     const material = new BABYLON.StandardMaterial(`extMat_${node.id}`, this.scene);
-    material.emissiveColor = new BABYLON.Color3(0.15, 0.15, 0.15);  // Subtle gray
+    material.diffuseColor = new BABYLON.Color3(0.90, 0.72, 0.18);
+    material.emissiveColor = new BABYLON.Color3(0.40, 0.30, 0.06);
+    material.specularColor = new BABYLON.Color3(1.0, 0.92, 0.54);
+    material.specularPower = 80;
+    material.alpha = 1.0;
+    material.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
+    const labelTexture = this.createExternalPyramidLabelTexture(node.name, node.id);
+    labelTexture.hasAlpha = false;
+    labelTexture.uScale = -1;
+    labelTexture.uOffset = 1;
+    material.diffuseTexture = labelTexture;
     material.wireframe = false;
-    cylinder.material = material;
+    pyramid.material = material;
 
     // Store reference to this mesh for raycasting during edge creation
-    this.nodeMeshes.set(node.id, cylinder);
+    this.nodeMeshes.set(node.id, pyramid);
 
-    this.createLabel(node.name, cylinder as BABYLON.Mesh);
-    onNodeInteraction(cylinder as BABYLON.Mesh, material, node);
+    onNodeInteraction(pyramid as BABYLON.Mesh, material, node);
+  }
+
+  /**
+   * Render module name directly on external pyramid faces (no billboard plane).
+   */
+  private createExternalPyramidLabelTexture(label: string, nodeId: string): BABYLON.DynamicTexture {
+    const width = 2048;
+    const height = 256;
+    const texture = new BABYLON.DynamicTexture(
+      `extLabelTexture_${nodeId}`,
+      { width, height },
+      this.scene,
+      true,
+    );
+
+    texture.hasAlpha = false;
+    const ctx = texture.getContext() as CanvasRenderingContext2D;
+    ctx.fillStyle = 'rgb(216, 164, 36)';
+    ctx.fillRect(0, 0, width, height);
+
+    const maxLabelChars = 34;
+    const cleanLabel = label.length > maxLabelChars
+      ? `${label.slice(0, maxLabelChars - 1)}...`
+      : label;
+
+    ctx.font = '700 46px Consolas';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 8;
+    ctx.strokeStyle = 'rgba(40, 24, 2, 0.95)';
+    ctx.fillStyle = 'rgba(255, 246, 214, 0.98)';
+
+    // Draw a darker base strip so the label reads as sitting near the pyramid base.
+    const stripTop = Math.floor(height * 0.70);
+    ctx.fillStyle = 'rgba(110, 76, 16, 0.92)';
+    ctx.fillRect(0, stripTop, width, height - stripTop);
+    ctx.fillStyle = 'rgba(255, 246, 214, 0.98)';
+
+    const faceCenters = [0.125, 0.375, 0.625, 0.875].map((u) => width * u);
+    const y = Math.floor(height * 0.84);
+    for (const x of faceCenters) {
+      ctx.strokeText(cleanLabel, x, y);
+      ctx.fillText(cleanLabel, x, y);
+    }
+
+    texture.update();
+    return texture;
   }
 
   /**
@@ -106,24 +167,18 @@ export class MeshFactory {
   ): void {
     // Keep both exported and internal function boxes large enough to see.
     const boxSize = node.isExported
-      ? Math.max(6.0, SceneConfig.FUNCTION_BOX_SIZE)
-      : Math.max(1.0, SceneConfig.FUNCTION_BOX_SIZE);
+      ? Math.max(SceneConfig.EXPORTED_FUNCTION_BOX_SIZE, SceneConfig.FUNCTION_BOX_SIZE)
+      : Math.max(SceneConfig.INTERNAL_FUNCTION_BOX_SIZE, SceneConfig.FUNCTION_BOX_SIZE);
 
-    const box = BABYLON.MeshBuilder.CreateBox(`func_${node.id}`, { size: boxSize }, this.scene);
+    const { texture, faceUV } = this.createFunctionFaceTextureAtlas(node, fileColor);
+    const box = BABYLON.MeshBuilder.CreateBox(`func_${node.id}`, { size: boxSize, faceUV }, this.scene);
     box.position = position;
     box.isPickable = true;
+    (box as any).boxSize = boxSize;
 
     const material = new BABYLON.StandardMaterial(`mat_${node.id}`, this.scene);
-
-    // Use a solid base on the cube and render signature text as planes on each face.
-    // This avoids inconsistent UV orientation across cube faces.
-    material.diffuseColor = fileColor
-      ? new BABYLON.Color3(
-        0.35 + (fileColor.r * 0.35),
-        0.35 + (fileColor.g * 0.35),
-        0.35 + (fileColor.b * 0.35)
-      )
-      : new BABYLON.Color3(0.6, 0.6, 0.6);
+    material.diffuseColor = new BABYLON.Color3(1, 1, 1);
+    material.diffuseTexture = texture;
     
     // Subtle emissive glow based on file color
     if (fileColor) {
@@ -170,111 +225,30 @@ export class MeshFactory {
     // Store reference to this mesh for raycasting during edge creation
     this.nodeMeshes.set(node.id, box);
 
-    this.createFunctionFaceDescriptionPlanes(node, box, fileColor, boxSize);
-
     onNodeInteraction(box as BABYLON.Mesh, material, node);
   }
-
   /**
-   * Create one description plane per face so text orientation is controlled
-   * explicitly instead of relying on cube UV orientation.
+   * Build a texture atlas plus face UV mapping for a single box mesh.
    */
-  private createFunctionFaceDescriptionPlanes(
+  private createFunctionFaceTextureAtlas(
     node: GraphNode,
-    parentBox: BABYLON.Mesh,
-    fileColor: BABYLON.Color3 | null,
-    boxSize: number
-  ): void {
-    // Single texture shared across all faces — each plane is placed facing
-    // outward and uses backFaceCulling=true so it's only visible from the
-    // outside.  No per-face texture flip is needed because the UV layout is
-    // aligned correctly for each outward-facing orientation.
-    // Keep most of the face transparent so the cube's base color remains visible.
-    const texture = this.createSignatureTexture(node, fileColor);
-    const half = boxSize / 2;
-    const offset = half + 0.01;
-    const planeSize = boxSize;
+    fileColor: BABYLON.Color3 | null
+  ): { texture: BABYLON.DynamicTexture; faceUV: BABYLON.Vector4[] } {
+    const tileSize = Math.floor(SceneConfig.SIGNATURE_TEXTURE_SIZE / 2);
+    const atlasCols = 3;
+    const atlasRows = 2;
+    const textureWidth = tileSize * atlasCols;
+    const textureHeight = tileSize * atlasRows;
 
-    const faces: Array<{ suffix: string; position: BABYLON.Vector3; rotation: BABYLON.Vector3 }> = [
-      {
-        suffix: 'front',
-        position: new BABYLON.Vector3(0, 0, offset),
-        rotation: new BABYLON.Vector3(0, 0, 0),
-      },
-      {
-        suffix: 'back',
-        position: new BABYLON.Vector3(0, 0, -offset),
-        rotation: new BABYLON.Vector3(0, Math.PI, 0),
-      },
-      {
-        suffix: 'right',
-        position: new BABYLON.Vector3(offset, 0, 0),
-        rotation: new BABYLON.Vector3(0, Math.PI / 2, 0),
-      },
-      {
-        suffix: 'left',
-        position: new BABYLON.Vector3(-offset, 0, 0),
-        rotation: new BABYLON.Vector3(0, -Math.PI / 2, 0),
-      },
-      {
-        suffix: 'top',
-        position: new BABYLON.Vector3(0, offset, 0),
-        rotation: new BABYLON.Vector3(-Math.PI / 2, 0, Math.PI),
-      },
-      {
-        suffix: 'bottom',
-        position: new BABYLON.Vector3(0, -offset, 0),
-        rotation: new BABYLON.Vector3(Math.PI / 2, 0, 0),
-      },
-    ];
-
-    for (const face of faces) {
-      const labelPlane = BABYLON.MeshBuilder.CreatePlane(
-        `func_label_${node.id}_${face.suffix}`,
-        { width: planeSize, height: planeSize, sideOrientation: BABYLON.Mesh.BACKSIDE },
-        this.scene
-      );
-      labelPlane.parent = parentBox;
-      labelPlane.position = face.position;
-      labelPlane.rotation = face.rotation;
-      labelPlane.isPickable = false;
-
-      const labelMaterial = new BABYLON.StandardMaterial(`func_label_mat_${node.id}_${face.suffix}`, this.scene);
-      labelMaterial.diffuseColor = new BABYLON.Color3(1, 1, 1);
-      labelMaterial.diffuseTexture = texture;
-      labelMaterial.emissiveColor = new BABYLON.Color3(0.95, 0.95, 0.95);
-      labelMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
-      labelMaterial.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
-      labelMaterial.useAlphaFromDiffuseTexture = true;
-      // Cull back faces so we only see the intended front of each label.
-      labelMaterial.backFaceCulling = true;
-      labelMaterial.disableLighting = true;
-      labelPlane.material = labelMaterial;
-    }
-  }
-
-  /**
-   * Create a dynamic texture with function signature information.
-   * Uses the file color for the label background, ensuring visual consistency.
-   */
-  private createSignatureTexture(node: GraphNode, fileColor: BABYLON.Color3 | null): BABYLON.DynamicTexture {
-    const textureSize = SceneConfig.SIGNATURE_TEXTURE_SIZE;
     const dynamicTexture = new BABYLON.DynamicTexture(
       `signatureTexture_${node.id}`,
-      textureSize,
+      { width: textureWidth, height: textureHeight },
       this.scene
     );
-    dynamicTexture.hasAlpha = true;
+    dynamicTexture.hasAlpha = false;
     const ctx = dynamicTexture.getContext() as any;
 
-    // BACKSIDE orientation makes the visible label side horizontally mirrored;
-    // pre-flip the canvas so rendered text reads forward in-world.
-    ctx.save();
-    ctx.translate(textureSize, 0);
-    ctx.scale(-1, 1);
-
-    // Clear to fully transparent so box color shows through.
-    ctx.clearRect(0, 0, textureSize, textureSize);
+    ctx.clearRect(0, 0, textureWidth, textureHeight);
 
     // Draw background using the file color, darkened for contrast with white text.
     let bgColor = 'rgb(0, 0, 0)';
@@ -284,22 +258,145 @@ export class MeshFactory {
       const b = Math.max(0, Math.floor(fileColor.b * 200));
       bgColor = `rgb(${r}, ${g}, ${b})`;
     }
-    ctx.fillStyle = bgColor;
-    ctx.fillRect(0, 0, textureSize, textureSize);
 
-    // Function boxes should display only the function signature.
-    ctx.font = `bold ${SceneConfig.SIGNATURE_FONT_SIZE_PX}px ${SceneConfig.SIGNATURE_FONT_FAMILY}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    const faceLabels = ['front', 'back', 'right', 'left', 'top', 'bottom'];
+    for (let i = 0; i < faceLabels.length; i++) {
+      const col = i % atlasCols;
+      const row = Math.floor(i / atlasCols);
+      const x = col * tileSize;
+      const y = row * tileSize;
+      const centerX = x + (tileSize / 2);
+      const centerY = y + (tileSize / 2);
+      const maxTextWidth = tileSize * 0.86;
+      const lineHeight = Math.floor(tileSize * 0.16);
+      const maxLines = 4;
 
-    // Draw white text directly – fully opaque pixels only.
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(node.name, textureSize / 2, textureSize / 2);
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(x, y, tileSize, tileSize);
 
-    ctx.restore();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+      ctx.lineWidth = Math.max(2, Math.floor(tileSize * 0.01));
+      ctx.strokeRect(x + 2, y + 2, tileSize - 4, tileSize - 4);
+
+      const faceFontSize = Math.max(18, Math.floor(tileSize * 0.22));
+      ctx.font = `bold ${faceFontSize}px ${SceneConfig.SIGNATURE_FONT_FAMILY}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#ffffff';
+
+      const wrappedLines = this.wrapTextToWidth(ctx, node.name, maxTextWidth, maxLines);
+      const totalHeight = wrappedLines.length * lineHeight;
+      let lineY = centerY - (totalHeight / 2) + (lineHeight / 2);
+      for (const line of wrappedLines) {
+        ctx.fillText(line, centerX, lineY);
+        lineY += lineHeight;
+      }
+    }
 
     dynamicTexture.update();
-    return dynamicTexture;
+
+    const buildUV = (index: number): BABYLON.Vector4 => {
+      const col = index % atlasCols;
+      const row = Math.floor(index / atlasCols);
+      const u0 = col / atlasCols;
+      const v0 = row / atlasRows;
+      const u1 = (col + 1) / atlasCols;
+      const v1 = (row + 1) / atlasRows;
+      return new BABYLON.Vector4(u0, v0, u1, v1);
+    };
+
+    const faceUV: BABYLON.Vector4[] = [
+      buildUV(0),
+      buildUV(1),
+      buildUV(2),
+      buildUV(3),
+      buildUV(4),
+      buildUV(5),
+    ];
+
+    return { texture: dynamicTexture, faceUV };
+  }
+
+  /**
+   * Wrap text to fit a target pixel width, preserving readability for long symbol names.
+   */
+  private wrapTextToWidth(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    maxWidth: number,
+    maxLines: number
+  ): string[] {
+    const normalized = text.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]/g, ' ');
+    const words = normalized.split(/\s+/).filter(Boolean);
+    if (words.length === 0) {
+      return [text];
+    }
+
+    const lines: string[] = [];
+    let currentLine = '';
+
+    const pushLine = () => {
+      if (currentLine.trim().length > 0) {
+        lines.push(currentLine.trim());
+      }
+      currentLine = '';
+    };
+
+    for (const word of words) {
+      const candidate = currentLine ? `${currentLine} ${word}` : word;
+      if (ctx.measureText(candidate).width <= maxWidth) {
+        currentLine = candidate;
+        continue;
+      }
+
+      if (!currentLine) {
+        // Fallback: break very long tokens by character width.
+        let remaining = word;
+        while (remaining.length > 0) {
+          let take = remaining.length;
+          while (take > 1 && ctx.measureText(remaining.slice(0, take)).width > maxWidth) {
+            take--;
+          }
+          const chunk = remaining.slice(0, take);
+          lines.push(chunk);
+          remaining = remaining.slice(take);
+          if (lines.length >= maxLines) {
+            break;
+          }
+        }
+      } else {
+        pushLine();
+        currentLine = word;
+      }
+
+      if (lines.length >= maxLines) {
+        break;
+      }
+    }
+
+    if (lines.length < maxLines && currentLine) {
+      pushLine();
+    }
+
+    if (lines.length === 0) {
+      return [text];
+    }
+
+    if (lines.length > maxLines) {
+      return lines.slice(0, maxLines);
+    }
+
+    // Add ellipsis if we had to truncate words.
+    if (lines.length === maxLines && words.join(' ') !== lines.join(' ')) {
+      const lastIndex = lines.length - 1;
+      let last = lines[lastIndex];
+      while (last.length > 1 && ctx.measureText(`${last}...`).width > maxWidth) {
+        last = last.slice(0, -1);
+      }
+      lines[lastIndex] = `${last}...`;
+    }
+
+    return lines;
   }
 
   /**
@@ -352,39 +449,116 @@ export class MeshFactory {
    * Clears old edges before creating new ones
    */
   createEdges(
-    edges: Array<{ from: string; to: string }>,
+    edges: Array<{ from: string; to: string; kind?: 'call' | 'var-read' | 'var-write' }>,
     _layoutNodes: Map<string, any>,  // Kept for API compatibility, actual positions from mesh.getAbsolutePosition()
     sceneRoot?: BABYLON.TransformNode,
-    nodeExportedMap?: Map<string, boolean>  // Map of node IDs to isExported status
+    nodeExportedMap?: Map<string, boolean>,  // Map of node IDs to isExported status
+    fileColorMap?: Map<string, BABYLON.Color3> // Map of file paths to file box colors
   ): void {
-    // Clear old edges
-    for (const cylinder of this.edgeTubes.values()) {
-      cylinder.dispose();
-    }
-    this.edgeTubes.clear();
-    this.edgeMetadata.clear();
+    // Clear old edge meshes/materials first so repeated graph refreshes do not leak GPU resources.
+    this.clearEdges();
 
-    // Create material for same-file edges (visible but subtle and thin)
-    const samFileEdgeMaterial = new BABYLON.StandardMaterial('sameFileEdgeMaterial', this.scene);
-    samFileEdgeMaterial.emissiveColor = new BABYLON.Color3(0.5, 0.5, 0.5);  // Dim gray
-    samFileEdgeMaterial.alpha = 0.4;
-    samFileEdgeMaterial.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+    // All edges are colored by their target file. We cache one material per (targetFile, isCrossFile)
+    // pair so shared per-file materials are reused across edges.
+    // Cross-file edges: full opacity, bright emissive, normal thickness.
+    // Same-file edges: semi-transparent, dimmer emissive, thinner.
+    // Exported-target edges: slightly brighter emissive to stand out.
+    const edgeMaterialCache = new Map<string, BABYLON.StandardMaterial>();
 
-    // Create material for cross-file edges
-    const crossFileEdgeMaterial = new BABYLON.StandardMaterial('crossFileEdgeMaterial', this.scene);
-    crossFileEdgeMaterial.emissiveColor = new BABYLON.Color3(1.0, 0.84, 0.0);  // Golden
-    crossFileEdgeMaterial.alpha = 0;  // Hidden
-    crossFileEdgeMaterial.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+    const getEdgeMaterial = (
+      targetFileRaw: string,
+      crossFile: boolean,
+      exported: boolean,
+      selfLoop: boolean,
+      targetsExternalLibrary: boolean,
+      edgeKind?: 'call' | 'var-read' | 'var-write',
+    ): BABYLON.StandardMaterial => {
+      const targetFile = toProjectRelativePath(targetFileRaw);
+      const key = `${targetFile}|${crossFile}|${exported}|${selfLoop}|${targetsExternalLibrary}|${edgeKind ?? 'call'}`;
+      const cached = edgeMaterialCache.get(key);
+      if (cached) return cached;
 
-    // Create material for exported function connections (glowing yellow)
-    const exportedEdgeMaterial = new BABYLON.StandardMaterial('exportedEdgeMaterial', this.scene);
-    exportedEdgeMaterial.emissiveColor = new BABYLON.Color3(1.0, 1.0, 0.0);  // Bright yellow
-    exportedEdgeMaterial.specularColor = new BABYLON.Color3(1.0, 1.0, 0.8);
-    exportedEdgeMaterial.specularPower = 32;
-    exportedEdgeMaterial.alpha = 1.0;  // Visible
-    exportedEdgeMaterial.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+      const targetColor =
+        fileColorMap?.get(targetFile) ??
+        fileColorMap?.get(targetFileRaw) ??
+        new BABYLON.Color3(0.5, 0.5, 0.5);
+      const mat = new BABYLON.StandardMaterial(`edgeMat_${key}`, this.scene);
+
+      if (edgeKind === 'var-write') {
+        // Function writes to global variable.
+        mat.emissiveColor = new BABYLON.Color3(0.22, 0.90, 0.52);
+        mat.diffuseColor = new BABYLON.Color3(0.08, 0.56, 0.30);
+        mat.specularColor = new BABYLON.Color3(0.72, 1.0, 0.86);
+        mat.specularPower = 40;
+        mat.alpha = 1.0;
+        mat.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
+      } else if (edgeKind === 'var-read') {
+        // Function reads from global variable.
+        mat.emissiveColor = new BABYLON.Color3(0.24, 0.66, 1.0);
+        mat.diffuseColor = new BABYLON.Color3(0.10, 0.34, 0.72);
+        mat.specularColor = new BABYLON.Color3(0.76, 0.90, 1.0);
+        mat.specularPower = 36;
+        mat.alpha = 1.0;
+        mat.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
+      } else if (targetsExternalLibrary) {
+        // External-library edges use a consistent gold/yellow style.
+        mat.emissiveColor = new BABYLON.Color3(1.0, 0.82, 0.20);
+        mat.diffuseColor = new BABYLON.Color3(0.95, 0.70, 0.14);
+        mat.specularColor = new BABYLON.Color3(1.0, 0.92, 0.56);
+        mat.specularPower = 54;
+        mat.alpha = 1.0;
+        mat.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
+      } else if (selfLoop) {
+        // Recursive self-loop edges use a distinct high-contrast cool tint so they
+        // can be identified quickly among dense regular edges.
+        mat.emissiveColor = new BABYLON.Color3(0.28, 0.80, 1.0);
+        mat.diffuseColor = new BABYLON.Color3(0.12, 0.42, 0.86);
+        mat.specularColor = new BABYLON.Color3(0.72, 0.92, 1.0);
+        mat.specularPower = 48;
+        mat.alpha = 1.0;
+        mat.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
+      } else if (crossFile) {
+        // Cross-file: vivid target-file color, fully opaque
+        const boost = exported ? 0.15 : 0.0;
+        mat.emissiveColor = new BABYLON.Color3(
+          Math.min(1, targetColor.r * 0.85 + 0.15 + boost),
+          Math.min(1, targetColor.g * 0.85 + 0.15 + boost),
+          Math.min(1, targetColor.b * 0.85 + 0.15 + boost)
+        );
+        mat.diffuseColor = new BABYLON.Color3(
+          Math.min(1, targetColor.r * 0.5 + 0.1),
+          Math.min(1, targetColor.g * 0.5 + 0.1),
+          Math.min(1, targetColor.b * 0.5 + 0.1)
+        );
+        mat.specularColor = new BABYLON.Color3(
+          Math.min(1, targetColor.r * 0.5 + 0.5),
+          Math.min(1, targetColor.g * 0.5 + 0.5),
+          Math.min(1, targetColor.b * 0.5 + 0.5)
+        );
+        mat.specularPower = 32;
+        mat.alpha = 1.0;
+        mat.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
+      } else {
+        // Same-file: keep target tint but make lines clearly readable at distance.
+        mat.emissiveColor = new BABYLON.Color3(
+          Math.min(1, targetColor.r * 0.85 + 0.16),
+          Math.min(1, targetColor.g * 0.85 + 0.16),
+          Math.min(1, targetColor.b * 0.85 + 0.16)
+        );
+        mat.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+        mat.alpha = exported ? 1.0 : 0.9;
+        mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+      }
+      mat.backFaceCulling = false;
+      // Keep edges visually stable at range and in darker regions.
+      mat.disableLighting = true;
+      this.edgeMaterials.add(mat);
+      edgeMaterialCache.set(key, mat);
+      return mat;
+    };
 
     // Create cylinder for each edge that will be repositioned each frame
+    const edgeKeySet = new Set(edges.map((edge) => `${edge.from}->${edge.to}`));
     let edgeIndex = 0;
     for (const edge of edges) {
       // Note: We don't check layoutNodes because updateEdges() will use actual mesh positions
@@ -393,43 +567,98 @@ export class MeshFactory {
       // Extract file paths to determine if cross-file
       const fromFile = edge.from.split('@')[1];
       const toFile = edge.to.split('@')[1];
+      const edgeKind = edge.kind ?? 'call';
       const isCrossFile = fromFile !== toFile;
-      
-      // Check if the target node is an exported function
-      const isExportedConnection = nodeExportedMap && nodeExportedMap.get(edge.to);
-      
-      // Select material: cross-file exported connections get glowing yellow;
-      // same-file edges (including to exported functions) use the internal style.
-      let material = samFileEdgeMaterial;
-      if (isExportedConnection && isCrossFile) {
-        material = exportedEdgeMaterial;
-      } else if (isCrossFile) {
-        material = crossFileEdgeMaterial;
-      }
+      const isSelfLoop = edge.from === edge.to;
+      const targetsExternalLibrary = edge.to.startsWith('ext:');
+      const hasReverseEdge = !isSelfLoop && edgeKeySet.has(`${edge.to}->${edge.from}`);
+      const bidirectionalOffsetSign = hasReverseEdge
+        ? (edge.from.localeCompare(edge.to) <= 0 ? 1 : -1)
+        : 0;
 
-      // Thinner cylinders for same-file (internal) edges, normal size for cross-file.
-      const edgeDiameter = isCrossFile
-        ? SceneConfig.EDGE_RADIUS * 2
-        : SceneConfig.INTERNAL_EDGE_RADIUS * 2;
-      const cylinder = BABYLON.MeshBuilder.CreateCylinder(`edge_${edgeIndex}`, {
-        diameter: edgeDiameter,
-        height: 1,  // Will be scaled based on distance
-      }, this.scene);
+      // Check if the target node is an exported function
+      const isExportedConnection = !!(nodeExportedMap && nodeExportedMap.get(edge.to));
+
+      const targetFileRaw = toFile || 'unknown';
+      const material = getEdgeMaterial(
+        targetFileRaw,
+        isCrossFile,
+        isExportedConnection,
+        isSelfLoop,
+        targetsExternalLibrary,
+        edgeKind,
+      );
+
+      // Cross-file edges are thicker; same-file edges are thinner.
+      // Exported-target same-file edges use an intermediate thickness.
+      const edgeDiameter = edgeKind === 'var-write'
+        ? SceneConfig.INTERNAL_EDGE_RADIUS * 3.0
+        : edgeKind === 'var-read'
+          ? SceneConfig.INTERNAL_EDGE_RADIUS * 2.2
+          : isSelfLoop
+        ? SceneConfig.EDGE_RADIUS * 1.6
+        : isCrossFile
+          ? SceneConfig.EDGE_RADIUS * 2
+          : isExportedConnection
+            ? SceneConfig.INTERNAL_EDGE_RADIUS * 4
+            : SceneConfig.INTERNAL_EDGE_RADIUS * 2;
+      const cylinder = isSelfLoop
+        ? BABYLON.MeshBuilder.CreateTube(`edge_${edgeIndex}`, {
+            path: this.buildSelfLoopPath(sceneRoot ?? null, BABYLON.Vector3.Zero(), 2.0),
+            radius: Math.max(0.06, edgeDiameter * 0.45),
+            updatable: true,
+          }, this.scene)
+        : BABYLON.MeshBuilder.CreateCylinder(`edge_${edgeIndex}`, {
+            diameter: edgeDiameter,
+            height: 1,  // Will be scaled based on distance
+          }, this.scene);
       
       cylinder.material = material;
-      cylinder.isPickable = false;
+      cylinder.isPickable = true;
+      // Keep connection edges rendered even when camera intersects their bounds.
+      cylinder.alwaysSelectAsActiveMesh = true;
+      cylinder.renderingGroupId = 1;  // Render edges on top of transparent boxes
+      (cylinder as any).edgeData = { from: edge.from, to: edge.to };
       
       // Parent to scene root to move with the scene
       if (sceneRoot) {
         cylinder.parent = sceneRoot;
       }
 
-      // Store cylinder and metadata
+      // Arrowhead cone at the target end: tip points in the direction of the call
+      const arrowHeight = edgeKind === 'var-write'
+        ? edgeDiameter * 5.0
+        : edgeKind === 'var-read'
+          ? edgeDiameter * 4.4
+          : edgeDiameter * 4.0;
+      const arrowBaseDiameter = edgeKind === 'var-write'
+        ? edgeDiameter * 2.9
+        : edgeKind === 'var-read'
+          ? edgeDiameter * 2.6
+          : edgeDiameter * 2.5;
+      const arrow = BABYLON.MeshBuilder.CreateCylinder(`arrow_${edgeIndex}`, {
+        diameterTop: 0,           // cone tip
+        diameterBottom: arrowBaseDiameter,
+        height: arrowHeight,
+      }, this.scene);
+      arrow.material = material;
+      arrow.isPickable = true;
+      arrow.alwaysSelectAsActiveMesh = true;
+      arrow.renderingGroupId = 1;  // Render edges on top of transparent boxes
+      (arrow as any).edgeData = { from: edge.from, to: edge.to };
+      if (sceneRoot) {
+        arrow.parent = sceneRoot;
+      }
+
+      // Store cylinder, arrow and metadata
       this.edgeTubes.set(`${edgeIndex}`, cylinder);
+      this.edgeArrows.set(`${edgeIndex}`, arrow);
       this.edgeMetadata.set(`${edgeIndex}`, {
         from: edge.from,
         to: edge.to,
-        isCrossFile
+        isCrossFile,
+        isSelfLoop,
+        bidirectionalOffsetSign,
       });
 
       edgeIndex++;
@@ -443,6 +672,118 @@ export class MeshFactory {
    */
   removeMeshReference(nodeId: string): void {
     this.nodeMeshes.delete(nodeId);
+  }
+
+  /**
+   * Clear all edge meshes and edge materials created by this factory.
+   */
+  public clearEdges(): void {
+    for (const cylinder of this.edgeTubes.values()) {
+      cylinder.dispose();
+    }
+    this.edgeTubes.clear();
+
+    for (const arrow of this.edgeArrows.values()) {
+      arrow.dispose();
+    }
+    this.edgeArrows.clear();
+    this.edgeMetadata.clear();
+
+    for (const material of this.edgeMaterials.values()) {
+      material.dispose();
+    }
+    this.edgeMaterials.clear();
+  }
+
+  /**
+   * Remove all cached node mesh references.
+   */
+  public clearNodeReferences(): void {
+    this.nodeMeshes.clear();
+  }
+
+  private toParentLocalPoint(parent: BABYLON.Node | null, worldPoint: BABYLON.Vector3): BABYLON.Vector3 {
+    if (parent && (parent as any).getWorldMatrix) {
+      const parentMatrix = (parent as any).getWorldMatrix().clone() as BABYLON.Matrix;
+      const inverseParentMatrix = BABYLON.Matrix.Invert(parentMatrix);
+      return BABYLON.Vector3.TransformCoordinates(worldPoint, inverseParentMatrix);
+    }
+    return worldPoint.clone();
+  }
+
+  private buildSelfLoopPath(parent: BABYLON.Node | null, sourceCenterWorld: BABYLON.Vector3, nodeRadius: number): BABYLON.Vector3[] {
+    const loopRadius = Math.max(3.2, nodeRadius * 1.8);
+    const loopLift = Math.max(2.6, nodeRadius * 1.4);
+    const loopCenter = sourceCenterWorld.add(new BABYLON.Vector3(0, loopLift, 0));
+    const angleOffset = -Math.PI / 3;
+    const segments = 28;
+    const worldPath: BABYLON.Vector3[] = [];
+
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments;
+      const angle = angleOffset + (Math.PI * 2 * t);
+      worldPath.push(new BABYLON.Vector3(
+        loopCenter.x + (Math.cos(angle) * loopRadius),
+        loopCenter.y,
+        loopCenter.z + (Math.sin(angle) * loopRadius),
+      ));
+    }
+
+    return worldPath.map((point) => this.toParentLocalPoint(parent, point));
+  }
+
+  private recreateSelfLoopTube(
+    edgeId: string,
+    existingTube: BABYLON.Mesh,
+    path: BABYLON.Vector3[],
+    radius: number,
+  ): BABYLON.Mesh {
+    const replacement = BABYLON.MeshBuilder.CreateTube(existingTube.name, {
+      path,
+      radius,
+      updatable: true,
+    }, this.scene);
+
+    replacement.material = existingTube.material;
+    replacement.isPickable = existingTube.isPickable;
+    replacement.alwaysSelectAsActiveMesh = existingTube.alwaysSelectAsActiveMesh;
+    replacement.parent = existingTube.parent;
+    (replacement as any).edgeData = (existingTube as any).edgeData;
+
+    existingTube.dispose();
+    this.edgeTubes.set(edgeId, replacement);
+    return replacement;
+  }
+
+  private computeBidirectionalOffsetVector(
+    edgeDirection: BABYLON.Vector3,
+    isCrossFile: boolean,
+    offsetSign: number,
+  ): BABYLON.Vector3 {
+    if (offsetSign === 0) {
+      return BABYLON.Vector3.Zero();
+    }
+
+    // Build a stable perpendicular vector so reciprocal edges can be rendered
+    // as separate parallel lines.
+    let referenceUp = BABYLON.Axis.Y;
+    if (Math.abs(BABYLON.Vector3.Dot(edgeDirection, referenceUp)) > 0.92) {
+      referenceUp = BABYLON.Axis.X;
+    }
+
+    let lateral = BABYLON.Vector3.Cross(edgeDirection, referenceUp);
+    if (!Number.isFinite(lateral.length()) || lateral.lengthSquared() < 0.000001) {
+      lateral = BABYLON.Vector3.Cross(edgeDirection, BABYLON.Axis.Z);
+    }
+    if (!Number.isFinite(lateral.length()) || lateral.lengthSquared() < 0.000001) {
+      return BABYLON.Vector3.Zero();
+    }
+    lateral.normalize();
+
+    const baseOffset = isCrossFile
+      ? Math.max(1.6, SceneConfig.EDGE_RADIUS * 4)
+      : Math.max(1.0, SceneConfig.INTERNAL_EDGE_RADIUS * 10);
+    return lateral.scale(baseOffset * offsetSign);
   }
 
   /**
@@ -467,6 +808,59 @@ export class MeshFactory {
         continue;  // Skip if nodes not found
       }
 
+      const arrow = this.edgeArrows.get(edgeId);
+
+      if (metadata.isSelfLoop) {
+        const sourceCenterPos = sourceMesh.getAbsolutePosition().clone();
+        const sourceRadius = sourceMesh.getBoundingInfo()?.boundingSphere?.radiusWorld ?? 2.0;
+        const loopPath = this.buildSelfLoopPath(cylinder.parent ?? null, sourceCenterPos, sourceRadius);
+        const loopTubeRadius = metadata.isCrossFile
+          ? Math.max(0.1, SceneConfig.EDGE_RADIUS * 0.65)
+          : Math.max(0.08, SceneConfig.INTERNAL_EDGE_RADIUS * 1.2);
+
+        let activeTube = cylinder;
+        try {
+          BABYLON.MeshBuilder.CreateTube(cylinder.name, {
+            path: loopPath,
+            radius: loopTubeRadius,
+            updatable: true,
+            instance: cylinder,
+          }, this.scene);
+        } catch {
+          activeTube = this.recreateSelfLoopTube(edgeId, cylinder, loopPath, loopTubeRadius);
+        }
+
+        if (!activeTube.isEnabled()) {
+          activeTube.setEnabled(true);
+        }
+
+        if (arrow) {
+          const loopRadius = Math.max(3.2, sourceRadius * 1.8);
+          const loopLift = Math.max(2.6, sourceRadius * 1.4);
+          const loopCenter = sourceCenterPos.add(new BABYLON.Vector3(0, loopLift, 0));
+          const angle = -Math.PI / 3;
+          const pointOnLoop = new BABYLON.Vector3(
+            loopCenter.x + (Math.cos(angle) * loopRadius),
+            loopCenter.y,
+            loopCenter.z + (Math.sin(angle) * loopRadius),
+          );
+          const tangent = new BABYLON.Vector3(-Math.sin(angle), 0, Math.cos(angle)).normalize();
+          const arrowHalfHeight = arrow.getBoundingInfo().boundingBox.maximum.y;
+          const arrowCenterWorld = pointOnLoop.subtract(tangent.scale(arrowHalfHeight));
+          arrow.position = this.toParentLocalPoint(arrow.parent ?? null, arrowCenterWorld);
+
+          const arrowQ = BABYLON.Quaternion.Identity();
+          BABYLON.Quaternion.FromUnitVectorsToRef(BABYLON.Axis.Y, tangent, arrowQ);
+          arrow.rotationQuaternion = arrowQ;
+
+          if (!arrow.isEnabled()) {
+            arrow.setEnabled(true);
+          }
+        }
+
+        continue;
+      }
+
       // Get current positions (world space)
       const sourceCenterPos = sourceMesh.getAbsolutePosition().clone();
       const targetCenterPos = targetMesh.getAbsolutePosition().clone();
@@ -477,32 +871,59 @@ export class MeshFactory {
 
       if (distance < 0.001) {
         cylinder.setEnabled(false);  // Hide edge if nodes are at same position
+        this.edgeArrows.get(edgeId)?.setEnabled(false);
         continue;
       }
 
-      // Get half-sizes of source and target meshes for surface contact points
+      // Use vertical half extents so edges connect through top/bottom faces.
       const sourceBoundingBox = sourceMesh.getBoundingInfo().boundingBox;
       const targetBoundingBox = targetMesh.getBoundingInfo().boundingBox;
-      // Calculate half-size as distance from center to corner
-      const sourceSize = sourceBoundingBox.maximum.subtract(sourceBoundingBox.minimum).scale(0.5);
-      const targetSize = targetBoundingBox.maximum.subtract(targetBoundingBox.minimum).scale(0.5);
-      const sourceHalfSize = sourceSize.length();  // Approximate half-size (distance to corner)
-      const targetHalfSize = targetSize.length();  // Approximate half-size (distance to corner)
+      const sourceHalfY = Math.max(
+        0.1,
+        (sourceBoundingBox.maximum.y - sourceBoundingBox.minimum.y) * 0.5,
+      );
+      const targetHalfY = Math.max(
+        0.1,
+        (targetBoundingBox.maximum.y - targetBoundingBox.minimum.y) * 0.5,
+      );
 
       // Normalize direction
       const normalizedDir = direction.normalize();
+      const bidirectionalOffset = this.computeBidirectionalOffsetVector(
+        normalizedDir,
+        metadata.isCrossFile,
+        metadata.bidirectionalOffsetSign,
+      );
+      const offsetSourcePos = sourceCenterPos.add(bidirectionalOffset);
+      const offsetTargetPos = targetCenterPos.add(bidirectionalOffset);
 
-      // Start point: move source center outward by half its size
-      const edgeStartPos = sourceCenterPos.add(normalizedDir.scale(sourceHalfSize));
-      
-      // End point: move target center inward by half its size (approach from outside)
-      const edgeEndPos = targetCenterPos.add(normalizedDir.scale(-targetHalfSize));
+      // All non-self edges connect via top/bottom faces only.
+      // If target is above source, exit source top and enter target bottom.
+      // If target is below source, exit source bottom and enter target top.
+      const verticalSign = targetCenterPos.y >= sourceCenterPos.y ? 1 : -1;
+      const sourceVerticalOffset = new BABYLON.Vector3(0, verticalSign * sourceHalfY, 0);
+      const targetVerticalOffset = new BABYLON.Vector3(0, -verticalSign * targetHalfY, 0);
 
-      // Use midpoint of start and end for cylinder position
-      const midpointWorld = edgeStartPos.add(edgeEndPos).scale(0.5);
+      const edgeStartPos = offsetSourcePos.add(sourceVerticalOffset);
+      const edgeEndPos = offsetTargetPos.add(targetVerticalOffset);
+
+      // Edge direction unit vector (source → target)
+      const edgeDirection = edgeEndPos.subtract(edgeStartPos).normalize();
+
+      // Compute arrow cone height so we can shorten the cylinder to avoid overlap.
+      // The cone is unscaled so its bounding-box half-height equals arrowHeight/2.
+      const arrowFullHeight = arrow
+        ? arrow.getBoundingInfo().boundingBox.maximum.y * 2
+        : 0;
+
+      // Cylinder ends at the cone's base (not the target surface) so the tip is visible.
+      const cylinderEndPos = edgeEndPos.subtract(edgeDirection.scale(arrowFullHeight));
+
+      // Use midpoint of start and cylinder-end for the cylinder position
+      const midpointWorld = edgeStartPos.add(cylinderEndPos).scale(0.5);
       
-      // Recalculate distance based on surface points
-      const surfaceDistance = edgeEndPos.subtract(edgeStartPos).length();
+      // Recalculate distance based on surface points (cylinder portion only)
+      const surfaceDistance = cylinderEndPos.subtract(edgeStartPos).length();
       
       // Convert world position to local position relative to parent
       // If cylinder has a parent, position is automatically local
@@ -519,7 +940,6 @@ export class MeshFactory {
       cylinder.scaling.y = Math.max(surfaceDistance, 0.1);  // Minimum 0.1 to avoid invisible edges
 
       // Rotate cylinder to point along the connection
-      const edgeDirection = edgeEndPos.subtract(edgeStartPos).normalize();
       const yAxis = BABYLON.Axis.Y;
       const rotationQuaternion = BABYLON.Quaternion.Identity();
       BABYLON.Quaternion.FromUnitVectorsToRef(yAxis, edgeDirection, rotationQuaternion);
@@ -528,6 +948,30 @@ export class MeshFactory {
       // Ensure cylinder is visible
       if (!cylinder.isEnabled) {
         cylinder.setEnabled(true);
+      }
+
+      // Position and orient arrowhead at the target surface
+      if (arrow) {
+        const arrowHalfHeight = arrowFullHeight / 2;
+        // Place cone center so its tip (+Y) sits exactly at edgeEndPos
+        const arrowCenterWorld = edgeEndPos.subtract(edgeDirection.scale(arrowHalfHeight));
+
+        if (arrow.parent) {
+          const parentMatrix = (arrow.parent as BABYLON.TransformNode).getWorldMatrix().clone();
+          const inverseParentMatrix = BABYLON.Matrix.Invert(parentMatrix);
+          arrow.position = BABYLON.Vector3.TransformCoordinates(arrowCenterWorld, inverseParentMatrix);
+        } else {
+          arrow.position = arrowCenterWorld;
+        }
+
+        // Same rotation as the cylinder: align Y-axis to edge direction
+        const arrowQ = BABYLON.Quaternion.Identity();
+        BABYLON.Quaternion.FromUnitVectorsToRef(BABYLON.Axis.Y, edgeDirection, arrowQ);
+        arrow.rotationQuaternion = arrowQ;
+
+        if (!arrow.isEnabled) {
+          arrow.setEnabled(true);
+        }
       }
     }
   }

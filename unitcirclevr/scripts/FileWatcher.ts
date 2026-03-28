@@ -5,17 +5,26 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { CodeTreeBuilder } from './CodeTreeBuilder';
+import { execFileSync } from 'child_process';
 
 class FileWatcher {
   private sourceDir: string;
-  private builder: CodeTreeBuilder;
   private isProcessing = false;
   private debounceTimer: NodeJS.Timeout | null = null;
 
-  constructor(sourceDir: string = './src') {
+  constructor(sourceDir: string = '.') {
     this.sourceDir = sourceDir;
-    this.builder = new CodeTreeBuilder(sourceDir);
+  }
+
+  private shouldIgnoreFile(filename: string): boolean {
+    const normalized = filename.replace(/\\+/g, '/');
+    if (!normalized || normalized.startsWith('.')) return true;
+    if (normalized.includes('/node_modules/') || normalized.startsWith('node_modules/')) return true;
+    if (normalized.includes('/.git/') || normalized.startsWith('.git/')) return true;
+    if (normalized.includes('/dist/') || normalized.startsWith('dist/')) return true;
+    if (normalized.includes('/coverage/') || normalized.startsWith('coverage/')) return true;
+    if (normalized === 'public/graph.json' || normalized === 'public/version.json') return true;
+    return false;
   }
 
   /**
@@ -30,13 +39,11 @@ class FileWatcher {
 
     // Watch the directory
     fs.watch(this.sourceDir, { recursive: true }, (eventType, filename) => {
-      if (!filename || filename.endsWith('.spec.ts') || filename.startsWith('.')) {
+      if (!filename || this.shouldIgnoreFile(filename)) {
         return;
       }
 
-      if (filename.endsWith('.ts')) {
-        this.debounceRebuild();
-      }
+      this.debounceRebuild();
     });
   }
 
@@ -61,15 +68,23 @@ class FileWatcher {
 
     try {
       const startTime = Date.now();
-      const graph = this.builder.build();
+      const nodeExecutable = process.execPath;
+      const tsxCliPath = path.resolve('./node_modules/tsx/dist/cli.mjs');
+
+      execFileSync(nodeExecutable, [tsxCliPath, path.resolve('./scripts/build-graph.ts')], {
+        stdio: 'inherit',
+        cwd: path.resolve(this.sourceDir),
+      });
+
+      const versionPath = path.resolve('./public/version.json');
+      const version = JSON.parse(fs.readFileSync(versionPath, 'utf-8')) as {
+        graphNodes?: number;
+        graphEdges?: number;
+      };
       const duration = Date.now() - startTime;
 
-      // Write to public folder
-      const outputPath = path.resolve('./public/graph.json');
-      fs.writeFileSync(outputPath, JSON.stringify(graph, null, 2));
-
       console.log(
-        `✅ [${new Date().toLocaleTimeString()}] Graph updated: ${graph.nodes.length} functions, ${graph.edges.length} calls (${duration}ms)`
+        `✅ [${new Date().toLocaleTimeString()}] Graph updated: ${version.graphNodes || 0} functions, ${version.graphEdges || 0} calls (${duration}ms)`
       );
     } catch (error) {
       console.error(`❌ Error rebuilding graph:`, error);
@@ -80,7 +95,7 @@ class FileWatcher {
 }
 
 // Start watching
-const watcher = new FileWatcher('./src');
+const watcher = new FileWatcher('.');
 watcher.watch();
 
 // Handle graceful shutdown

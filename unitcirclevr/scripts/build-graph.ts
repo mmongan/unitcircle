@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
-import { CodeTreeBuilder } from './CodeTreeBuilder.js';
+import { CodeTreeBuilder } from './CodeTreeBuilder.ts';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import * as fs from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const srcDir = path.join(__dirname, '../src');
+const projectRoot = path.join(__dirname, '..');
 const publicDir = path.join(__dirname, '../public');
 
 // Ensure public directory exists
@@ -18,7 +18,7 @@ console.log('\n🔄 Building fresh code graph from source...\n');
 
 try {
   // Build a fresh complete graph from current source
-  const builder = new CodeTreeBuilder(srcDir);
+  const builder = new CodeTreeBuilder(projectRoot);
   const graph = builder.build();
 
   // Validate graph completeness

@@ -11,16 +11,19 @@ export interface GraphNode {
   line?: number;
   isExported?: boolean;
   type?: NodeType;
+  code?: string;
 }
 
 export interface GraphEdge {
   from: string;
   to: string;
+  kind?: 'call' | 'var-read' | 'var-write';
 }
 
 export interface GraphData {
   nodes: GraphNode[];
   edges: GraphEdge[];
+  files?: string[];
   lastUpdated: string;
 }
 

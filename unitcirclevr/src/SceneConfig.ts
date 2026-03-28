@@ -8,11 +8,11 @@ export class SceneConfig {
   static readonly EXPORTED_FUNCTION_COLOR = new BABYLON.Color3(0.15, 0.5, 0.4);
   static readonly LEAF_FUNCTION_COLOR = new BABYLON.Color3(0.4, 0.4, 0.4);
   static readonly CALLED_FUNCTION_COLORS = [
-    new BABYLON.Color3(0.5, 0.1, 0.1),
-    new BABYLON.Color3(0.1, 0.5, 0.1),
-    new BABYLON.Color3(0.1, 0.1, 0.5),
-    new BABYLON.Color3(0.5, 0.5, 0.1),
-    new BABYLON.Color3(0.5, 0.1, 0.5),
+    new BABYLON.Color3(0.10, 0.46, 0.68),
+    new BABYLON.Color3(0.12, 0.56, 0.24),
+    new BABYLON.Color3(0.18, 0.30, 0.70),
+    new BABYLON.Color3(0.10, 0.58, 0.58),
+    new BABYLON.Color3(0.40, 0.46, 0.12),
   ];
 
   static readonly EXPORTED_VARIABLE_COLOR = new BABYLON.Color3(0.5, 0.4, 0.1);
@@ -22,13 +22,17 @@ export class SceneConfig {
   // Interaction Colors
   static readonly HOVER_COLOR = new BABYLON.Color3(0.4, 0.4, 0.4);
   static readonly EDGE_COLOR = new BABYLON.Color3(0.5, 0.5, 0.5);
+  static readonly FILE_BOX_EDGE_COLOR = new BABYLON.Color4(0.08, 0.08, 0.08, 1.0);
+  static readonly FILE_BOX_EDGE_WIDTH = 4;
   static readonly GROUND_COLOR = new BABYLON.Color3(0.2, 0.7, 0.2);
 
   // Node Dimensions
   static readonly FUNCTION_BOX_SIZE = 0.1;
+  static readonly INTERNAL_FUNCTION_BOX_SIZE = 1.6;
+  static readonly EXPORTED_FUNCTION_BOX_SIZE = 6.0;
   static readonly VARIABLE_SPHERE_DIAMETER = 1.5;
-  static readonly EXTERNAL_CYLINDER_DIAMETER = 1.2;
-  static readonly EXTERNAL_CYLINDER_HEIGHT = 2.0;
+  static readonly EXTERNAL_PYRAMID_BASE = 1.2;
+  static readonly EXTERNAL_PYRAMID_HEIGHT = 2.0;
 
   // Lighting
   static readonly LIGHT_INTENSITY = 0.7;
@@ -51,16 +55,16 @@ export class SceneConfig {
   static readonly LABEL_TEXTURE_SIZE = 512;
 
   // Texture
-  static readonly SIGNATURE_TEXTURE_SIZE = 1024;
-  static readonly SIGNATURE_TEXTURE_BORDER_SIZE = 20;
-  static readonly SIGNATURE_FONT_SIZE_PX = 84;
+  static readonly SIGNATURE_TEXTURE_SIZE = 256;
+  static readonly SIGNATURE_TEXTURE_BORDER_SIZE = 10;
+  static readonly SIGNATURE_FONT_SIZE_PX = 42;
   static readonly SIGNATURE_FONT_FAMILY = 'monospace';
   static readonly SIGNATURE_TEXT_COLOR = '#ffffff';
   static readonly SIGNATURE_BORDER_COLOR = '#ffffff';
 
   // Edge Rendering
   static readonly EDGE_RADIUS = 0.2;          // Cross-file / exported edge radius
-  static readonly INTERNAL_EDGE_RADIUS = 0.05; // Same-file internal edge radius (thinner)
+  static readonly INTERNAL_EDGE_RADIUS = 0.14; // Same-file internal edge radius (boosted for distance readability)
 
   // Physics Layout
   static readonly LAYOUT_ITERATIONS = 1; // Simple random placement requires minimal iterations

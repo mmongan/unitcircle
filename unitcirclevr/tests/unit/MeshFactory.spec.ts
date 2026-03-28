@@ -4,12 +4,26 @@ import { SceneConfig } from '../../src/SceneConfig';
 import * as BABYLON from '@babylonjs/core';
 
 vi.mock('@babylonjs/core', () => {
+  const makeVector = (x: number, y: number, z: number) => {
+    const v: any = { x, y, z };
+    v.add = vi.fn((other: any) => makeVector(v.x + other.x, v.y + other.y, v.z + other.z));
+    v.subtract = vi.fn((other: any) => makeVector(v.x - other.x, v.y - other.y, v.z - other.z));
+    v.scale = vi.fn((s: number) => makeVector(v.x * s, v.y * s, v.z * s));
+    v.clone = vi.fn(() => makeVector(v.x, v.y, v.z));
+    v.length = vi.fn(() => Math.sqrt((v.x * v.x) + (v.y * v.y) + (v.z * v.z)));
+    v.normalize = vi.fn(() => {
+      const len = v.length();
+      return len > 0.000001 ? makeVector(v.x / len, v.y / len, v.z / len) : makeVector(0, 0, 0);
+    });
+    return v;
+  };
+
   const makeMesh = () => ({
     isPickable: false,
     parent: null,
     material: null,
-    position: { x: 0, y: 0, z: 0 },
-    scaling: { x: 1, y: 1, z: 1 },
+    position: makeVector(0, 0, 0),
+    scaling: makeVector(1, 1, 1),
     billboardMode: 0,
     isVisible: true,
     setEnabled: vi.fn(),
@@ -21,7 +35,7 @@ vi.mock('@babylonjs/core', () => {
       },
       boundingSphere: { radiusWorld: 1.5 },
     })),
-    getAbsolutePosition: vi.fn(() => ({ x: 0, y: 0, z: 0 })),
+    getAbsolutePosition: vi.fn(() => makeVector(0, 0, 0)),
     computeWorldMatrix: vi.fn(),
     getChildren: vi.fn(() => []),
   });
@@ -46,9 +60,14 @@ vi.mock('@babylonjs/core', () => {
       r, g, b,
       clone: vi.fn(() => ({ r, g, b })),
     })),
+    Color4: vi.fn((r: number, g: number, b: number, a: number) => ({
+      r, g, b, a,
+      clone: vi.fn(() => ({ r, g, b, a })),
+    })),
     MeshBuilder: {
       CreateBox: vi.fn(makeMesh),
       CreateCylinder: vi.fn(makeMesh),
+      CreateTube: vi.fn(makeMesh),
       CreateSphere: vi.fn(makeMesh),
       CreatePlane: vi.fn(makeMesh),
     },
@@ -72,11 +91,9 @@ vi.mock('@babylonjs/core', () => {
     })),
     Vector3: Object.assign(
       vi.fn((x: number, y: number, z: number) => {
-        const v: any = { x, y, z, add: vi.fn(), subtract: vi.fn() };
-        v.clone = vi.fn(() => ({ x: v.x, y: v.y, z: v.z }));
-        return v;
+        return makeVector(x, y, z);
       }),
-      { Zero: vi.fn(() => ({ x: 0, y: 0, z: 0 })) }
+      { Zero: vi.fn(() => makeVector(0, 0, 0)) }
     ),
     ActionManager: Object.assign(
       vi.fn(() => ({ registerAction: vi.fn() })),
@@ -91,6 +108,16 @@ describe('MeshFactory', () => {
   let factory: MeshFactory;
   const mockScene = {} as any;
 
+  const getEdgeCylinderCall = () =>
+    vi.mocked(BABYLON.MeshBuilder.CreateCylinder).mock.calls.find(
+      (call) => String(call[0]).startsWith('edge_')
+    );
+
+  const getArrowCylinderCalls = () =>
+    vi.mocked(BABYLON.MeshBuilder.CreateCylinder).mock.calls.filter(
+      (call) => String(call[0]).startsWith('arrow_')
+    );
+
   beforeEach(() => {
     vi.clearAllMocks();
     factory = new MeshFactory(mockScene);
@@ -103,11 +130,9 @@ describe('MeshFactory', () => {
         new Map()
       );
 
-      expect(vi.mocked(BABYLON.MeshBuilder.CreateCylinder)).toHaveBeenCalledWith(
-        expect.stringContaining('edge_'),
-        expect.objectContaining({ diameter: SceneConfig.INTERNAL_EDGE_RADIUS * 2 }),
-        mockScene
-      );
+      const edgeCall = getEdgeCylinderCall();
+      expect(edgeCall).toBeDefined();
+      expect(edgeCall?.[1]).toEqual(expect.objectContaining({ diameter: SceneConfig.INTERNAL_EDGE_RADIUS * 2 }));
     });
 
     it('creates a standard-width cylinder for cross-file edges', () => {
@@ -116,27 +141,23 @@ describe('MeshFactory', () => {
         new Map()
       );
 
-      expect(vi.mocked(BABYLON.MeshBuilder.CreateCylinder)).toHaveBeenCalledWith(
-        expect.stringContaining('edge_'),
-        expect.objectContaining({ diameter: SceneConfig.EDGE_RADIUS * 2 }),
-        mockScene
-      );
+      const edgeCall = getEdgeCylinderCall();
+      expect(edgeCall).toBeDefined();
+      expect(edgeCall?.[1]).toEqual(expect.objectContaining({ diameter: SceneConfig.EDGE_RADIUS * 2 }));
     });
 
-    it('creates a standard-width cylinder for exported-function edges', () => {
-      const exportedMap = new Map([['funcB@src/fileB.ts', true]]);
+    it('creates a medium-width same-file cylinder for exported-function edges', () => {
+      const exportedMap = new Map([['funcB@src/file.ts', true]]);
       factory.createEdges(
-        [{ from: 'funcA@src/fileA.ts', to: 'funcB@src/fileB.ts' }],
+        [{ from: 'funcA@src/file.ts', to: 'funcB@src/file.ts' }],
         new Map(),
         undefined,
         exportedMap
       );
 
-      expect(vi.mocked(BABYLON.MeshBuilder.CreateCylinder)).toHaveBeenCalledWith(
-        expect.stringContaining('edge_'),
-        expect.objectContaining({ diameter: SceneConfig.EDGE_RADIUS * 2 }),
-        mockScene
-      );
+      const edgeCall = getEdgeCylinderCall();
+      expect(edgeCall).toBeDefined();
+      expect(edgeCall?.[1]).toEqual(expect.objectContaining({ diameter: SceneConfig.INTERNAL_EDGE_RADIUS * 4 }));
     });
 
     it('INTERNAL_EDGE_RADIUS diameter is less than EDGE_RADIUS diameter', () => {
@@ -156,30 +177,29 @@ describe('MeshFactory', () => {
       expect(sameFileMat.alpha).toBeGreaterThan(0);
     });
 
-    it('same-file edge material alpha is 0.4', () => {
+    it('same-file edge material alpha is 0.9', () => {
       factory.createEdges(
         [{ from: 'funcA@src/file.ts', to: 'funcB@src/file.ts' }],
         new Map()
       );
 
       const sameFileMat = vi.mocked(BABYLON.StandardMaterial).mock.results[0].value;
-      expect(sameFileMat.alpha).toBe(0.4);
+      expect(sameFileMat.alpha).toBe(0.9);
     });
 
-    it('cross-file edge material remains hidden (alpha 0)', () => {
+    it('cross-file edge material remains fully visible (alpha 1)', () => {
       factory.createEdges(
         [{ from: 'funcA@src/fileA.ts', to: 'funcB@src/fileB.ts' }],
         new Map()
       );
 
-      // Second StandardMaterial created = crossFileEdgeMaterial
-      const crossFileMat = vi.mocked(BABYLON.StandardMaterial).mock.results[1].value;
-      expect(crossFileMat.alpha).toBe(0);
+      const crossFileMat = vi.mocked(BABYLON.StandardMaterial).mock.results[0].value;
+      expect(crossFileMat.alpha).toBe(1.0);
     });
   });
 
   describe('createEdges – general behaviour', () => {
-    it('creates one cylinder per edge', () => {
+    it('creates one edge-cylinder and one arrow-cylinder per non-self edge', () => {
       factory.createEdges(
         [
           { from: 'funcA@src/a.ts', to: 'funcB@src/a.ts' },
@@ -188,11 +208,68 @@ describe('MeshFactory', () => {
         new Map()
       );
 
-      expect(vi.mocked(BABYLON.MeshBuilder.CreateCylinder)).toHaveBeenCalledTimes(2);
+      const edgeCylinders = vi.mocked(BABYLON.MeshBuilder.CreateCylinder).mock.calls.filter(
+        (call) => String(call[0]).startsWith('edge_')
+      );
+      const arrowCylinders = getArrowCylinderCalls();
+      expect(edgeCylinders).toHaveLength(2);
+      expect(arrowCylinders).toHaveLength(2);
     });
 
     it('handles an empty edge list without throwing', () => {
       expect(() => factory.createEdges([], new Map())).not.toThrow();
+    });
+
+    it('creates a tube edge for self-loops and still creates an arrow', () => {
+      factory.createEdges(
+        [{ from: 'recursive@src/r.ts', to: 'recursive@src/r.ts' }],
+        new Map()
+      );
+
+      const tubeCalls = vi.mocked(BABYLON.MeshBuilder.CreateTube).mock.calls.filter(
+        (call) => String(call[0]).startsWith('edge_')
+      );
+      const edgeCylinders = vi.mocked(BABYLON.MeshBuilder.CreateCylinder).mock.calls.filter(
+        (call) => String(call[0]).startsWith('edge_')
+      );
+      const arrowCylinders = getArrowCylinderCalls();
+
+      expect(tubeCalls).toHaveLength(1);
+      expect(edgeCylinders).toHaveLength(0);
+      expect(arrowCylinders).toHaveLength(1);
+
+      const metadata = (factory as any).edgeMetadata as Map<string, any>;
+      const entry = Array.from(metadata.values())[0];
+      expect(entry.isSelfLoop).toBe(true);
+    });
+
+    it('assigns opposite lateral offset signs for bidirectional edges', () => {
+      factory.createEdges(
+        [
+          { from: 'funcA@src/a.ts', to: 'funcB@src/b.ts' },
+          { from: 'funcB@src/b.ts', to: 'funcA@src/a.ts' },
+        ],
+        new Map()
+      );
+
+      const metadata = Array.from(((factory as any).edgeMetadata as Map<string, any>).values());
+      const ab = metadata.find((m) => m.from === 'funcA@src/a.ts' && m.to === 'funcB@src/b.ts');
+      const ba = metadata.find((m) => m.from === 'funcB@src/b.ts' && m.to === 'funcA@src/a.ts');
+
+      expect(ab).toBeDefined();
+      expect(ba).toBeDefined();
+      expect(ab.bidirectionalOffsetSign).toBe(1);
+      expect(ba.bidirectionalOffsetSign).toBe(-1);
+    });
+
+    it('keeps lateral offset sign at zero for single-direction edges', () => {
+      factory.createEdges(
+        [{ from: 'funcA@src/a.ts', to: 'funcB@src/b.ts' }],
+        new Map()
+      );
+
+      const metadata = Array.from(((factory as any).edgeMetadata as Map<string, any>).values());
+      expect(metadata[0].bidirectionalOffsetSign).toBe(0);
     });
   });
 });

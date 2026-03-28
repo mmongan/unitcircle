@@ -775,6 +775,114 @@
       "code": "setPollInterval(intervalMs: number): void {\n    this.pollIntervalMs = intervalMs;\n  }"
     },
     {
+      "id": "clearScene@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphRenderer.ts",
+      "name": "clearScene",
+      "file": "src/GraphRenderer.ts",
+      "line": 32,
+      "isExported": true,
+      "type": "function",
+      "code": "public clearScene(): void {\n    // Dispose all node meshes\n    for (const mesh of this.nodeMeshMap.values()) {\n      mesh.dispose(false, true);\n    }\n    this.nodeMeshMap.clear();\n    this.meshFactory.clearNodeReferences();\n\n    // Dispose all edge meshes\n    this.meshFactory.clearEdges();\n\n    // Dispose all file box outlines\n    for (const mesh of this.fileBoxMeshes.values()) {\n      mesh.dispose(false, true);\n    }\n    this.fileBoxMeshes.clear();\n\n    // Dispose all directory box outlines\n    for (const mesh of this.directoryBoxMeshes.values()) {\n      mesh.dispose(false, true);\n    }\n    this.directoryBoxMeshes.clear();\n\n    // Dispose labels\n    for (const mesh of this.fileBoxLabels.values()) {\n      mesh.dispose(false, true);\n    }\n    this.fileBoxLabels.clear();\n\n    for (const mesh of this.directoryBoxLabels.values()) {\n      mesh.dispose(false, true);\n    }\n    this.directoryBoxLabels.clear();\n\n    this.lastFileBoxScales.clear();\n    this.lastDirectoryBoxScales.clear();\n  }"
+    },
+    {
+      "id": "renderFileBoxes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphRenderer.ts",
+      "name": "renderFileBoxes",
+      "file": "src/GraphRenderer.ts",
+      "line": 73,
+      "isExported": true,
+      "type": "function",
+      "code": "public renderFileBoxes(fileBoxDimensions: Map<string, BABYLON.Vector3>): void {\n    for (const [file, dims] of fileBoxDimensions) {\n      if (this.fileBoxMeshes.has(file)) continue; // Already exists\n\n      const box = BABYLON.MeshBuilder.CreateBox(\n        `filebox_${file}`,\n        { size: 1 },\n        this.scene,\n      );\n      box.parent = this.sceneRoot;\n      box.isPickable = true;\n      box.scaling = dims.clone();\n\n      // Wireframe material\n      const mat = new BABYLON.StandardMaterial(`filebox_mat_${file}`, this.scene);\n      mat.wireframe = true;\n      mat.alpha = 0.18;\n      mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;\n      mat.needDepthPrePass = true;\n      mat.disableDepthWrite = true;\n      mat.emissiveColor = new BABYLON.Color3(0.4, 0.6, 0.8);\n      box.material = mat;\n\n      this.fileBoxMeshes.set(file, box);\n      this.lastFileBoxScales.set(file, dims.clone());\n    }\n  }"
+    },
+    {
+      "id": "renderDirectoryBoxes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphRenderer.ts",
+      "name": "renderDirectoryBoxes",
+      "file": "src/GraphRenderer.ts",
+      "line": 104,
+      "isExported": true,
+      "type": "function",
+      "code": "public renderDirectoryBoxes(directoryBoxDimensions: Map<string, { position: BABYLON.Vector3; scaling: BABYLON.Vector3 }>): void {\n    for (const [dirPath, { position, scaling }] of directoryBoxDimensions) {\n      if (this.directoryBoxMeshes.has(dirPath)) {\n        const existing = this.directoryBoxMeshes.get(dirPath)!;\n        existing.position.copyFrom(position);\n        existing.scaling.copyFrom(scaling);\n        continue;\n      }\n\n      const box = BABYLON.MeshBuilder.CreateBox(\n        `dirbox_${dirPath}`,\n        { size: 1 },\n        this.scene,\n      );\n      box.parent = this.sceneRoot;\n      box.position.copyFrom(position);\n      box.scaling.copyFrom(scaling);\n      box.isPickable = false;\n\n      const mat = new BABYLON.StandardMaterial(`dirbox_mat_${dirPath}`, this.scene);\n      mat.wireframe = true;\n      mat.alpha = 0.08;\n      mat.emissiveColor = new BABYLON.Color3(0.3, 0.5, 0.7);\n      box.material = mat;\n\n      this.directoryBoxMeshes.set(dirPath, box);\n    }\n  }"
+    },
+    {
+      "id": "renderNodes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphRenderer.ts",
+      "name": "renderNodes",
+      "file": "src/GraphRenderer.ts",
+      "line": 136,
+      "isExported": true,
+      "type": "function",
+      "code": "public renderNodes(\n    nodes: GraphNode[],\n    nodePositions: Map<string, BABYLON.Vector3>,\n    fileColorMap: Map<string, BABYLON.Color3>,\n    onNodeCreated?: (mesh: BABYLON.Mesh, material: BABYLON.StandardMaterial, node: GraphNode) => void,\n  ): void {\n    let renderCount = 0;\n\n    for (const node of nodes) {\n      if (this.nodeMeshMap.has(node.id)) continue; // Already rendered\n\n      const position = nodePositions.get(node.id) || BABYLON.Vector3.Zero();\n      const color = fileColorMap.get(node.file || 'external') || new BABYLON.Color3(0.7, 0.7, 0.7);\n\n      // Create node mesh via factory\n      this.meshFactory.createNodeMesh(node, position, color, 0, (mesh, material) => {\n        this.nodeMeshMap.set(node.id, mesh);\n        mesh.parent = this.sceneRoot;\n        mesh.position = position.clone();\n\n        if (onNodeCreated) {\n          onNodeCreated(mesh, material, node);\n        }\n\n        renderCount++;\n      });\n    }\n\n    console.log(`📦 Rendered nodes: ${renderCount}`);\n  }"
+    },
+    {
+      "id": "renderEdges@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphRenderer.ts",
+      "name": "renderEdges",
+      "file": "src/GraphRenderer.ts",
+      "line": 170,
+      "isExported": true,
+      "type": "function",
+      "code": "public renderEdges(\n    edges: GraphEdge[],\n    nodeMeshMap: Map<string, BABYLON.Mesh>,\n    _currentEdgeKinds: Map<string, GraphEdge['kind']>,\n  ): void {\n    // Edge rendering delegated to MeshFactory.createEdges() which is called\n    // with full graph data from VRSceneManager - this method is a placeholder\n    // for the rendering interface\n    const edgeData = edges.map(e => ({\n      from: e.from,\n      to: e.to,\n      kind: e.kind || 'call' as const,\n    }));\n\n    if (edgeData.length > 0 && nodeMeshMap.size > 0) {\n      // Edges will be rendered via parent service\n      console.log(`📊 Prepared ${edgeData.length} edges for rendering`);\n    }\n  }"
+    },
+    {
+      "id": "createFileBoxLabel@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphRenderer.ts",
+      "name": "createFileBoxLabel",
+      "file": "src/GraphRenderer.ts",
+      "line": 193,
+      "isExported": true,
+      "type": "function",
+      "code": "public createFileBoxLabel(\n    file: string,\n    box: BABYLON.Mesh,\n  ): BABYLON.Mesh | null {\n    const labelTexture = new BABYLON.DynamicTexture(`label_${file}`, 512, this.scene, true);\n    const ctx = labelTexture.getContext() as CanvasRenderingContext2D;\n\n    // Draw label background and text\n    ctx.fillStyle = 'rgba(40, 60, 80, 0.9)';\n    ctx.fillRect(0, 0, 512, 128);\n    ctx.fillStyle = '#ffffff';\n    ctx.font = 'bold 32px monospace';\n    ctx.textAlign = 'center';\n    ctx.textBaseline = 'middle';\n    ctx.fillText(file, 256, 64);\n    labelTexture.update();\n\n    // Create label plane\n    const labelPlane = BABYLON.MeshBuilder.CreatePlane(\n      `label_plane_${file}`,\n      { width: 4, height: 1 },\n      this.scene,\n    );\n    labelPlane.parent = this.sceneRoot;\n    labelPlane.position.copyFrom(box.position);\n    labelPlane.position.y += box.scaling.y * 0.5 + 1;\n\n    const labelMat = new BABYLON.StandardMaterial(`label_mat_${file}`, this.scene);\n    labelMat.emissiveTexture = labelTexture;\n    labelMat.disableLighting = true;\n    labelMat.backFaceCulling = false;\n    labelPlane.material = labelMat;\n\n    this.fileBoxLabels.set(file, labelPlane);\n    return labelPlane;\n  }"
+    },
+    {
+      "id": "updateLabelTransforms@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphRenderer.ts",
+      "name": "updateLabelTransforms",
+      "file": "src/GraphRenderer.ts",
+      "line": 233,
+      "isExported": true,
+      "type": "function",
+      "code": "public updateLabelTransforms(): void {\n    for (const [file, label] of this.fileBoxLabels) {\n      const box = this.fileBoxMeshes.get(file);\n      if (!box) continue;\n\n      label.position.copyFrom(box.position);\n      label.position.y += box.scaling.y * 0.5 + 1;\n    }\n\n    for (const [dir, label] of this.directoryBoxLabels) {\n      const box = this.directoryBoxMeshes.get(dir);\n      if (!box) continue;\n\n      label.position.copyFrom(box.position);\n      label.position.y += box.scaling.y * 0.5 + 1;\n    }\n  }"
+    },
+    {
+      "id": "getNodeMeshMap@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphRenderer.ts",
+      "name": "getNodeMeshMap",
+      "file": "src/GraphRenderer.ts",
+      "line": 254,
+      "isExported": true,
+      "type": "function",
+      "code": "public getNodeMeshMap(): Map<string, BABYLON.Mesh> {\n    return this.nodeMeshMap;\n  }"
+    },
+    {
+      "id": "getFileBoxMeshes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphRenderer.ts",
+      "name": "getFileBoxMeshes",
+      "file": "src/GraphRenderer.ts",
+      "line": 258,
+      "isExported": true,
+      "type": "function",
+      "code": "public getFileBoxMeshes(): Map<string, BABYLON.Mesh> {\n    return this.fileBoxMeshes;\n  }"
+    },
+    {
+      "id": "getDirectoryBoxMeshes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphRenderer.ts",
+      "name": "getDirectoryBoxMeshes",
+      "file": "src/GraphRenderer.ts",
+      "line": 262,
+      "isExported": true,
+      "type": "function",
+      "code": "public getDirectoryBoxMeshes(): Map<string, BABYLON.Mesh> {\n    return this.directoryBoxMeshes;\n  }"
+    },
+    {
+      "id": "populateCurrentEdges@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphRenderer.ts",
+      "name": "populateCurrentEdges",
+      "file": "src/GraphRenderer.ts",
+      "line": 269,
+      "isExported": true,
+      "type": "function",
+      "code": "public populateCurrentEdges(edges: GraphEdge[]): Map<string, GraphEdge['kind']> {\n    const edgeKinds = new Map<string, GraphEdge['kind']>();\n    for (const edge of edges) {\n      const key = `${edge.from}→${edge.to}`;\n      edgeKinds.set(key, edge.kind ?? 'call');\n    }\n    return edgeKinds;\n  }"
+    },
+    {
+      "id": "autosizeFileBoxes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphRenderer.ts",
+      "name": "autosizeFileBoxes",
+      "file": "src/GraphRenderer.ts",
+      "line": 281,
+      "isExported": true,
+      "type": "function",
+      "code": "public autosizeFileBoxes(\n    _fileNodeCounts: Map<string, number>,\n    nodeGroupBounds: Map<string, { min: BABYLON.Vector3; max: BABYLON.Vector3 }>,\n  ): Map<string, BABYLON.Vector3> {\n    const dimensions = new Map<string, BABYLON.Vector3>();\n\n    for (const [file, bounds] of nodeGroupBounds) {\n      const size = bounds.max.subtract(bounds.min);\n      const padding = 4.0;\n      const scaledSize = new BABYLON.Vector3(\n        Math.max(8, size.x + padding),\n        Math.max(8, size.y + padding),\n        Math.max(8, size.z + padding),\n      );\n      dimensions.set(file, scaledSize);\n    }\n\n    return dimensions;\n  }"
+    },
+    {
       "id": "loadGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
       "name": "loadGraph",
       "file": "src/GraphViewer.ts",
@@ -1090,6 +1198,204 @@
       "code": "private createBreadcrumbLabelAnchor(\n    name: string,\n    segments: Array<{ text: string; kind: 'file' | 'directory'; path: string }>,\n    fillStyle: string,\n    strokeStyle: string,\n    textStyle: string,\n  ): BABYLON.Mesh {\n    const anchor = BABYLON.MeshBuilder.CreatePlane(\n      `${name}_anchor`,\n      { width: 1, height: 1 },\n      this.scene,\n    );\n    anchor.visibility = 0;\n    anchor.isPickable = false;\n    anchor.parent = this.sceneRoot;\n    anchor.scaling = new BABYLON.Vector3(1, 1, 1);\n    anchor.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;\n    anchor.renderingGroupId = 3;\n    anchor.alwaysSelectAsActiveMesh = true;\n    anchor.setEnabled(this.state.labelsVisible);\n\n    const horizontalGap = 1.4;\n    const verticalGap = 1.15;\n    const maxRowWidth = 52;\n    const rowHeight = 4.8;\n    const rows: Array<Array<{ mesh: BABYLON.Mesh; width: number }>> = [];\n    let currentRow: Array<{ mesh: BABYLON.Mesh; width: number }> = [];\n    let currentRowWidth = 0;\n\n    for (let index = 0; index < segments.length; index++) {\n      const segment = segments[index];\n      const isCurrentSegment = index === segments.length - 1;\n      const chipFill = this.withAdjustedAlpha(fillStyle, isCurrentSegment ? 0.96 : 0.56);\n      const chipStroke = this.withAdjustedAlpha(strokeStyle, isCurrentSegment ? 1.0 : 0.72);\n      const chipText = isCurrentSegment ? textStyle : 'rgba(232, 238, 244, 0.82)';\n      const chip = this.createLabelChip(`${name}_chip_${index}`, segment.text, chipFill, chipStroke, chipText);\n      chip.mesh.parent = anchor;\n      chip.mesh.isPickable = this.state.labelsVisible;\n      (chip.mesh as any).labelData = { kind: segment.kind, path: segment.path };\n\n      const widthWithGap = currentRow.length === 0 ? chip.width : chip.width + horizontalGap;\n      if (currentRow.length > 0 && currentRowWidth + widthWithGap > maxRowWidth) {\n        rows.push(currentRow);\n        currentRow = [];\n        currentRowWidth = 0;\n      }\n\n      currentRow.push({ mesh: chip.mesh, width: chip.width });\n      currentRowWidth += currentRow.length === 1 ? chip.width : chip.width + horizontalGap;\n    }\n\n    if (currentRow.length > 0) rows.push(currentRow);\n\n    const totalHeight = rows.length * rowHeight + Math.max(0, rows.length - 1) * verticalGap;\n    rows.forEach((row, rowIndex) => {\n      const rowWidth = row.reduce((sum, c, i) => sum + c.width + (i > 0 ? horizontalGap : 0), 0);\n      let cursorX = -rowWidth * 0.5;\n      const y = totalHeight * 0.5 - rowIndex * (rowHeight + verticalGap) - rowHeight * 0.5;\n      row.forEach((chip) => {\n        chip.mesh.position.x = cursorX + chip.width * 0.5;\n        chip.mesh.position.y = y;\n        chip.mesh.position.z = 0;\n        cursorX += chip.width + horizontalGap;\n      });\n    });\n\n    return anchor;\n  }"
     },
     {
+      "id": "setFileLayout@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "name": "setFileLayout",
+      "file": "src/LayoutPipelineService.ts",
+      "line": 29,
+      "isExported": true,
+      "type": "function",
+      "code": "public setFileLayout(layout: ForceDirectedLayout): void {\n    this.fileLayout = layout;\n  }"
+    },
+    {
+      "id": "getFileLayout@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "name": "getFileLayout",
+      "file": "src/LayoutPipelineService.ts",
+      "line": 33,
+      "isExported": true,
+      "type": "function",
+      "code": "public getFileLayout(): ForceDirectedLayout | null {\n    return this.fileLayout;\n  }"
+    },
+    {
+      "id": "setFileInternalLayouts@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "name": "setFileInternalLayouts",
+      "file": "src/LayoutPipelineService.ts",
+      "line": 37,
+      "isExported": true,
+      "type": "function",
+      "code": "public setFileInternalLayouts(layouts: Map<string, ForceDirectedLayout>): void {\n    this.fileInternalLayouts = layouts;\n  }"
+    },
+    {
+      "id": "getFileInternalLayouts@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "name": "getFileInternalLayouts",
+      "file": "src/LayoutPipelineService.ts",
+      "line": 41,
+      "isExported": true,
+      "type": "function",
+      "code": "public getFileInternalLayouts(): Map<string, ForceDirectedLayout> {\n    return this.fileInternalLayouts;\n  }"
+    },
+    {
+      "id": "setFileBoxMeshes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "name": "setFileBoxMeshes",
+      "file": "src/LayoutPipelineService.ts",
+      "line": 45,
+      "isExported": true,
+      "type": "function",
+      "code": "public setFileBoxMeshes(meshes: Map<string, BABYLON.Mesh>): void {\n    this.fileBoxMeshes = meshes;\n  }"
+    },
+    {
+      "id": "getFileBoxMeshes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "name": "getFileBoxMeshes",
+      "file": "src/LayoutPipelineService.ts",
+      "line": 49,
+      "isExported": true,
+      "type": "function",
+      "code": "public getFileBoxMeshes(): Map<string, BABYLON.Mesh> {\n    return this.fileBoxMeshes;\n  }"
+    },
+    {
+      "id": "setNodeMeshMap@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "name": "setNodeMeshMap",
+      "file": "src/LayoutPipelineService.ts",
+      "line": 55,
+      "isExported": true,
+      "type": "function",
+      "code": "public setNodeMeshMap(meshes: Map<string, BABYLON.Mesh>): void {\n    this.nodeMeshMap = meshes;\n  }"
+    },
+    {
+      "id": "getNodeMeshMap@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "name": "getNodeMeshMap",
+      "file": "src/LayoutPipelineService.ts",
+      "line": 59,
+      "isExported": true,
+      "type": "function",
+      "code": "public getNodeMeshMap(): Map<string, BABYLON.Mesh> {\n    return this.nodeMeshMap;\n  }"
+    },
+    {
+      "id": "setGraphNodeMap@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "name": "setGraphNodeMap",
+      "file": "src/LayoutPipelineService.ts",
+      "line": 63,
+      "isExported": true,
+      "type": "function",
+      "code": "public setGraphNodeMap(nodes: Map<string, GraphNode>): void {\n    this.graphNodeMap = nodes;\n  }"
+    },
+    {
+      "id": "activatePhysics@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "name": "activatePhysics",
+      "file": "src/LayoutPipelineService.ts",
+      "line": 67,
+      "isExported": true,
+      "type": "function",
+      "code": "public activatePhysics(): void {\n    this.physicsActive = true;\n    this.physicsIterationCount = 0;\n  }"
+    },
+    {
+      "id": "deactivatePhysics@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "name": "deactivatePhysics",
+      "file": "src/LayoutPipelineService.ts",
+      "line": 72,
+      "isExported": true,
+      "type": "function",
+      "code": "public deactivatePhysics(): void {\n    this.physicsActive = false;\n  }"
+    },
+    {
+      "id": "setupPhysicsLoop@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "name": "setupPhysicsLoop",
+      "file": "src/LayoutPipelineService.ts",
+      "line": 79,
+      "isExported": true,
+      "type": "function",
+      "code": "public setupPhysicsLoop(): void {\n    if (this.physicsLoopInitialized) {\n      return;\n    }\n    this.physicsLoopInitialized = true;\n\n    if (this.scene.registerBeforeRender) {\n      this.scene.registerBeforeRender(() => {\n        if (this.physicsActive && this.fileLayout && this.fileInternalLayouts.size > 0) {\n          // Step 1: Update file-level layout\n          this.fileLayout.updateFrame();\n          const filePositions = this.fileLayout.getNodes();\n\n          // Step 2: Update file box positions from layout\n          for (const [file, fileBox] of this.fileBoxMeshes.entries()) {\n            const fileNode = filePositions.get(file);\n            if (!fileNode) continue;\n            fileBox.position.x = fileNode.position.x;\n            fileBox.position.y = fileNode.position.y;\n            fileBox.position.z = fileNode.position.z;\n          }\n\n          // Step 3: Apply collision resolution\n          this.applyFileBoxRepulsion(this.fileLayout);\n          this.resolveInitialFileBoxOverlaps(4);\n          this.enforceMinimumFileBoxGap(28.0, 4);\n          this.enforceTopLevelDirectoryGap(36.0, 1);\n\n          // Step 4: Re-apply positions after collision\n          for (const [file, fileBox] of this.fileBoxMeshes.entries()) {\n            const fileNode = filePositions.get(file);\n            if (!fileNode) continue;\n            fileBox.position.x = fileNode.position.x;\n            fileBox.position.y = fileNode.position.y;\n            fileBox.position.z = fileNode.position.z;\n          }\n\n          // Step 5: Check convergence\n          this.physicsIterationCount++;\n          const maxIterations = 500;\n          if (this.physicsIterationCount > maxIterations) {\n            this.physicsActive = false;\n            console.log(`✓ Physics converged after ${this.physicsIterationCount} iterations`);\n          }\n        }\n      });\n    }\n  }"
+    },
+    {
+      "id": "applyFileBoxRepulsion@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "name": "applyFileBoxRepulsion",
+      "file": "src/LayoutPipelineService.ts",
+      "line": 131,
+      "isExported": true,
+      "type": "function",
+      "code": "public applyFileBoxRepulsion(layout: ForceDirectedLayout): void {\n    const nodes = layout.getNodes();\n    const nodeEntries = Array.from(nodes.entries());\n\n    for (let i = 0; i < nodeEntries.length; i++) {\n      for (let j = i + 1; j < nodeEntries.length; j++) {\n        const [fileA, nodeA] = nodeEntries[i];\n        const [fileB, nodeB] = nodeEntries[j];\n\n        const boxA = this.fileBoxMeshes.get(fileA);\n        const boxB = this.fileBoxMeshes.get(fileB);\n        if (!boxA || !boxB) continue;\n\n        const aHalf = boxA.scaling.scale(0.5);\n        const bHalf = boxB.scaling.scale(0.5);\n\n        const dx = nodeB.position.x - nodeA.position.x;\n        const dy = nodeB.position.y - nodeA.position.y;\n        const dz = nodeB.position.z - nodeA.position.z;\n\n        const minDistX = aHalf.x + bHalf.x;\n        const minDistY = aHalf.y + bHalf.y;\n        const minDistZ = aHalf.z + bHalf.z;\n\n        if (Math.abs(dx) < minDistX && Math.abs(dy) < minDistY && Math.abs(dz) < minDistZ) {\n          const force = 0.0015;\n          const mag = Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.001;\n          const fx = (dx / mag) * force;\n          const fy = (dy / mag) * force;\n          const fz = (dz / mag) * force;\n\n          nodeA.velocity.x -= fx;\n          nodeA.velocity.y -= fy;\n          nodeA.velocity.z -= fz;\n          nodeB.velocity.x += fx;\n          nodeB.velocity.y += fy;\n          nodeB.velocity.z += fz;\n        }\n      }\n    }\n  }"
+    },
+    {
+      "id": "resolveInitialFileBoxOverlaps@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "name": "resolveInitialFileBoxOverlaps",
+      "file": "src/LayoutPipelineService.ts",
+      "line": 176,
+      "isExported": true,
+      "type": "function",
+      "code": "public resolveInitialFileBoxOverlaps(maxPasses: number = 4): void {\n    const boxes = Array.from(this.fileBoxMeshes.values());\n\n    for (let pass = 0; pass < maxPasses; pass++) {\n      let movedAny = false;\n\n      for (let i = 0; i < boxes.length; i++) {\n        for (let j = i + 1; j < boxes.length; j++) {\n          const boxA = boxes[i];\n          const boxB = boxes[j];\n\n          const aMin = boxA.position.subtract(boxA.scaling.scale(0.5));\n          const aMax = boxA.position.add(boxA.scaling.scale(0.5));\n          const bMin = boxB.position.subtract(boxB.scaling.scale(0.5));\n          const bMax = boxB.position.add(boxB.scaling.scale(0.5));\n\n          const overlapX = Math.min(aMax.x, bMax.x) - Math.max(aMin.x, bMin.x);\n          const overlapY = Math.min(aMax.y, bMax.y) - Math.max(aMin.y, bMin.y);\n          const overlapZ = Math.min(aMax.z, bMax.z) - Math.max(aMin.z, bMin.z);\n\n          if (overlapX > 0 && overlapY > 0 && overlapZ > 0) {\n            let axis: 'x' | 'y' | 'z' = 'x';\n            if (overlapY < overlapX && overlapY < overlapZ) axis = 'y';\n            if (overlapZ < overlapX && overlapZ < overlapY) axis = 'z';\n\n            const correction = (overlapX > 0 && overlapY > 0 && overlapZ > 0)\n              ? Math.min(overlapX, overlapY, overlapZ) * 0.5 + 0.5\n              : 0;\n\n            if (axis === 'x') {\n              const sign = boxA.position.x < boxB.position.x ? -1 : 1;\n              boxA.position.x += sign * correction;\n              boxB.position.x -= sign * correction;\n            } else if (axis === 'y') {\n              const sign = boxA.position.y < boxB.position.y ? -1 : 1;\n              boxA.position.y += sign * correction;\n              boxB.position.y -= sign * correction;\n            } else {\n              const sign = boxA.position.z < boxB.position.z ? -1 : 1;\n              boxA.position.z += sign * correction;\n              boxB.position.z -= sign * correction;\n            }\n            movedAny = true;\n          }\n        }\n      }\n\n      if (!movedAny) break;\n    }\n  }"
+    },
+    {
+      "id": "enforceMinimumFileBoxGap@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "name": "enforceMinimumFileBoxGap",
+      "file": "src/LayoutPipelineService.ts",
+      "line": 230,
+      "isExported": true,
+      "type": "function",
+      "code": "public enforceMinimumFileBoxGap(minGap: number, maxPasses: number = 4): void {\n    const boxes = Array.from(this.fileBoxMeshes.values());\n\n    for (let pass = 0; pass < maxPasses; pass++) {\n      let movedAny = false;\n\n      for (let i = 0; i < boxes.length; i++) {\n        for (let j = i + 1; j < boxes.length; j++) {\n          const boxA = boxes[i];\n          const boxB = boxes[j];\n\n          const dx = boxB.position.x - boxA.position.x;\n          const dy = boxB.position.y - boxA.position.y;\n          const dz = boxB.position.z - boxA.position.z;\n          const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);\n\n          if (distance < 0.001) continue;\n\n          const aHalf = boxA.scaling.scale(0.5);\n          const bHalf = boxB.scaling.scale(0.5);\n          const minDist = (aHalf.x + bHalf.x + aHalf.y + bHalf.y + aHalf.z + bHalf.z) / 3;\n          const requiredDist = minDist + minGap;\n\n          if (distance < requiredDist) {\n            const ratio = requiredDist / distance;\n            const moveX = (dx * ratio - dx) * 0.5;\n            const moveY = (dy * ratio - dy) * 0.5;\n            const moveZ = (dz * ratio - dz) * 0.5;\n\n            boxA.position.x -= moveX;\n            boxA.position.y -= moveY;\n            boxA.position.z -= moveZ;\n            boxB.position.x += moveX;\n            boxB.position.y += moveY;\n            boxB.position.z += moveZ;\n            movedAny = true;\n          }\n        }\n      }\n\n      if (!movedAny) break;\n    }\n  }"
+    },
+    {
+      "id": "enforceTopLevelDirectoryGap@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "name": "enforceTopLevelDirectoryGap",
+      "file": "src/LayoutPipelineService.ts",
+      "line": 277,
+      "isExported": true,
+      "type": "function",
+      "code": "public enforceTopLevelDirectoryGap(minGap: number, maxPasses: number = 3): void {\n    if (!this.fileLayout) return;\n\n    const fileNodes = this.fileLayout.getNodes();\n    const files = Array.from(this.fileBoxMeshes.keys()).filter(f => f !== 'external');\n\n    const getTopLevelGroup = (filePath: string): string => {\n      const rel = toProjectRelativePath(filePath);\n      const parts = rel.split('/').filter(Boolean);\n      return parts.length <= 1 ? '__root__' : parts[0];\n    };\n\n    const groups = new Map<string, string[]>();\n    for (const file of files) {\n      const group = getTopLevelGroup(file);\n      if (!groups.has(group)) groups.set(group, []);\n      groups.get(group)!.push(file);\n    }\n\n    const groupKeys = Array.from(groups.keys());\n    if (groupKeys.length < 2) return;\n\n    for (let pass = 0; pass < maxPasses; pass++) {\n      let movedAny = false;\n\n      for (let i = 0; i < groupKeys.length; i++) {\n        for (let j = i + 1; j < groupKeys.length; j++) {\n          const groupA = groupKeys[i];\n          const groupB = groupKeys[j];\n          \n          // Calculate bounds for each group (simplified)\n          let minXa = Infinity, maxXa = -Infinity;\n          let minXb = Infinity, maxXb = -Infinity;\n\n          const groupAFiles = groups.get(groupA) || [];\n          const groupBFiles = groups.get(groupB) || [];\n\n          for (const file of groupAFiles) {\n            const box = this.fileBoxMeshes.get(file);\n            if (!box) continue;\n            minXa = Math.min(minXa, box.position.x);\n            maxXa = Math.max(maxXa, box.position.x);\n          }\n\n          for (const file of groupBFiles) {\n            const box = this.fileBoxMeshes.get(file);\n            if (!box) continue;\n            minXb = Math.min(minXb, box.position.x);\n            maxXb = Math.max(maxXb, box.position.x);\n          }\n\n          if (!Number.isFinite(minXa) || !Number.isFinite(minXb)) continue;\n\n          const gapA = maxXa - minXa;\n          const gapB = maxXb - minXb;\n          const centerA = (minXa + maxXa) * 0.5;\n          const centerB = (minXb + maxXb) * 0.5;\n          const distance = Math.abs(centerB - centerA);\n          const requiredDistance = (gapA + gapB) * 0.5 + minGap;\n\n          if (distance < requiredDistance) {\n            const correction = (requiredDistance - distance) * 0.5 + 0.1;\n            const sign = centerB > centerA ? 1 : -1;\n\n            for (const file of groupAFiles) {\n              const node = fileNodes.get(file);\n              if (node) node.position.x -= sign * correction;\n            }\n            for (const file of groupBFiles) {\n              const node = fileNodes.get(file);\n              if (node) node.position.x += sign * correction;\n            }\n            movedAny = true;\n          }\n        }\n      }\n\n      if (!movedAny) break;\n    }\n  }"
+    },
+    {
+      "id": "compactFileBoxLayout@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "name": "compactFileBoxLayout",
+      "file": "src/LayoutPipelineService.ts",
+      "line": 361,
+      "isExported": true,
+      "type": "function",
+      "code": "public compactFileBoxLayout(targetCentroidGap: number, _minGap: number): void {\n    if (!this.fileLayout) return;\n\n    const nodes = this.fileLayout.getNodes();\n    const nodeArray = Array.from(nodes.entries());\n\n    // Calculate centroid of all boxes\n    let cx = 0, cy = 0, cz = 0;\n    for (const [, node] of nodeArray) {\n      cx += node.position.x;\n      cy += node.position.y;\n      cz += node.position.z;\n    }\n    cx /= Math.max(1, nodeArray.length);\n    cy /= Math.max(1, nodeArray.length);\n    cz /= Math.max(1, nodeArray.length);\n\n    // Gently nudge everything toward centroid\n    for (const [, node] of nodeArray) {\n      const dx = cx - node.position.x;\n      const dy = cy - node.position.y;\n      const dz = cz - node.position.z;\n      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);\n\n      if (dist > 0.001) {\n        const factor = Math.min(0.02, targetCentroidGap / Math.max(1, dist));\n        node.position.x += dx * factor;\n        node.position.y += dy * factor;\n        node.position.z += dz * factor;\n      }\n    }\n\n    // Update file box positions\n    for (const [file, fileBox] of this.fileBoxMeshes) {\n      const node = nodes.get(file);\n      if (node && node.position) {\n        fileBox.position.x = node.position.x;\n        fileBox.position.y = node.position.y;\n        fileBox.position.z = node.position.z;\n      }\n    }\n  }"
+    },
+    {
+      "id": "clampNodesInsideFileBoxes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "name": "clampNodesInsideFileBoxes",
+      "file": "src/LayoutPipelineService.ts",
+      "line": 407,
+      "isExported": true,
+      "type": "function",
+      "code": "public clampNodesInsideFileBoxes(): void {\n    for (const [nodeId, mesh] of this.nodeMeshMap) {\n      const node = this.graphNodeMap.get(nodeId);\n      if (!node || !node.file) continue;\n\n      const fileBox = this.fileBoxMeshes.get(node.file);\n      if (!fileBox) continue;\n\n      const padding = 2.0;\n      const boxHalf = fileBox.scaling.scale(0.5);\n      const maxX = boxHalf.x - padding;\n      const maxY = boxHalf.y - padding;\n      const maxZ = boxHalf.z - padding;\n\n      mesh.position.x = Math.max(-maxX, Math.min(maxX, mesh.position.x));\n      mesh.position.y = Math.max(-maxY, Math.min(maxY, mesh.position.y));\n      mesh.position.z = Math.max(-maxZ, Math.min(maxZ, mesh.position.z));\n    }\n  }"
+    },
+    {
+      "id": "enforceInFileNodeClearance@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "name": "enforceInFileNodeClearance",
+      "file": "src/LayoutPipelineService.ts",
+      "line": 430,
+      "isExported": true,
+      "type": "function",
+      "code": "public enforceInFileNodeClearance(): void {\n    const meshArray = Array.from(this.nodeMeshMap.values());\n    const minDistance = 3.0;\n\n    for (let i = 0; i < meshArray.length; i++) {\n      for (let j = i + 1; j < meshArray.length; j++) {\n        const meshA = meshArray[i];\n        const meshB = meshArray[j];\n\n        const dx = meshB.position.x - meshA.position.x;\n        const dy = meshB.position.y - meshA.position.y;\n        const dz = meshB.position.z - meshA.position.z;\n        const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);\n\n        if (distance < minDistance && distance > 0.001) {\n          const ratio = minDistance / distance;\n          const moveX = (dx * ratio - dx) * 0.5;\n          const moveY = (dy * ratio - dy) * 0.5;\n          const moveZ = (dz * ratio - dz) * 0.5;\n\n          meshA.position.x -= moveX;\n          meshA.position.y -= moveY;\n          meshA.position.z -= moveZ;\n          meshB.position.x += moveX;\n          meshB.position.y += moveY;\n          meshB.position.z += moveZ;\n        }\n      }\n    }\n  }"
+    },
+    {
+      "id": "resolveNodeEdgeObstructions@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "name": "resolveNodeEdgeObstructions",
+      "file": "src/LayoutPipelineService.ts",
+      "line": 464,
+      "isExported": true,
+      "type": "function",
+      "code": "public resolveNodeEdgeObstructions(_maxPasses: number = 20): void {\n    // Placeholder for edge obstruction resolution\n    // This would involve checking node positions against edge paths\n  }"
+    },
+    {
+      "id": "resolveEdgeObstructions@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "name": "resolveEdgeObstructions",
+      "file": "src/LayoutPipelineService.ts",
+      "line": 472,
+      "isExported": true,
+      "type": "function",
+      "code": "public resolveEdgeObstructions(_maxPasses: number = 30): void {\n    // Placeholder for edge obstruction resolution\n  }"
+    },
+    {
+      "id": "resolveFunctionLabelObstructions@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "name": "resolveFunctionLabelObstructions",
+      "file": "src/LayoutPipelineService.ts",
+      "line": 479,
+      "isExported": true,
+      "type": "function",
+      "code": "public resolveFunctionLabelObstructions(_maxPasses: number = 12): void {\n    // Placeholder for label obstruction resolution\n  }"
+    },
+    {
       "id": "logBuildVersion@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
       "name": "logBuildVersion",
       "file": "src/main.ts",
@@ -1358,6 +1664,141 @@
       "isExported": true,
       "type": "function",
       "code": "public updateEdges(): void {\n    if (this.edgeTubes.size === 0 || this.nodeMeshes.size === 0) {\n      return;  // No edges to update\n    }\n\n    for (const [edgeId, cylinder] of this.edgeTubes) {\n      const metadata = this.edgeMetadata.get(edgeId);\n      if (!metadata) continue;\n\n      // Get current node positions directly from meshes (always up-to-date after layout/repulsion)\n      const sourceMesh = this.nodeMeshes.get(metadata.from);\n      const targetMesh = this.nodeMeshes.get(metadata.to);\n\n      if (!sourceMesh || !targetMesh) {\n        continue;  // Skip if nodes not found\n      }\n\n      const arrow = this.edgeArrows.get(edgeId);\n\n      if (metadata.isSelfLoop) {\n        const sourceCenterPos = sourceMesh.getAbsolutePosition().clone();\n        const sourceRadius = sourceMesh.getBoundingInfo()?.boundingSphere?.radiusWorld ?? 2.0;\n        const loopPath = this.buildSelfLoopPath(cylinder.parent ?? null, sourceCenterPos, sourceRadius);\n        const loopTubeRadius = metadata.isCrossFile\n          ? Math.max(0.1, SceneConfig.EDGE_RADIUS * 0.65)\n          : Math.max(0.08, SceneConfig.INTERNAL_EDGE_RADIUS * 1.2);\n\n        let activeTube = cylinder;\n        try {\n          BABYLON.MeshBuilder.CreateTube(cylinder.name, {\n            path: loopPath,\n            radius: loopTubeRadius,\n            updatable: true,\n            instance: cylinder,\n          }, this.scene);\n        } catch {\n          activeTube = this.recreateSelfLoopTube(edgeId, cylinder, loopPath, loopTubeRadius);\n        }\n\n        if (!activeTube.isEnabled()) {\n          activeTube.setEnabled(true);\n        }\n\n        if (arrow) {\n          const loopRadius = Math.max(3.2, sourceRadius * 1.8);\n          const loopLift = Math.max(2.6, sourceRadius * 1.4);\n          const loopCenter = sourceCenterPos.add(new BABYLON.Vector3(0, loopLift, 0));\n          const angle = -Math.PI / 3;\n          const pointOnLoop = new BABYLON.Vector3(\n            loopCenter.x + (Math.cos(angle) * loopRadius),\n            loopCenter.y,\n            loopCenter.z + (Math.sin(angle) * loopRadius),\n          );\n          const tangent = new BABYLON.Vector3(-Math.sin(angle), 0, Math.cos(angle)).normalize();\n          const arrowHalfHeight = arrow.getBoundingInfo().boundingBox.maximum.y;\n          const arrowCenterWorld = pointOnLoop.subtract(tangent.scale(arrowHalfHeight));\n          arrow.position = this.toParentLocalPoint(arrow.parent ?? null, arrowCenterWorld);\n\n          const arrowQ = BABYLON.Quaternion.Identity();\n          BABYLON.Quaternion.FromUnitVectorsToRef(BABYLON.Axis.Y, tangent, arrowQ);\n          arrow.rotationQuaternion = arrowQ;\n\n          if (!arrow.isEnabled()) {\n            arrow.setEnabled(true);\n          }\n        }\n\n        continue;\n      }\n\n      // Get current positions (world space)\n      const sourceCenterPos = sourceMesh.getAbsolutePosition().clone();\n      const targetCenterPos = targetMesh.getAbsolutePosition().clone();\n\n      // Calculate direction and distance\n      const direction = targetCenterPos.subtract(sourceCenterPos);\n      const distance = direction.length();\n\n      if (distance < 0.001) {\n        cylinder.setEnabled(false);  // Hide edge if nodes are at same position\n        this.edgeArrows.get(edgeId)?.setEnabled(false);\n        continue;\n      }\n\n      // Use vertical half extents so edges connect through top/bottom faces.\n      const sourceBoundingBox = sourceMesh.getBoundingInfo().boundingBox;\n      const targetBoundingBox = targetMesh.getBoundingInfo().boundingBox;\n      const sourceHalfY = Math.max(\n        0.1,\n        (sourceBoundingBox.maximum.y - sourceBoundingBox.minimum.y) * 0.5,\n      );\n      const targetHalfY = Math.max(\n        0.1,\n        (targetBoundingBox.maximum.y - targetBoundingBox.minimum.y) * 0.5,\n      );\n\n      // Normalize direction\n      const normalizedDir = direction.normalize();\n      const bidirectionalOffset = this.computeBidirectionalOffsetVector(\n        normalizedDir,\n        metadata.isCrossFile,\n        metadata.bidirectionalOffsetSign,\n      );\n      const offsetSourcePos = sourceCenterPos.add(bidirectionalOffset);\n      const offsetTargetPos = targetCenterPos.add(bidirectionalOffset);\n\n      // All non-self edges connect via top/bottom faces only.\n      // If target is above source, exit source top and enter target bottom.\n      // If target is below source, exit source bottom and enter target top.\n      const verticalSign = targetCenterPos.y >= sourceCenterPos.y ? 1 : -1;\n      const sourceVerticalOffset = new BABYLON.Vector3(0, verticalSign * sourceHalfY, 0);\n      const targetVerticalOffset = new BABYLON.Vector3(0, -verticalSign * targetHalfY, 0);\n\n      const edgeStartPos = offsetSourcePos.add(sourceVerticalOffset);\n      const edgeEndPos = offsetTargetPos.add(targetVerticalOffset);\n\n      // Edge direction unit vector (source → target)\n      const edgeDirection = edgeEndPos.subtract(edgeStartPos).normalize();\n\n      // Compute arrow cone height so we can shorten the cylinder to avoid overlap.\n      // The cone is unscaled so its bounding-box half-height equals arrowHeight/2.\n      const arrowFullHeight = arrow\n        ? arrow.getBoundingInfo().boundingBox.maximum.y * 2\n        : 0;\n\n      // Cylinder ends at the cone's base (not the target surface) so the tip is visible.\n      const cylinderEndPos = edgeEndPos.subtract(edgeDirection.scale(arrowFullHeight));\n\n      // Use midpoint of start and cylinder-end for the cylinder position\n      const midpointWorld = edgeStartPos.add(cylinderEndPos).scale(0.5);\n      \n      // Recalculate distance based on surface points (cylinder portion only)\n      const surfaceDistance = cylinderEndPos.subtract(edgeStartPos).length();\n      \n      // Convert world position to local position relative to parent\n      // If cylinder has a parent, position is automatically local\n      if (cylinder.parent) {\n        const parentMatrix = (cylinder.parent as BABYLON.TransformNode).getWorldMatrix().clone();\n        const inverseParentMatrix = BABYLON.Matrix.Invert(parentMatrix);\n        const localPosition = BABYLON.Vector3.TransformCoordinates(midpointWorld, inverseParentMatrix);\n        cylinder.position = localPosition;\n      } else {\n        cylinder.position = midpointWorld;\n      }\n\n      // Scale cylinder to surface-to-surface distance\n      cylinder.scaling.y = Math.max(surfaceDistance, 0.1);  // Minimum 0.1 to avoid invisible edges\n\n      // Rotate cylinder to point along the connection\n      const yAxis = BABYLON.Axis.Y;\n      const rotationQuaternion = BABYLON.Quaternion.Identity();\n      BABYLON.Quaternion.FromUnitVectorsToRef(yAxis, edgeDirection, rotationQuaternion);\n      cylinder.rotationQuaternion = rotationQuaternion;\n\n      // Ensure cylinder is visible\n      if (!cylinder.isEnabled) {\n        cylinder.setEnabled(true);\n      }\n\n      // Position and orient arrowhead at the target surface\n      if (arrow) {\n        const arrowHalfHeight = arrowFullHeight / 2;\n        // Place cone center so its tip (+Y) sits exactly at edgeEndPos\n        const arrowCenterWorld = edgeEndPos.subtract(edgeDirection.scale(arrowHalfHeight));\n\n        if (arrow.parent) {\n          const parentMatrix = (arrow.parent as BABYLON.TransformNode).getWorldMatrix().clone();\n          const inverseParentMatrix = BABYLON.Matrix.Invert(parentMatrix);\n          arrow.position = BABYLON.Vector3.TransformCoordinates(arrowCenterWorld, inverseParentMatrix);\n        } else {\n          arrow.position = arrowCenterWorld;\n        }\n\n        // Same rotation as the cylinder: align Y-axis to edge direction\n        const arrowQ = BABYLON.Quaternion.Identity();\n        BABYLON.Quaternion.FromUnitVectorsToRef(BABYLON.Axis.Y, edgeDirection, arrowQ);\n        arrow.rotationQuaternion = arrowQ;\n\n        if (!arrow.isEnabled) {\n          arrow.setEnabled(true);\n        }\n      }\n    }\n  }"
+    },
+    {
+      "id": "setGripController@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "name": "setGripController",
+      "file": "src/NavigationController.ts",
+      "line": 35,
+      "isExported": true,
+      "type": "function",
+      "code": "public setGripController(gripController: Quest3GripController): void {\n    this.gripController = gripController;\n  }"
+    },
+    {
+      "id": "setupFlightControls@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "name": "setupFlightControls",
+      "file": "src/NavigationController.ts",
+      "line": 39,
+      "isExported": true,
+      "type": "function",
+      "code": "public setupFlightControls(): void {\n    // Keyboard event listeners for WASD movement\n    document.addEventListener('keydown', (event) => {\n      const key = event.key.toLowerCase();\n      if (['w', 'a', 's', 'd', ' ', 'shift', 'control', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {\n        this.keysPressed.set(key, true);\n        this.isFlying = true;\n        // Cancel any in-progress fly-to animation so manual flight takes over\n        // immediately instead of fighting the tween.\n        if (this.isAnimating) {\n          this.scene.stopAnimation(this.camera);\n          if (this.flyObserver) {\n            this.scene.onBeforeRenderObservable.remove(this.flyObserver);\n            this.flyObserver = null;\n          }\n          this.isAnimating = false;\n        }\n      }\n    });\n\n    document.addEventListener('keyup', (event) => {\n      const key = event.key.toLowerCase();\n      this.keysPressed.set(key, false);\n      // Stop flying if no keys are pressed\n      if ([...this.keysPressed.values()].every(v => !v)) {\n        this.isFlying = false;\n      }\n    });\n\n    // Update flight each frame\n    if (this.scene.registerBeforeRender) {\n      this.scene.registerBeforeRender(() => {\n        if (this.isInXR()) {\n          this.updateXRFlight();\n        } else if (this.isFlying) {\n          this.updateFlight();\n        }\n      });\n    }\n  }"
+    },
+    {
+      "id": "updateXRFlight@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "name": "updateXRFlight",
+      "file": "src/NavigationController.ts",
+      "line": 84,
+      "isExported": true,
+      "type": "function",
+      "code": "public updateXRFlight(): void {\n    if (!this.gripController) {\n      return;\n    }\n\n    const leftGrip = this.gripController.getGripState('left');\n    const rightGrip = this.gripController.getGripState('right');\n    const deadzone = 0.15;\n\n    const strafeInput = Math.abs(leftGrip.thumbstickX) > deadzone ? leftGrip.thumbstickX : 0;\n    const forwardInput = Math.abs(leftGrip.thumbstickY) > deadzone ? -leftGrip.thumbstickY : 0;\n    const verticalInput = Math.abs(rightGrip.thumbstickY) > deadzone ? rightGrip.thumbstickY : 0;\n\n    if (strafeInput === 0 && forwardInput === 0 && verticalInput === 0) {\n      return;\n    }\n\n    // Manual thumbstick locomotion must override any in-progress XR fly animation.\n    if (this.isAnimating) {\n      this.scene.stopAnimation(this.sceneRoot);\n      this.isAnimating = false;\n    }\n\n    const deltaTime = Math.min(this.engine.getDeltaTime() / 1000, 1 / 30);\n    const distance = this.flightSpeed * deltaTime;\n    const activeCamera = this.scene.activeCamera;\n    if (!activeCamera) {\n      return;\n    }\n\n    const cameraForward = activeCamera.getForwardRay().direction;\n    const flatForward = new BABYLON.Vector3(cameraForward.x, 0, cameraForward.z);\n    const forward = flatForward.lengthSquared() > 0.0001\n      ? flatForward.normalize()\n      : new BABYLON.Vector3(0, 0, 1);\n    const right = new BABYLON.Vector3(forward.z, 0, -forward.x);\n    const up = BABYLON.Axis.Y;\n\n    const desiredMovement = BABYLON.Vector3.Zero();\n    desiredMovement.addInPlace(forward.scale(forwardInput * distance));\n    desiredMovement.addInPlace(right.scale(strafeInput * distance));\n    desiredMovement.addInPlace(up.scale(verticalInput * distance));\n\n    if (desiredMovement.lengthSquared() === 0) {\n      return;\n    }\n\n    // Move the world opposite the user's intended locomotion.\n    this.sceneRoot.position.subtractInPlace(desiredMovement);\n  }"
+    },
+    {
+      "id": "updateFlight@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "name": "updateFlight",
+      "file": "src/NavigationController.ts",
+      "line": 138,
+      "isExported": true,
+      "type": "function",
+      "code": "public updateFlight(): void {\n    // Clamp delta to avoid large per-frame movement spikes that look like vibration.\n    const deltaTime = Math.min(this.engine.getDeltaTime() / 1000, 1 / 30);\n    const distance = this.flightSpeed * deltaTime;\n\n    // Get camera direction vectors\n    const forward = this.camera.getDirection(BABYLON.Axis.Z);\n    const right = this.camera.getDirection(BABYLON.Axis.X);\n    const up = BABYLON.Axis.Y;\n\n    const movement = BABYLON.Vector3.Zero();\n\n    // Process keyboard input\n    if (this.keysPressed.get('w') || this.keysPressed.get('arrowup')) {\n      // Move forward\n      movement.addInPlace(forward.scale(distance));\n    }\n    if (this.keysPressed.get('s') || this.keysPressed.get('arrowdown')) {\n      // Move backward\n      movement.addInPlace(forward.scale(-distance));\n    }\n    if (this.keysPressed.get('a') || this.keysPressed.get('arrowleft')) {\n      // Move left\n      movement.addInPlace(right.scale(-distance));\n    }\n    if (this.keysPressed.get('d') || this.keysPressed.get('arrowright')) {\n      // Move right\n      movement.addInPlace(right.scale(distance));\n    }\n    if (this.keysPressed.get(' ')) {\n      // Move up\n      movement.addInPlace(up.scale(distance));\n    }\n    if (this.keysPressed.get('shift') || this.keysPressed.get('control')) {\n      // Move down\n      movement.addInPlace(up.scale(-distance));\n    }\n\n    if (movement.lengthSquared() > 0) {\n      this.camera.position.addInPlace(movement);\n    }\n  }"
+    },
+    {
+      "id": "flyToWorldPosition@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "name": "flyToWorldPosition",
+      "file": "src/NavigationController.ts",
+      "line": 184,
+      "isExported": true,
+      "type": "function",
+      "code": "public flyToWorldPosition(targetPosition: BABYLON.Vector3, targetMesh: BABYLON.Mesh): void {\n    if (this.isInXR()) {\n      this.flyToViaSceneRoot(targetPosition, targetMesh);\n    } else {\n      this.flyToViaCamera(targetPosition, targetMesh);\n    }\n  }"
+    },
+    {
+      "id": "flyToViaCamera@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "name": "flyToViaCamera",
+      "file": "src/NavigationController.ts",
+      "line": 195,
+      "isExported": false,
+      "type": "function",
+      "code": "private flyToViaCamera(targetPosition: BABYLON.Vector3, targetMesh: BABYLON.Mesh): void {\n    if (!this.camera) return;\n\n    const startPos = this.camera.position.clone();\n    const distance = BABYLON.Vector3.Distance(startPos, targetPosition);\n    const duration = Math.max(300, Math.min(1500, distance * 5));\n\n    this.isAnimating = true;\n    let elapsedTime = 0;\n\n    if (this.flyObserver) {\n      this.scene.onBeforeRenderObservable.remove(this.flyObserver);\n    }\n\n    this.flyObserver = this.scene.onBeforeRenderObservable.add(() => {\n      if (!this.isAnimating) {\n        if (this.flyObserver) {\n          this.scene.onBeforeRenderObservable.remove(this.flyObserver);\n          this.flyObserver = null;\n        }\n        return;\n      }\n\n      elapsedTime += this.engine.getDeltaTime();\n      const progress = Math.min(elapsedTime / duration, 1.0);\n\n      // Easing function: ease-out cubic\n      const easeProgress = 1 - Math.pow(1 - progress, 3);\n\n      this.camera.position = BABYLON.Vector3.Lerp(startPos, targetPosition, easeProgress);\n      this.camera.target = targetMesh.getAbsolutePosition();\n\n      if (progress >= 1.0) {\n        this.isAnimating = false;\n        this.camera.position = targetPosition;\n        this.camera.target = targetMesh.getAbsolutePosition();\n      }\n    });\n  }"
+    },
+    {
+      "id": "flyToViaSceneRoot@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "name": "flyToViaSceneRoot",
+      "file": "src/NavigationController.ts",
+      "line": 238,
+      "isExported": false,
+      "type": "function",
+      "code": "private flyToViaSceneRoot(targetPosition: BABYLON.Vector3, _targetMesh: BABYLON.Mesh): void {\n    const activeCamera = this.scene.activeCamera;\n    if (!activeCamera) return;\n\n    const cameraForward = activeCamera.getForwardRay().direction;\n    const gazeDistance = 2.0;\n    const gazePoint = activeCamera.globalPosition.add(cameraForward.scale(gazeDistance));\n\n    const startPos = this.sceneRoot.position.clone();\n    const offset = gazePoint.subtract(targetPosition);\n    const endPos = this.sceneRoot.position.add(offset);\n\n    const distance = BABYLON.Vector3.Distance(startPos, endPos);\n    const duration = Math.max(300, Math.min(1500, distance * 5));\n\n    this.isAnimating = true;\n    let elapsedTime = 0;\n\n    if (this.flyObserver) {\n      this.scene.onBeforeRenderObservable.remove(this.flyObserver);\n    }\n\n    this.flyObserver = this.scene.onBeforeRenderObservable.add(() => {\n      if (!this.isAnimating) {\n        if (this.flyObserver) {\n          this.scene.onBeforeRenderObservable.remove(this.flyObserver);\n          this.flyObserver = null;\n        }\n        return;\n      }\n\n      elapsedTime += this.engine.getDeltaTime();\n      const progress = Math.min(elapsedTime / duration, 1.0);\n\n      // Easing function: ease-out cubic\n      const easeProgress = 1 - Math.pow(1 - progress, 3);\n\n      this.sceneRoot.position = BABYLON.Vector3.Lerp(startPos, endPos, easeProgress);\n\n      if (progress >= 1.0) {\n        this.isAnimating = false;\n        this.sceneRoot.position = endPos;\n      }\n    });\n  }"
+    },
+    {
+      "id": "slideFaceView@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "name": "slideFaceView",
+      "file": "src/NavigationController.ts",
+      "line": 287,
+      "isExported": true,
+      "type": "function",
+      "code": "public slideFaceView(faceNormal: BABYLON.Vector3, targetMesh: BABYLON.Mesh): void {\n    const meshCenter = targetMesh.getAbsolutePosition();\n    const scaling = targetMesh.scaling;\n    const distance = Math.max(scaling.x, scaling.y, scaling.z) * 1.5;\n\n    let viewOffset = faceNormal.scale(distance);\n    \n    // Add small vertical offset to show the face better\n    viewOffset.y += distance * 0.3;\n\n    const targetPos = meshCenter.add(viewOffset);\n    this.flyToWorldPosition(targetPos, targetMesh);\n  }"
+    },
+    {
+      "id": "quantizeFaceNormalFromPickedPoint@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "name": "quantizeFaceNormalFromPickedPoint",
+      "file": "src/NavigationController.ts",
+      "line": 304,
+      "isExported": true,
+      "type": "function",
+      "code": "public quantizeFaceNormalFromPickedPoint(\n    mesh: BABYLON.Mesh,\n    pickedPoint: BABYLON.Vector3 | null,\n    fallbackNormal: BABYLON.Vector3,\n  ): BABYLON.Vector3 {\n    if (!pickedPoint) {\n      return fallbackNormal.clone();\n    }\n\n    const center = mesh.getAbsolutePosition();\n    const delta = pickedPoint.subtract(center);\n    if (!Number.isFinite(delta.length()) || delta.lengthSquared() < 0.000001) {\n      return fallbackNormal.clone();\n    }\n\n    const absX = Math.abs(delta.x);\n    const absY = Math.abs(delta.y);\n    const absZ = Math.abs(delta.z);\n    let quantized: BABYLON.Vector3;\n    if (absX >= absY && absX >= absZ) {\n      quantized = new BABYLON.Vector3(delta.x >= 0 ? 1 : -1, 0, 0);\n    } else if (absY >= absX && absY >= absZ) {\n      quantized = new BABYLON.Vector3(0, delta.y >= 0 ? 1 : -1, 0);\n    } else {\n      quantized = new BABYLON.Vector3(0, 0, delta.z >= 0 ? 1 : -1);\n    }\n\n    return this.coerceFaceNormalToSide(quantized, fallbackNormal);\n  }"
+    },
+    {
+      "id": "coerceFaceNormalToSide@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "name": "coerceFaceNormalToSide",
+      "file": "src/NavigationController.ts",
+      "line": 337,
+      "isExported": true,
+      "type": "function",
+      "code": "public coerceFaceNormalToSide(\n    faceNormal: BABYLON.Vector3,\n    fallbackNormal: BABYLON.Vector3,\n  ): BABYLON.Vector3 {\n    // Code view is only shown on side faces (+/-X, +/-Z), never top/bottom.\n    if (Math.abs(faceNormal.y) < 0.5) {\n      return faceNormal.clone();\n    }\n\n    const absFallbackX = Math.abs(fallbackNormal.x);\n    const absFallbackZ = Math.abs(fallbackNormal.z);\n    if (absFallbackX >= absFallbackZ) {\n      return new BABYLON.Vector3(fallbackNormal.x >= 0 ? 1 : -1, 0, 0);\n    }\n    return new BABYLON.Vector3(0, 0, fallbackNormal.z >= 0 ? 1 : -1);\n  }"
+    },
+    {
+      "id": "isFaceNormalEqual@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "name": "isFaceNormalEqual",
+      "file": "src/NavigationController.ts",
+      "line": 357,
+      "isExported": true,
+      "type": "function",
+      "code": "public isFaceNormalEqual(a: BABYLON.Vector3 | null, b: BABYLON.Vector3 | null): boolean {\n    if (!a || !b) return false;\n    const tolerance = 0.1;\n    return (\n      Math.abs(a.x - b.x) < tolerance &&\n      Math.abs(a.y - b.y) < tolerance &&\n      Math.abs(a.z - b.z) < tolerance\n    );\n  }"
+    },
+    {
+      "id": "getViewerWorldPosition@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "name": "getViewerWorldPosition",
+      "file": "src/NavigationController.ts",
+      "line": 370,
+      "isExported": true,
+      "type": "function",
+      "code": "public getViewerWorldPosition(): BABYLON.Vector3 {\n    return this.isInXR()\n      ? this.scene.activeCamera?.globalPosition || BABYLON.Vector3.Zero()\n      : this.camera.position;\n  }"
+    },
+    {
+      "id": "isInXR@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "name": "isInXR",
+      "file": "src/NavigationController.ts",
+      "line": 379,
+      "isExported": true,
+      "type": "function",
+      "code": "public isInXR(): boolean {\n    return this.scene.activeCamera?.name === 'webxr' || false;\n  }"
+    },
+    {
+      "id": "getIsAnimating@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "name": "getIsAnimating",
+      "file": "src/NavigationController.ts",
+      "line": 386,
+      "isExported": true,
+      "type": "function",
+      "code": "public getIsAnimating(): boolean {\n    return this.isAnimating;\n  }"
+    },
+    {
+      "id": "stopAnimation@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "name": "stopAnimation",
+      "file": "src/NavigationController.ts",
+      "line": 393,
+      "isExported": true,
+      "type": "function",
+      "code": "public stopAnimation(): void {\n    if (this.flyObserver) {\n      this.scene.onBeforeRenderObservable.remove(this.flyObserver);\n      this.flyObserver = null;\n    }\n    this.isAnimating = false;\n  }"
     },
     {
       "id": "normalizePath@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\PathUtils.ts",
@@ -3754,7 +4195,7 @@
     },
     {
       "from": "handleEditorScreenClick@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\FunctionEditorService.ts",
-      "to": "getViewerWorldPosition@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "to": "getViewerWorldPosition@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
       "kind": "call"
     },
     {
@@ -3829,17 +4270,17 @@
     },
     {
       "from": "focusCurrentEditorFaceCloseUp@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\FunctionEditorService.ts",
-      "to": "coerceFaceNormalToSide@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "to": "coerceFaceNormalToSide@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
       "kind": "call"
     },
     {
       "from": "findNearbyFunctionForEditor@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\FunctionEditorService.ts",
-      "to": "getViewerWorldPosition@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "to": "getViewerWorldPosition@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
       "kind": "call"
     },
     {
       "from": "getPreferredEditorFaceNormal@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\FunctionEditorService.ts",
-      "to": "getViewerWorldPosition@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "to": "getViewerWorldPosition@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
       "kind": "call"
     },
     {
@@ -3876,6 +4317,26 @@
       "from": "drawHighlightedLine@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\FunctionEditorService.ts",
       "to": "var:PRISM_DEFAULT_COLOR@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\FunctionEditorService.ts",
       "kind": "var-read"
+    },
+    {
+      "from": "clearScene@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphRenderer.ts",
+      "to": "dispose@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\FunctionEditorService.ts",
+      "kind": "call"
+    },
+    {
+      "from": "clearScene@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphRenderer.ts",
+      "to": "clearNodeReferences@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
+      "kind": "call"
+    },
+    {
+      "from": "clearScene@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphRenderer.ts",
+      "to": "clearEdges@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
+      "kind": "call"
+    },
+    {
+      "from": "renderNodes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphRenderer.ts",
+      "to": "createNodeMesh@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
+      "kind": "call"
     },
     {
       "from": "loadGraph@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\GraphViewer.ts",
@@ -4024,7 +4485,7 @@
     },
     {
       "from": "updateLabelDistanceScaling@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LabelManager.ts",
-      "to": "isInXR@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "to": "isInXR@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
       "kind": "call"
     },
     {
@@ -4075,6 +4536,56 @@
     {
       "from": "createBreadcrumbLabelAnchor@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LabelManager.ts",
       "to": "createLabelChip@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LabelManager.ts",
+      "kind": "call"
+    },
+    {
+      "from": "setupPhysicsLoop@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "to": "updateFrame@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
+      "kind": "call"
+    },
+    {
+      "from": "setupPhysicsLoop@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "to": "getNodes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
+      "kind": "call"
+    },
+    {
+      "from": "setupPhysicsLoop@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "to": "applyFileBoxRepulsion@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "kind": "call"
+    },
+    {
+      "from": "setupPhysicsLoop@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "to": "resolveInitialFileBoxOverlaps@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "kind": "call"
+    },
+    {
+      "from": "setupPhysicsLoop@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "to": "enforceMinimumFileBoxGap@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "kind": "call"
+    },
+    {
+      "from": "setupPhysicsLoop@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "to": "enforceTopLevelDirectoryGap@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "kind": "call"
+    },
+    {
+      "from": "applyFileBoxRepulsion@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "to": "getNodes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
+      "kind": "call"
+    },
+    {
+      "from": "enforceTopLevelDirectoryGap@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "to": "getNodes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
+      "kind": "call"
+    },
+    {
+      "from": "enforceTopLevelDirectoryGap@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "to": "toProjectRelativePath@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\PathUtils.ts",
+      "kind": "call"
+    },
+    {
+      "from": "compactFileBoxLayout@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\LayoutPipelineService.ts",
+      "to": "getNodes@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\ForceDirectedLayout.ts",
       "kind": "call"
     },
     {
@@ -4293,6 +4804,66 @@
       "kind": "call"
     },
     {
+      "from": "setupFlightControls@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "to": "stopAnimation@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "kind": "call"
+    },
+    {
+      "from": "setupFlightControls@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "to": "isInXR@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "kind": "call"
+    },
+    {
+      "from": "setupFlightControls@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "to": "updateXRFlight@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "kind": "call"
+    },
+    {
+      "from": "setupFlightControls@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "to": "updateFlight@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "kind": "call"
+    },
+    {
+      "from": "updateXRFlight@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "to": "getGripState@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\Quest3GripController.ts",
+      "kind": "call"
+    },
+    {
+      "from": "updateXRFlight@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "to": "stopAnimation@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "kind": "call"
+    },
+    {
+      "from": "flyToWorldPosition@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "to": "isInXR@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "kind": "call"
+    },
+    {
+      "from": "flyToWorldPosition@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "to": "flyToViaSceneRoot@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "kind": "call"
+    },
+    {
+      "from": "flyToWorldPosition@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "to": "flyToViaCamera@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "kind": "call"
+    },
+    {
+      "from": "slideFaceView@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "to": "flyToWorldPosition@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "kind": "call"
+    },
+    {
+      "from": "quantizeFaceNormalFromPickedPoint@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "to": "coerceFaceNormalToSide@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "kind": "call"
+    },
+    {
+      "from": "getViewerWorldPosition@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "to": "isInXR@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "kind": "call"
+    },
+    {
       "from": "toProjectRelativePath@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\PathUtils.ts",
       "to": "normalizePath@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\PathUtils.ts",
       "kind": "call"
@@ -4454,6 +5025,11 @@
     },
     {
       "from": "setupFlightControls@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "to": "stopAnimation@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "kind": "call"
+    },
+    {
+      "from": "setupFlightControls@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "to": "updateLabelDistanceScaling@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "kind": "call"
     },
@@ -4475,6 +5051,11 @@
     {
       "from": "updateXRFlight@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "to": "getGripState@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\Quest3GripController.ts",
+      "kind": "call"
+    },
+    {
+      "from": "updateXRFlight@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "to": "stopAnimation@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
       "kind": "call"
     },
     {
@@ -5079,6 +5660,11 @@
     },
     {
       "from": "flyToViaCamera@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "to": "stopAnimation@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "kind": "call"
+    },
+    {
+      "from": "flyToViaCamera@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "to": "var:EDITOR_WORLD_HEIGHT_SCALE@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "kind": "var-read"
     },
@@ -5086,6 +5672,11 @@
       "from": "flyToViaCamera@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "to": "var:EDITOR_WORLD_WIDTH_SCALE@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "kind": "var-read"
+    },
+    {
+      "from": "flyToViaSceneRoot@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "to": "stopAnimation@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
+      "kind": "call"
     },
     {
       "from": "flyToViaSceneRoot@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
@@ -5105,6 +5696,11 @@
     {
       "from": "slideFaceView@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "to": "flyToViaCamera@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "kind": "call"
+    },
+    {
+      "from": "slideFaceView@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
+      "to": "stopAnimation@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
       "kind": "call"
     },
     {
@@ -5800,9 +6396,12 @@
     "src/ForceDirectedLayout.ts",
     "src/FunctionEditorService.ts",
     "src/GraphLoader.ts",
+    "src/GraphRenderer.ts",
     "src/GraphViewer.ts",
     "src/LabelManager.ts",
+    "src/LayoutPipelineService.ts",
     "src/MeshFactory.ts",
+    "src/NavigationController.ts",
     "src/PathUtils.ts",
     "src/Quest3GripController.ts",
     "src/SceneConfig.ts",
@@ -5817,5 +6416,5 @@
     "vite.config.ts",
     "vitest.config.ts"
   ],
-  "lastUpdated": "2026-03-28T23:17:09.166Z"
+  "lastUpdated": "2026-03-28T23:32:37.704Z"
 }

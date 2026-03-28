@@ -7,6 +7,7 @@ export class GraphLoader {
   private cache: GraphData | null = null;
   private lastLoadTime: number = 0;
   private lastSeenVersion: string = '';
+  private lastLoggedGraphVersion: string = '';
   private pollIntervalMs: number;
 
   constructor(pollIntervalMs: number = 2000) {
@@ -58,7 +59,17 @@ export class GraphLoader {
         const data = await response.json();
         this.cache = data;
         this.lastLoadTime = Date.now();
-        console.log(`✓ Loaded graph with ${data.nodes?.length || 0} functions and ${data.edges?.length || 0} calls`);
+        const graphVersion = data.lastUpdated || '';
+        // Prime version tracking on the initial load so the first poll doesn't
+        // immediately treat the current graph as a new update. This is safe as
+        // long as graph.lastUpdated and version.json.buildTime are kept in sync.
+        if (!this.lastSeenVersion && graphVersion) {
+          this.lastSeenVersion = graphVersion;
+        }
+        if (graphVersion !== this.lastLoggedGraphVersion) {
+          console.log(`✓ Loaded graph with ${data.nodes?.length || 0} functions and ${data.edges?.length || 0} calls`);
+          this.lastLoggedGraphVersion = graphVersion;
+        }
         return data;
       }
       

@@ -15,6 +15,7 @@ export interface Node {
   label: string;
   file?: string;  // Source file for this node
   isExported?: boolean;  // Whether this is an exported function/variable
+  radius: number; // Relative layout radius used for size-aware spacing forces
 }
 
 export interface Edge {
@@ -33,19 +34,27 @@ export class ForceDirectedLayout {
   private readonly C_ATTRACTIVE_SAME_FILE = 0.30;  // 6x stronger attraction for same-file connected nodes
   private readonly DAMPING = 0.92;         // Velocity damping per iteration
   private readonly MIN_DISTANCE = 1.0;     // Minimum distance to prevent singularity in force calculations
-  private readonly MIN_NODE_SEPARATION = 90.0;    // Minimum distance between unconnected same-file nodes
   private readonly MIN_CROSS_FILE_SEPARATION = 35.0;  // Stronger separation for cross-file nodes
   private readonly EQUILIBRIUM_THRESHOLD = 0.001;  // Converged when all velocities below this
+  private readonly BASE_NODE_RADIUS = 1.0;
+  private readonly EXPORTED_RADIUS_FACTOR = 1.8;
 
-  constructor(nodeIds: string[], edges: Edge[], nodeFileMap?: Map<string, string>, nodeExportedMap?: Map<string, boolean>, edgeFilter?: (edge: Edge) => boolean) {
+  constructor(
+    nodeIds: string[],
+    edges: Edge[],
+    nodeFileMap?: Map<string, string>,
+    nodeExportedMap?: Map<string, boolean>,
+    edgeFilter?: (edge: Edge) => boolean,
+    nodeSizeMap?: Map<string, number>
+  ) {
     this.edges = edges;
     this.edgeFilter = edgeFilter;
     this.nodes = new Map();
 
     // Use smaller space for internal layouts (when nodeFileMap is provided), larger for file-level
-    // Internal layouts need to fit within file boxes (~120-300 units), so use proportional space
+    // Internal layouts need to fit within file boxes; 40 units keeps nodes compact
     // File-level layouts need to spread files far apart, so use 1250 unit space
-    this.SPACE_SIZE = nodeFileMap ? 150 : 1250;
+    this.SPACE_SIZE = nodeFileMap ? 40 : 1250;
 
     // Initialize nodes with random positions close to center
     // Nodes will spread apart due to sphere repulsion forces
@@ -53,19 +62,27 @@ export class ForceDirectedLayout {
       // Generate random position near center, scaled to layout space
       // For smaller spaces (internal layouts), use proportionally smaller initial radius
       const maxInitialRadius = this.SPACE_SIZE * 0.15;  // 15% of space size
-      const radius = (this.SPACE_SIZE * 0.05) + Math.random() * maxInitialRadius;  // 5-20% of space size
+      const seedRadius = (this.SPACE_SIZE * 0.05) + Math.random() * maxInitialRadius;  // 5-20% of space size
       const theta = Math.random() * Math.PI * 2;  // azimuth angle: 0-2π
       const phi = Math.acos(Math.random() * 2 - 1);  // polar angle: uniform distribution on sphere
+
+      const isExported = !!nodeExportedMap?.get(id);
+      const requestedSize = nodeSizeMap?.get(id);
+      const radius = Math.max(
+        0.4,
+        requestedSize ?? (isExported ? this.BASE_NODE_RADIUS * this.EXPORTED_RADIUS_FACTOR : this.BASE_NODE_RADIUS)
+      );
 
       this.nodes.set(id, {
         id,
         label: id.split('@')[0],
         file: nodeFileMap?.get(id),
-        isExported: nodeExportedMap?.get(id),
+        isExported,
+        radius,
         position: {
-          x: radius * Math.sin(phi) * Math.cos(theta),
-          y: radius * Math.sin(phi) * Math.sin(theta),
-          z: radius * Math.cos(phi)
+          x: seedRadius * Math.sin(phi) * Math.cos(theta),
+          y: seedRadius * Math.sin(phi) * Math.sin(theta),
+          z: seedRadius * Math.cos(phi)
         },
         velocity: { x: 0, y: 0, z: 0 }
       });
@@ -124,8 +141,6 @@ export class ForceDirectedLayout {
         maxVelocity = Math.max(maxVelocity, speed);
       }
 
-      // Enforce minimum distance constraints
-      this.enforceAllPairsMinimumDistance();
       this.enforceFileCrossConstraint();
 
       // Early exit if layout converged
@@ -144,12 +159,20 @@ export class ForceDirectedLayout {
     const dy = nodeB.position.y - nodeA.position.y;
     const dz = nodeB.position.z - nodeA.position.z;
 
-    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz) || this.MIN_DISTANCE;
+    const rawDistance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    const combinedRadius = nodeA.radius + nodeB.radius;
+    const minDistance = Math.max(this.MIN_DISTANCE, combinedRadius);
+    const distance = Math.max(rawDistance, minDistance);
     
     // All repulsive forces use same-file strength (cross-file nodes don't repel)
     const repulsiveConstant = this.C_REPULSIVE;
     
-    const force = (repulsiveConstant / (distance * distance)) || 0;
+    let force = (repulsiveConstant / (distance * distance)) || 0;
+    if (rawDistance < combinedRadius) {
+      // Extra separation when larger nodes overlap so they settle farther apart.
+      const overlapRatio = (combinedRadius - rawDistance) / combinedRadius;
+      force *= 1 + overlapRatio * 6;
+    }
 
     const fx = (force * dx) / distance;
     const fy = (force * dy) / distance;
@@ -182,8 +205,9 @@ export class ForceDirectedLayout {
     // Use strongest attraction for same-file connected nodes (6x stronger)
     const attractionConstant = isSameFile ? this.C_ATTRACTIVE_SAME_FILE : this.C_ATTRACTIVE;
 
-    // Spring-like force: F = k * distance
-    const force = attractionConstant * distance;
+    // Size-aware spring: target edge length scales with node radii so larger nodes keep clearance.
+    const restLength = Math.max(this.MIN_DISTANCE, (nodeA.radius + nodeB.radius) * 1.15);
+    const force = attractionConstant * (distance - restLength);
 
     const fx = (force * dx) / distance;
     const fy = (force * dy) / distance;
@@ -253,71 +277,11 @@ export class ForceDirectedLayout {
       maxVelocity = Math.max(maxVelocity, speed);
     }
 
-    // Enforce minimum distance constraint for all node pairs (prevent overlap)
-    this.enforceAllPairsMinimumDistance();
-    
     // Enforce stronger minimum distance constraint between nodes from different files
     this.enforceFileCrossConstraint();
 
     // Return true if still converging, false if settled
     return maxVelocity >= this.EQUILIBRIUM_THRESHOLD;
-  }
-
-  /**
-   * Enforce minimum distance constraint between same-file node pairs
-   * Push unconnected nodes from same file apart if they get closer than MIN_NODE_SEPARATION (25 units)
-   * Cross-file pairs are handled separately by enforceFileCrossConstraint with stronger constraints
-   */
-  private enforceAllPairsMinimumDistance(): void {
-    const nodeArray = Array.from(this.nodes.values());
-    const nodeCount = nodeArray.length;
-    const pushForce = this.C_REPULSIVE * 4;  // Strong push to prevent overlap
-
-    for (let i = 0; i < nodeCount; i++) {
-      for (let j = i + 1; j < nodeCount; j++) {
-        const nodeA = nodeArray[i];
-        const nodeB = nodeArray[j];
-
-        // Skip cross-file pairs - they're handled by enforceFileCrossConstraint
-        if (nodeA.file && nodeB.file && nodeA.file !== nodeB.file) {
-          continue;
-        }
-
-        const dx = nodeB.position.x - nodeA.position.x;
-        const dy = nodeB.position.y - nodeA.position.y;
-        const dz = nodeB.position.z - nodeA.position.z;
-
-        const distance = Math.sqrt(dx * dx + dy * dy + dz * dz) || this.MIN_DISTANCE;
-
-        // If same-file unconnected nodes are closer than minimum separation, push them apart
-        if (distance < this.MIN_NODE_SEPARATION) {
-          const direction = distance > 0 
-            ? { x: dx / distance, y: dy / distance, z: dz / distance }
-            : { x: Math.random() - 0.5, y: Math.random() - 0.5, z: Math.random() - 0.5 };
-
-          // Calculate how much to push
-          const pushAmount = (this.MIN_NODE_SEPARATION - distance) * pushForce;
-
-          // Push nodes apart
-          nodeA.position.x -= direction.x * pushAmount;
-          nodeA.position.y -= direction.y * pushAmount;
-          nodeA.position.z -= direction.z * pushAmount;
-
-          nodeB.position.x += direction.x * pushAmount;
-          nodeB.position.y += direction.y * pushAmount;
-          nodeB.position.z += direction.z * pushAmount;
-
-          // Re-constrain to bounds after pushing
-          nodeA.position.x = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeA.position.x));
-          nodeA.position.y = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeA.position.y));
-          nodeA.position.z = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeA.position.z));
-
-          nodeB.position.x = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeB.position.x));
-          nodeB.position.y = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeB.position.y));
-          nodeB.position.z = Math.max(-this.SPACE_SIZE, Math.min(this.SPACE_SIZE, nodeB.position.z));
-        }
-      }
-    }
   }
 
   /**
@@ -346,14 +310,16 @@ export class ForceDirectedLayout {
 
         const distance = Math.sqrt(dx * dx + dy * dy + dz * dz) || this.MIN_DISTANCE;
 
+        const sizeAwareSeparation = Math.max(this.MIN_CROSS_FILE_SEPARATION, (nodeA.radius + nodeB.radius) * 2.0);
+
         // If cross-file nodes are closer than minimum distance, push them apart strongly
-        if (distance < this.MIN_CROSS_FILE_SEPARATION) {
+        if (distance < sizeAwareSeparation) {
           const direction = distance > 0 
             ? { x: dx / distance, y: dy / distance, z: dz / distance }
             : { x: Math.random() - 0.5, y: Math.random() - 0.5, z: Math.random() - 0.5 };
 
           // Calculate how much to push (stronger for cross-file)
-          const pushAmount = (this.MIN_CROSS_FILE_SEPARATION - distance) * pushForce;
+          const pushAmount = (sizeAwareSeparation - distance) * pushForce;
 
           // Push nodes apart
           nodeA.position.x -= direction.x * pushAmount;
