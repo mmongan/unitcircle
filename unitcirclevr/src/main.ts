@@ -4,9 +4,7 @@ import '@babylonjs/loaders/glTF'
 
 const LOADING_OVERLAY_ID = 'startupLoadingOverlay';
 const LOADING_OVERLAY_MIN_VISIBLE_MS = 1200;
-const LABEL_TOGGLE_BUTTON_ID = 'desktopLabelToggle';
 let loadingOverlayShownAt = 0;
-let desktopLabelControlsInitialized = false;
 
 // Log build version timestamp
 async function logBuildVersion(): Promise<void> {
@@ -67,87 +65,28 @@ async function createVRScene(canvas: HTMLCanvasElement): Promise<void> {
 async function runVRScene(vrScene: VRSceneManager): Promise<void> {
   // Initialize the scene visualization before starting render loop
   await vrScene.initialize();
-  setupDesktopLabelControls(vrScene);
+  setupLayoutRebuildShortcut(vrScene);
   vrScene.run();
   hideLoadingOverlay();
 }
 
-function setupDesktopLabelControls(vrScene: VRSceneManager): void {
-  if (desktopLabelControlsInitialized) {
-    return;
-  }
-  desktopLabelControlsInitialized = true;
-
-  let button = document.getElementById(LABEL_TOGGLE_BUTTON_ID) as HTMLButtonElement | null;
-  if (!button) {
-    button = document.createElement('button');
-    button.id = LABEL_TOGGLE_BUTTON_ID;
-    button.className = 'desktop-label-toggle';
-    document.body.appendChild(button);
-  }
-
-  const updateButtonText = () => {
-    if (!button) {
-      return;
-    }
-    button.textContent = `Hold Alt: ${vrScene.areNavigationLabelsVisible() ? 'On' : 'Off'}`;
-  };
-
-  let isAltHeld = false;
-
-  const isAltOnlyEvent = (event: KeyboardEvent): boolean => {
-    const isAltKey = event.key === 'Alt' || event.code === 'AltLeft' || event.code === 'AltRight';
-    return isAltKey && !event.ctrlKey && !event.metaKey && !event.shiftKey;
-  };
-
-  const releaseAltHold = () => {
-    if (!isAltHeld) {
-      return;
-    }
-    isAltHeld = false;
-    vrScene.setNavigationLabelsVisible(false);
-    updateButtonText();
-  };
-
-  window.addEventListener('keydown', (event) => {
+function setupLayoutRebuildShortcut(vrScene: VRSceneManager): void {
+  document.addEventListener('keydown', (event) => {
     const target = event.target as HTMLElement | null;
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
       return;
     }
 
-    if (isAltOnlyEvent(event)) {
-      // Prevent browser/UI Alt handling from stealing focus.
+    // Press 'R' to rebuild exported function layout
+    if (event.key.toLowerCase() === 'r' && event.ctrlKey) {
       event.preventDefault();
-      if (!isAltHeld) {
-        isAltHeld = true;
-        vrScene.setNavigationLabelsVisible(true);
-        updateButtonText();
-      }
-    }
-  }, true);
-
-  window.addEventListener('keyup', (event) => {
-    if (isAltOnlyEvent(event)) {
-      event.preventDefault();
-      releaseAltHold();
-    } else if (isAltHeld && !event.altKey) {
-      // Fallback in case key identity differs across platforms/devices.
-      releaseAltHold();
-    }
-  }, true);
-
-  window.addEventListener('blur', () => {
-    releaseAltHold();
-  });
-
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-      releaseAltHold();
+      console.log('🔄 Rebuilding exported function layout (Ctrl+R)...');
+      vrScene.rebuildExportedFunctionLayout();
     }
   });
-
-  updateButtonText();
 }
+
+
 
 function setupWindowCleanup(): void {
   window.addEventListener('beforeunload', () => {

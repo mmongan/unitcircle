@@ -1914,13 +1914,11 @@ export class VRSceneManager {
         mesh.outlineColor = SceneConfig.HOVER_COLOR.clone();
         mesh.outlineWidth = 0.08;
         mesh.renderOutline = true;
-        this.showTooltip(node);
       })
     );
     mesh.actionManager.registerAction(
       new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPointerOutTrigger, () => {
         mesh.renderOutline = false;
-        this.hideTooltip();
       })
     );
   }
@@ -2743,13 +2741,11 @@ export class VRSceneManager {
             fileColor.g * 0.5,
             fileColor.b * 0.5
           );
-          this.showTooltip({ name: file });
         })
       );
       boxMesh.actionManager.registerAction(
         new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPointerOutTrigger, () => {
           material.emissiveColor = originalEmissive.clone();
-          this.hideTooltip();
         })
       );
 
@@ -4893,40 +4889,7 @@ export class VRSceneManager {
     }
   }
 
-  private showTooltip(node: { name: string; file?: string; line?: number }): void {
-    // Create HTML tooltip element
-    const existing = document.getElementById('tooltip');
-    if (existing) existing.remove();
 
-    const tooltip = document.createElement('div');
-    tooltip.id = 'tooltip';
-    
-    let tooltipContent = `<div><strong>${node.name}</strong></div>`;
-    if (node.file) {
-      tooltipContent += `<div style="color: #88ff88; margin-top: 4px;">📄 ${node.file}</div>`;
-    }
-    if (node.line) {
-      tooltipContent += `<div style="color: #88ff88;">📍 Line ${node.line}</div>`;
-    }
-    
-    tooltip.innerHTML = `
-      <div style="background: rgba(0, 0, 0, 0.9); color: white; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 12px; border: 2px solid #00ff00; max-width: 250px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);">
-        ${tooltipContent}
-      </div>
-    `;
-    
-    tooltip.style.position = 'fixed';
-    tooltip.style.top = '20px';
-    tooltip.style.right = '20px';
-    tooltip.style.zIndex = '1000';
-    
-    document.body.appendChild(tooltip);
-  }
-
-  private hideTooltip(): void {
-    const tooltip = document.getElementById('tooltip');
-    if (tooltip) tooltip.remove();
-  }
 
   private ensureFunctionEditorScreen(): void {
     if (this.functionEditorScreen && this.functionEditorTexture && this.functionEditorMaterial) {
@@ -5726,6 +5689,55 @@ export class VRSceneManager {
 
   public areNavigationLabelsVisible(): boolean {
     return this.labelsVisible;
+  }
+
+  /**
+   * Rebuild the exported function layout to bring them closer to file box surfaces
+   */
+  public rebuildExportedFunctionLayout(): void {
+    if (!this.currentGraphData || this.fileBoxMeshes.size === 0) {
+      return;
+    }
+
+    console.log('🔄 Rebuilding exported function layout...');
+
+    // Re-run exported function positioning
+    if (this.useLegacyExportedFaceLayout) {
+      this.placeExportedFunctionsOnOptimalFace();
+      this.spreadExportedFunctionsOnFaces(12);
+      this.pullInternalNodesToExportedFace();
+      this.rerunInternalLayoutsAfterExportPlacement(120);
+      this.resizeAndResolveAfterInternalRelayout();
+      this.resolveNodeEdgeObstructions(20);
+      this.resolveExportedFaceEdgeObstructions(15);
+      this.spreadExportedFunctionsOnFaces(8);
+      this.resolveFunctionLabelObstructions(12);
+    }
+
+    // Resolve any remaining collisions
+    this.resolveInitialFileBoxOverlaps(6);
+    this.enforceMinimumFileBoxGap(28.0, 4);
+    this.enforceTopLevelDirectoryGap(36.0, 2);
+
+    // Refresh labels after repositioning
+    this.refreshLabelTransformsIfScaleChanged(true);
+
+    // Update edges for new positions
+    this.clearEdgesAndRender();
+
+    console.log('✓ Exported function layout rebuilt');
+  }
+
+  private clearEdgesAndRender(): void {
+    // Clear and re-render edges
+    this.meshFactory.clearEdges();
+    if (this.currentGraphData) {
+      this.populateCurrentEdges(this.currentGraphData);
+      this.resolveEdgeObstructions(30);
+      this.resolveNodeEdgeObstructions(20);
+      this.renderEdges();
+      this.meshFactory.updateEdges();
+    }
   }
 
   /**
