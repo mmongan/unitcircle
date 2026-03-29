@@ -1681,13 +1681,22 @@
       "line": 985,
       "isExported": false,
       "type": "function",
-      "code": "private shouldRenderEdge(\n    metadata: { from: string; to: string; isCrossFile: boolean; isSelfLoop: boolean; bidirectionalOffsetSign: number },\n    sourceMesh: BABYLON.Mesh,\n    targetMesh: BABYLON.Mesh,\n  ): boolean {\n    if (metadata.isCrossFile) {\n      return true;\n    }\n\n    const sharedParent = sourceMesh.parent && sourceMesh.parent === targetMesh.parent\n      ? sourceMesh.parent\n      : null;\n    if (!sharedParent || typeof (sharedParent as BABYLON.AbstractMesh).getBoundingInfo !== 'function') {\n      return true;\n    }\n\n    const viewerWorldPosition = this.getViewerWorldPosition();\n    if (!viewerWorldPosition) {\n      return true;\n    }\n\n    const boundingBox = (sharedParent as BABYLON.AbstractMesh).getBoundingInfo()?.boundingBox;\n    if (!boundingBox || typeof boundingBox.intersectsPoint !== 'function') {\n      return true;\n    }\n\n    return boundingBox.intersectsPoint(viewerWorldPosition);\n  }"
+      "code": "private shouldRenderEdge(\n    metadata: { from: string; to: string; isCrossFile: boolean; isSelfLoop: boolean; bidirectionalOffsetSign: number },\n    sourceMesh: BABYLON.Mesh,\n    targetMesh: BABYLON.Mesh,\n  ): boolean {\n    if (metadata.isCrossFile) {\n      return true;\n    }\n\n    const sharedParent = sourceMesh.parent && sourceMesh.parent === targetMesh.parent\n      ? sourceMesh.parent\n      : null;\n    if (!sharedParent || typeof (sharedParent as BABYLON.AbstractMesh).getBoundingInfo !== 'function') {\n      return true;\n    }\n\n    if (typeof (sharedParent as BABYLON.AbstractMesh).computeWorldMatrix === 'function') {\n      (sharedParent as BABYLON.AbstractMesh).computeWorldMatrix(true);\n    }\n\n    const viewerWorldPosition = this.getViewerWorldPosition();\n    if (!viewerWorldPosition) {\n      return true;\n    }\n\n    const boundingBox = (sharedParent as BABYLON.AbstractMesh).getBoundingInfo()?.boundingBox;\n    if (!boundingBox) {\n      return true;\n    }\n\n    return this.isPointInsideBoundingBox(boundingBox, viewerWorldPosition);\n  }"
+    },
+    {
+      "id": "isPointInsideBoundingBox@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
+      "name": "isPointInsideBoundingBox",
+      "file": "src/MeshFactory.ts",
+      "line": 1018,
+      "isExported": false,
+      "type": "function",
+      "code": "private isPointInsideBoundingBox(\n    boundingBox: BABYLON.BoundingBox,\n    point: BABYLON.Vector3,\n  ): boolean {\n    if (typeof boundingBox.intersectsPoint === 'function') {\n      return boundingBox.intersectsPoint(point);\n    }\n\n    const minimumWorld = (boundingBox as any).minimumWorld ?? boundingBox.minimum;\n    const maximumWorld = (boundingBox as any).maximumWorld ?? boundingBox.maximum;\n    if (!minimumWorld || !maximumWorld) {\n      return true;\n    }\n\n    const padding = 0.5;\n    return point.x >= (minimumWorld.x - padding)\n      && point.x <= (maximumWorld.x + padding)\n      && point.y >= (minimumWorld.y - padding)\n      && point.y <= (maximumWorld.y + padding)\n      && point.z >= (minimumWorld.z - padding)\n      && point.z <= (maximumWorld.z + padding);\n  }"
     },
     {
       "id": "getViewerWorldPosition@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
       "name": "getViewerWorldPosition",
       "file": "src/MeshFactory.ts",
-      "line": 1014,
+      "line": 1041,
       "isExported": false,
       "type": "function",
       "code": "private getViewerWorldPosition(): BABYLON.Vector3 | null {\n    const activeCamera = this.scene.activeCamera;\n    if (!activeCamera) {\n      return null;\n    }\n\n    const activeGlobal = (activeCamera as any).globalPosition as BABYLON.Vector3 | undefined;\n    if (activeGlobal && Number.isFinite(activeGlobal.x) && Number.isFinite(activeGlobal.y) && Number.isFinite(activeGlobal.z)) {\n      return typeof activeGlobal.clone === 'function'\n        ? activeGlobal.clone()\n        : new BABYLON.Vector3(activeGlobal.x, activeGlobal.y, activeGlobal.z);\n    }\n\n    if (activeCamera.position) {\n      return typeof activeCamera.position.clone === 'function'\n        ? activeCamera.position.clone()\n        : new BABYLON.Vector3(activeCamera.position.x, activeCamera.position.y, activeCamera.position.z);\n    }\n\n    return null;\n  }"
@@ -4815,6 +4824,11 @@
       "kind": "call"
     },
     {
+      "from": "shouldRenderEdge@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
+      "to": "isPointInsideBoundingBox@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\MeshFactory.ts",
+      "kind": "call"
+    },
+    {
       "from": "setupFlightControls@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
       "to": "stopAnimation@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\NavigationController.ts",
       "kind": "call"
@@ -6502,5 +6516,5 @@
     "vite.config.ts",
     "vitest.config.ts"
   ],
-  "lastUpdated": "2026-03-29T00:15:16.013Z"
+  "lastUpdated": "2026-03-29T00:18:02.075Z"
 }

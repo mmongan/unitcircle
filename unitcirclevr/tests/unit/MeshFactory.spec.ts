@@ -328,6 +328,58 @@ describe('MeshFactory', () => {
       expect(visible).toBe(true);
     });
 
+    it('refreshes the shared file box world matrix before checking containment', () => {
+      const factoryWithCamera = new MeshFactory({
+        activeCamera: {
+          position: { x: 0, y: 0, z: 0, clone: vi.fn(() => ({ x: 0, y: 0, z: 0 })) },
+        },
+      } as any);
+
+      const sharedFileBox = {
+        computeWorldMatrix: vi.fn(),
+        getBoundingInfo: vi.fn(() => ({
+          boundingBox: {
+            intersectsPoint: vi.fn(() => true),
+          },
+        })),
+      } as any;
+
+      const visible = (factoryWithCamera as any).shouldRenderEdge(
+        { from: 'a', to: 'b', isCrossFile: false, isSelfLoop: false, bidirectionalOffsetSign: 0 },
+        { parent: sharedFileBox } as any,
+        { parent: sharedFileBox } as any,
+      );
+
+      expect(visible).toBe(true);
+      expect(sharedFileBox.computeWorldMatrix).toHaveBeenCalledWith(true);
+    });
+
+    it('falls back to world min/max bounds when intersectsPoint is unavailable', () => {
+      const factoryWithCamera = new MeshFactory({
+        activeCamera: {
+          position: { x: 1, y: 1, z: 1, clone: vi.fn(() => ({ x: 1, y: 1, z: 1 })) },
+        },
+      } as any);
+
+      const sharedFileBox = {
+        computeWorldMatrix: vi.fn(),
+        getBoundingInfo: vi.fn(() => ({
+          boundingBox: {
+            minimumWorld: { x: -2, y: -2, z: -2 },
+            maximumWorld: { x: 2, y: 2, z: 2 },
+          },
+        })),
+      } as any;
+
+      const visible = (factoryWithCamera as any).shouldRenderEdge(
+        { from: 'a', to: 'b', isCrossFile: false, isSelfLoop: false, bidirectionalOffsetSign: 0 },
+        { parent: sharedFileBox } as any,
+        { parent: sharedFileBox } as any,
+      );
+
+      expect(visible).toBe(true);
+    });
+
     it('keeps cross-file edges visible even when the viewer is outside a file box', () => {
       const factoryWithCamera = new MeshFactory({
         activeCamera: {

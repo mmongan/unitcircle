@@ -998,17 +998,44 @@ export class MeshFactory {
       return true;
     }
 
+    if (typeof (sharedParent as BABYLON.AbstractMesh).computeWorldMatrix === 'function') {
+      (sharedParent as BABYLON.AbstractMesh).computeWorldMatrix(true);
+    }
+
     const viewerWorldPosition = this.getViewerWorldPosition();
     if (!viewerWorldPosition) {
       return true;
     }
 
     const boundingBox = (sharedParent as BABYLON.AbstractMesh).getBoundingInfo()?.boundingBox;
-    if (!boundingBox || typeof boundingBox.intersectsPoint !== 'function') {
+    if (!boundingBox) {
       return true;
     }
 
-    return boundingBox.intersectsPoint(viewerWorldPosition);
+    return this.isPointInsideBoundingBox(boundingBox, viewerWorldPosition);
+  }
+
+  private isPointInsideBoundingBox(
+    boundingBox: BABYLON.BoundingBox,
+    point: BABYLON.Vector3,
+  ): boolean {
+    if (typeof boundingBox.intersectsPoint === 'function') {
+      return boundingBox.intersectsPoint(point);
+    }
+
+    const minimumWorld = (boundingBox as any).minimumWorld ?? boundingBox.minimum;
+    const maximumWorld = (boundingBox as any).maximumWorld ?? boundingBox.maximum;
+    if (!minimumWorld || !maximumWorld) {
+      return true;
+    }
+
+    const padding = 0.5;
+    return point.x >= (minimumWorld.x - padding)
+      && point.x <= (maximumWorld.x + padding)
+      && point.y >= (minimumWorld.y - padding)
+      && point.y <= (maximumWorld.y + padding)
+      && point.z >= (minimumWorld.z - padding)
+      && point.z <= (maximumWorld.z + padding);
   }
 
   private getViewerWorldPosition(): BABYLON.Vector3 | null {
