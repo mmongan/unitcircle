@@ -63,6 +63,7 @@ export class SceneConfig {
   static readonly SIGNATURE_BORDER_COLOR = '#ffffff';
 
   // Edge Rendering
+  static readonly ENABLE_EDGE_RENDERING = false;
   static readonly EDGE_RADIUS = 0.2;          // Cross-file / exported edge radius
   static readonly INTERNAL_EDGE_RADIUS = 0.14; // Same-file internal edge radius (boosted for distance readability)
 
@@ -78,6 +79,7 @@ export class SceneConfig {
   static readonly DECLUTTER_CONTEXT_DIRECTORY_BOX_ALPHA = 0.06;
   static readonly DECLUTTER_MUTATIONS_PER_FRAME = 140;
   static readonly SHOW_DIRECTORY_CAGE = false;
+  static readonly STATIC_OBJECT_RENDER = true;
 
   // Physics Layout
   static readonly LAYOUT_ITERATIONS = 1; // Simple random placement requires minimal iterations
@@ -86,7 +88,9 @@ export class SceneConfig {
   static readonly FLY_TO_ANIMATION_TIME_MS = 2000;  // Increased from 900ms for dramatic effect
   static readonly FLY_TO_ANIMATION_FPS = 60;
   static readonly FLY_TO_OFFSET = new BABYLON.Vector3(0, 0, 6.5);  // Stay outside cube (size 4.0)
+  static readonly AUTO_FOCUS_INDEX_ON_STARTUP = false;
 
   // Polling
+  static readonly ENABLE_GRAPH_POLLING = false;
   static readonly GRAPH_POLL_INTERVAL_MS = 2000;
 }

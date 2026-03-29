@@ -31,6 +31,7 @@ interface PendingDeclutterState {
   viewerInsideFile: boolean;
   focusedFile: string | null;
   focusedFileDirectory: string;
+  focusedDirectory: string | null;
   focusedDirectories: Set<string>;
   fileBoxes: DeclutterFileBoxWorkItem[];
   directoryBoxes: DeclutterDirectoryBoxWorkItem[];
@@ -63,6 +64,8 @@ export interface SceneDeclutterInput {
 export class SceneDeclutterService {
   private lastDeclutterSignature: string | null = null;
   private pendingDeclutterState: PendingDeclutterState | null = null;
+  private staticVisibilityApplied = false;
+  private staticLabelsVisible: boolean | null = null;
   private lastIdleViewerPosition: BABYLON.Vector3 | null = null;
   private lastIdleViewerForward: BABYLON.Vector3 | null = null;
   private lastIdleSelectedNodeId: string | null = null;
@@ -70,6 +73,11 @@ export class SceneDeclutterService {
   private lastIdleCheckAtMs = 0;
 
   public apply(input: SceneDeclutterInput): void {
+    if (SceneConfig.STATIC_OBJECT_RENDER) {
+      this.applyStaticVisibility(input);
+      return;
+    }
+
     // If there is queued declutter work, keep draining that batch before
     // recomputing the full visibility signature again.
     if (this.pendingDeclutterState) {
@@ -82,9 +90,12 @@ export class SceneDeclutterService {
     }
 
     const viewerInsideFile = this.isViewerInsideAnyFileBox(input);
-    const focusedFile = viewerInsideFile ? this.getFocusedFilePath(input) : null;
+    const focusedFile = this.getFocusedFilePath(input, viewerInsideFile);
+    const focusedDirectory = viewerInsideFile
+      ? (focusedFile ? getDirectoryPath(focusedFile) : null)
+      : this.getFocusedDirectoryPath(input, focusedFile);
     const focusedDirectories = this.buildFocusedDirectoryChain(focusedFile);
-    const signature = `${viewerInsideFile ? 'inside' : 'outside'}|${focusedFile ?? 'none'}|${Array.from(focusedDirectories).sort().join(',')}|${input.labelsVisible ? 'labels' : 'nolabels'}`;
+    const signature = `${viewerInsideFile ? 'inside' : 'outside'}|${focusedFile ?? 'none'}|${focusedDirectory ?? 'nodir'}|${Array.from(focusedDirectories).sort().join(',')}|${input.labelsVisible ? 'labels' : 'nolabels'}`;
 
     input.meshFactory.setDeclutterContext(focusedFile, focusedDirectories);
 
@@ -94,6 +105,7 @@ export class SceneDeclutterService {
         input,
         viewerInsideFile,
         focusedFile,
+        focusedDirectory,
         focusedDirectories,
       );
       this.processDeclutterBatch(input);
@@ -137,7 +149,18 @@ export class SceneDeclutterService {
     return activeCamera.position.clone();
   }
 
-  private getFocusedFilePath(input: SceneDeclutterInput): string | null {
+  private getFocusedFilePath(input: SceneDeclutterInput, preferViewerContainingFile: boolean): string | null {
+    if (preferViewerContainingFile) {
+      const viewerWorldPos = this.getViewerWorldPosition(input);
+      for (const [filePath, fileBox] of input.fileBoxMeshes.entries()) {
+        fileBox.computeWorldMatrix(true);
+        const bounds = fileBox.getBoundingInfo().boundingBox;
+        if (bounds.intersectsPoint(viewerWorldPos)) {
+          return toProjectRelativePath(filePath);
+        }
+      }
+    }
+
     const selectedNodeId = input.editorVisibleForNodeId || input.currentFunctionId;
     if (selectedNodeId) {
       const selectedNode = input.graphNodeMap.get(selectedNodeId);
@@ -147,6 +170,55 @@ export class SceneDeclutterService {
     }
 
     return null;
+  }
+
+  private getFocusedDirectoryPath(input: SceneDeclutterInput, focusedFile: string | null): string | null {
+    if (focusedFile) {
+      return getDirectoryPath(focusedFile);
+    }
+
+    const viewerWorldPos = this.getViewerWorldPosition(input);
+    let bestDirectory: string | null = null;
+    let bestVolume = Number.POSITIVE_INFINITY;
+
+    for (const [directoryPath, directoryBox] of input.directoryBoxMeshes.entries()) {
+      directoryBox.computeWorldMatrix(true);
+      const bounds = directoryBox.getBoundingInfo().boundingBox;
+      if (!bounds.intersectsPoint(viewerWorldPos)) {
+        continue;
+      }
+
+      const size = bounds.extendSizeWorld;
+      const volume = size.x * size.y * size.z;
+      if (volume < bestVolume) {
+        bestVolume = volume;
+        bestDirectory = toProjectRelativePath(directoryPath);
+      }
+    }
+
+    return bestDirectory;
+  }
+
+  private isFunctionBoxNode(node: GraphNode): boolean {
+    return node.type === 'function'
+      || node.type === 'class'
+      || node.type === 'interface'
+      || node.type === 'type-alias'
+      || node.type === 'enum'
+      || node.type === 'namespace';
+  }
+
+  private isNodeInFocusedDirectory(relativeFile: string | null, focusedDirectory: string | null): boolean {
+    if (!relativeFile || focusedDirectory === null) {
+      return false;
+    }
+
+    const nodeDir = getDirectoryPath(relativeFile);
+    if (!focusedDirectory) {
+      return true;
+    }
+
+    return nodeDir === focusedDirectory || nodeDir.startsWith(`${focusedDirectory}/`);
   }
 
   private buildFocusedDirectoryChain(filePath: string | null): Set<string> {
@@ -181,6 +253,7 @@ export class SceneDeclutterService {
     input: SceneDeclutterInput,
     viewerInsideFile: boolean,
     focusedFile: string | null,
+    focusedDirectory: string | null,
     focusedDirectories: Set<string>,
   ): PendingDeclutterState {
     const fileBoxes: DeclutterFileBoxWorkItem[] = [];
@@ -237,6 +310,7 @@ export class SceneDeclutterService {
       viewerInsideFile,
       focusedFile,
       focusedFileDirectory: focusedFile ? getDirectoryPath(focusedFile) : '',
+      focusedDirectory,
       focusedDirectories,
       fileBoxes,
       directoryBoxes,
@@ -326,50 +400,32 @@ export class SceneDeclutterService {
       if (state.nodeIndex < state.nodes.length) {
         const item = state.nodes[state.nodeIndex++];
         const material = item.mesh.material as BABYLON.StandardMaterial | null;
+        const isFunctionNode = this.isFunctionBoxNode(item.node);
+        const isFocusedNode = state.focusedFile !== null && item.relativeFile === state.focusedFile;
+        const isScopedDirectoryNode = this.isNodeInFocusedDirectory(item.relativeFile, state.focusedDirectory);
 
         if (!state.viewerInsideFile) {
-          item.mesh.setEnabled(true);
-          item.mesh.isVisible = true;
-          item.mesh.visibility = 1.0;
+          const shouldShow = isFunctionNode && isScopedDirectoryNode;
+
+          item.mesh.setEnabled(shouldShow);
+          item.mesh.isVisible = shouldShow;
+          item.mesh.visibility = shouldShow ? 1.0 : SceneConfig.DECLUTTER_HIDDEN_VISIBILITY;
           if (material) {
-            material.alpha = 1.0;
-            material.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
+            material.alpha = shouldShow ? 1.0 : 0.0;
+            material.transparencyMode = shouldShow
+              ? BABYLON.Material.MATERIAL_OPAQUE
+              : BABYLON.Material.MATERIAL_ALPHABLEND;
           }
         } else {
-          const isFocusedNode = state.focusedFile !== null && item.relativeFile === state.focusedFile;
-          const isContextNode = state.focusedFile !== null && state.focusedDirectories.has(item.fileDirectory);
-          const isFunctionNode = item.node.type === 'function'
-            || item.node.type === 'class'
-            || item.node.type === 'interface'
-            || item.node.type === 'type-alias'
-            || item.node.type === 'enum'
-            || item.node.type === 'namespace';
-          const isExternalOrVariable = item.node.type === 'external' || item.node.type === 'variable';
-          const shouldHide = state.focusedFile !== null && isExternalOrVariable && !isFocusedNode;
+          const shouldShow = isFunctionNode && isFocusedNode;
 
-          item.mesh.setEnabled(!shouldHide);
-          item.mesh.isVisible = !shouldHide;
-          item.mesh.visibility = shouldHide
-            ? SceneConfig.DECLUTTER_HIDDEN_VISIBILITY
-            : isFunctionNode
-              ? 1.0
-              : isFocusedNode
-                ? SceneConfig.DECLUTTER_FOCUS_VISIBILITY
-                : isContextNode
-                  ? SceneConfig.DECLUTTER_CONTEXT_VISIBILITY
-                  : SceneConfig.DECLUTTER_BACKGROUND_VISIBILITY;
+          item.mesh.setEnabled(shouldShow);
+          item.mesh.isVisible = shouldShow;
+          item.mesh.visibility = shouldShow ? 1.0 : SceneConfig.DECLUTTER_HIDDEN_VISIBILITY;
 
           if (material) {
-            material.alpha = shouldHide
-              ? 0.0
-              : isFunctionNode
-                ? 1.0
-                : isFocusedNode
-                  ? 1.0
-                  : isContextNode
-                    ? 0.88
-                    : 0.42;
-            material.transparencyMode = material.alpha >= 0.999
+            material.alpha = shouldShow ? 1.0 : 0.0;
+            material.transparencyMode = shouldShow
               ? BABYLON.Material.MATERIAL_OPAQUE
               : BABYLON.Material.MATERIAL_ALPHABLEND;
           }
@@ -418,5 +474,57 @@ export class SceneDeclutterService {
     if (isDone) {
       this.pendingDeclutterState = null;
     }
+  }
+
+  private applyStaticVisibility(input: SceneDeclutterInput): void {
+    if (this.staticVisibilityApplied && this.staticLabelsVisible === input.labelsVisible) {
+      return;
+    }
+
+    this.pendingDeclutterState = null;
+    this.lastDeclutterSignature = null;
+    input.meshFactory.setDeclutterContext(null, []);
+
+    for (const box of input.fileBoxMeshes.values()) {
+      box.setEnabled(true);
+      box.visibility = 1.0;
+      const material = box.material as BABYLON.StandardMaterial | null;
+      if (material) {
+        material.alpha = SceneConfig.DECLUTTER_ACTIVE_FILE_BOX_ALPHA;
+      }
+    }
+
+    for (const box of input.directoryBoxMeshes.values()) {
+      box.setEnabled(true);
+      box.visibility = 1.0;
+      const material = box.material as BABYLON.StandardMaterial | null;
+      if (material) {
+        material.alpha = SceneConfig.DECLUTTER_ACTIVE_DIRECTORY_BOX_ALPHA;
+      }
+    }
+
+    for (const mesh of input.nodeMeshMap.values()) {
+      mesh.setEnabled(true);
+      mesh.isVisible = true;
+      mesh.visibility = 1.0;
+      const material = mesh.material as BABYLON.StandardMaterial | null;
+      if (material) {
+        material.alpha = 1.0;
+        material.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
+      }
+    }
+
+    for (const label of input.fileBoxLabels.values()) {
+      input.setBreadcrumbAnchorInteractivity(label, input.labelsVisible);
+      label.visibility = input.labelsVisible ? 1 : 0;
+    }
+
+    for (const label of input.directoryBoxLabels.values()) {
+      input.setBreadcrumbAnchorInteractivity(label, input.labelsVisible);
+      label.visibility = input.labelsVisible ? 1 : 0;
+    }
+
+    this.staticVisibilityApplied = true;
+    this.staticLabelsVisible = input.labelsVisible;
   }
 }

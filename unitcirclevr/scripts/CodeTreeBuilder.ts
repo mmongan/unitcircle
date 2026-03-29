@@ -16,6 +16,17 @@ export interface FunctionNode {
   line: number;
   isExported: boolean;
   type: 'function';
+  containerId?: string;
+  code?: string;
+}
+
+export interface ModuleAnchorNode {
+  id: string;
+  name: string;
+  file: string;
+  line: number;
+  isExported: boolean;
+  type: 'module-anchor';
   code?: string;
 }
 
@@ -76,6 +87,7 @@ export interface GlobalVariable {
   line: number;
   isExported: boolean;
   type: 'variable';
+  containerId?: string;
 }
 
 export interface ExternalModule {
@@ -86,6 +98,7 @@ export interface ExternalModule {
 
 export type CodeNode =
   | FunctionNode
+  | ModuleAnchorNode
   | ClassNode
   | InterfaceNode
   | TypeAliasNode
@@ -134,7 +147,7 @@ export interface CodeGraph {
 export class CodeTreeBuilder {
   private sourceDir: string;
   private knownSourceFiles: Set<string> = new Set();
-  private functions: Map<string, FunctionNode> = new Map();
+  private functions: Map<string, FunctionNode | ModuleAnchorNode> = new Map();
   private classes: Map<string, ClassNode> = new Map();
   private interfaces: Map<string, InterfaceNode> = new Map();
   private typeAliases: Map<string, TypeAliasNode> = new Map();
@@ -262,9 +275,41 @@ export class CodeTreeBuilder {
     console.log(`✓ Extracted ${this.functions.size} functions, ${this.classes.size} classes, ${this.interfaces.size} interfaces, ${this.typeAliases.size} type aliases, ${this.enums.size} enums, ${this.namespaces.size} namespaces, ${this.variables.size} variables, ${this.externalModules.size} external modules`);
     console.log(`✓ Identified ${this.calls.length} function calls`);
 
+    // Validate edges: filter out any edges that reference non-existent nodes
+    const nodeIds = new Set(nodes.map(n => n.id));
+    const validEdges: typeof this.calls = [];
+    const invalidEdges: Array<{ edge: typeof this.calls[0]; reason: string }> = [];
+
+    for (const edge of this.calls) {
+      const fromExists = nodeIds.has(edge.from);
+      const toExists = nodeIds.has(edge.to);
+
+      if (!fromExists || !toExists) {
+        const reason = !fromExists && !toExists
+          ? 'both endpoints missing'
+          : !fromExists
+            ? `source missing: ${edge.from}`
+            : `target missing: ${edge.to}`;
+        invalidEdges.push({ edge, reason });
+      } else {
+        validEdges.push(edge);
+      }
+    }
+
+    if (invalidEdges.length > 0) {
+      console.warn(`⚠️  Filtered out ${invalidEdges.length} edges with missing node endpoints:`);
+      // Show first 5 invalid edges as examples
+      for (const { edge, reason } of invalidEdges.slice(0, 5)) {
+        console.warn(`   • ${edge.from} → ${edge.to} (${reason})`);
+      }
+      if (invalidEdges.length > 5) {
+        console.warn(`   ... and ${invalidEdges.length - 5} more`);
+      }
+    }
+
     return {
       nodes,
-      edges: this.calls,
+      edges: [],
       files: projectFiles,
       lastUpdated: new Date().toISOString()
     };
@@ -715,6 +760,7 @@ export class CodeTreeBuilder {
       const methodName = (node.name as any).text;
       const lineNumber = this.getLineNumber(node, filePath);
       const hasBody = Boolean(node.body);
+      const enclosingClassId = this.getEnclosingClassId(node, filePath);
       const id = hasBody
         ? `${methodName}@${filePath}`
         : `overload:${methodName}:${lineNumber}@${filePath}`;
@@ -731,6 +777,7 @@ export class CodeTreeBuilder {
         line: lineNumber,
         isExported,
         type: 'function',
+        containerId: enclosingClassId ?? undefined,
         code: this.extractFunctionCode(node)
       });
       if (isExported) {
@@ -747,32 +794,56 @@ export class CodeTreeBuilder {
       this.emitDecoratorEdges(node, id, filePath);
     }
 
-    // Extract arrow function methods in classes (e.g., private methodName = () => {})
-    if (ts.isPropertyDeclaration(node) && node.name && ts.isIdentifier(node.name) && node.initializer && ts.isArrowFunction(node.initializer)) {
-      const methodName = node.name.text;
+    // Extract class properties. Arrow-function properties are callable methods;
+    // other properties are represented as variable nodes.
+    if (ts.isPropertyDeclaration(node) && node.name && ts.isIdentifier(node.name)) {
+      const propertyName = node.name.text;
       const lineNumber = this.getLineNumber(node, filePath);
-      const id = `${methodName}@${filePath}`;
+      const enclosingClassName = this.getEnclosingClassName(node) ?? 'AnonymousClass';
+      const enclosingClassId = this.getEnclosingClassId(node, filePath);
       // Property is exported if it has export modifier OR if its parent class is exported
       const hasExportModifier = node.modifiers?.some(mod => mod.kind === ts.SyntaxKind.ExportKeyword) ?? false;
       const isPublicOrDefault = !(node.modifiers?.some(mod => mod.kind === ts.SyntaxKind.PrivateKeyword) ?? false);
       const parentClassExported = this.isMethodInExportedClass(node);
       const isExported = hasExportModifier || (parentClassExported && isPublicOrDefault);
 
-      this.functions.set(id, {
-        id,
-        name: methodName,
-        file: path.relative(this.sourceDir, filePath).replace(/\\/g, '/'),
-        line: lineNumber,
-        isExported,
-        type: 'function',
-        code: this.extractFunctionCode(node)
-      });
-      if (isExported) {
-        this.registerExportedSymbol(filePath, id);
+      if (node.initializer && ts.isArrowFunction(node.initializer)) {
+        const id = `${propertyName}@${filePath}`;
+        this.functions.set(id, {
+          id,
+          name: propertyName,
+          file: path.relative(this.sourceDir, filePath).replace(/\\/g, '/'),
+          line: lineNumber,
+          isExported,
+          type: 'function',
+          containerId: enclosingClassId ?? undefined,
+          code: this.extractFunctionCode(node)
+        });
+        if (isExported) {
+          this.registerExportedSymbol(filePath, id);
+        }
+      } else {
+        const id = `prop:${enclosingClassName}.${propertyName}@${filePath}`;
+        this.variables.set(id, {
+          id,
+          name: `${enclosingClassName}.${propertyName}`,
+          file: path.relative(this.sourceDir, filePath).replace(/\\/g, '/'),
+          line: lineNumber,
+          isExported,
+          type: 'variable',
+          containerId: enclosingClassId ?? undefined,
+        });
+        if (isExported) {
+          this.registerExportedSymbol(filePath, id);
+        }
       }
-      this.emitTypeReferenceEdges(node, id, filePath);
-      this.emitGenericConstraintEdges(node, id, filePath);
-      this.emitDecoratorEdges(node, id, filePath);
+
+      const propertyNodeId = node.initializer && ts.isArrowFunction(node.initializer)
+        ? `${propertyName}@${filePath}`
+        : `prop:${enclosingClassName}.${propertyName}@${filePath}`;
+      this.emitTypeReferenceEdges(node, propertyNodeId, filePath);
+      this.emitGenericConstraintEdges(node, propertyNodeId, filePath);
+      this.emitDecoratorEdges(node, propertyNodeId, filePath);
     }
 
     // Extract function overload signatures (declaration without body)
@@ -807,6 +878,7 @@ export class CodeTreeBuilder {
     if (ts.isConstructorDeclaration(node)) {
       const lineNumber = this.getLineNumber(node, filePath);
       const className = this.getEnclosingClassName(node) ?? 'AnonymousClass';
+      const enclosingClassId = this.getEnclosingClassId(node, filePath);
       const id = `constructor:${className}:${lineNumber}@${filePath}`;
       const parentClassExported = this.isMethodInExportedClass(node);
       const isPrivate = node.modifiers?.some(mod => mod.kind === ts.SyntaxKind.PrivateKeyword) ?? false;
@@ -819,6 +891,7 @@ export class CodeTreeBuilder {
         line: lineNumber,
         isExported,
         type: 'function',
+        containerId: enclosingClassId ?? undefined,
         code: this.extractFunctionCode(node)
       });
       if (isExported) {
@@ -833,6 +906,7 @@ export class CodeTreeBuilder {
     if ((ts.isGetAccessorDeclaration(node) || ts.isSetAccessorDeclaration(node)) && node.name && ts.isIdentifier(node.name)) {
       const lineNumber = this.getLineNumber(node, filePath);
       const className = this.getEnclosingClassName(node) ?? 'AnonymousClass';
+      const enclosingClassId = this.getEnclosingClassId(node, filePath);
       const accessorKind = ts.isGetAccessorDeclaration(node) ? 'get' : 'set';
       const id = `${accessorKind}:${className}.${node.name.text}:${lineNumber}@${filePath}`;
       const parentClassExported = this.isMethodInExportedClass(node);
@@ -846,6 +920,7 @@ export class CodeTreeBuilder {
         line: lineNumber,
         isExported,
         type: 'function',
+        containerId: enclosingClassId ?? undefined,
         code: this.extractFunctionCode(node)
       });
       if (isExported) {
@@ -1112,6 +1187,14 @@ export class CodeTreeBuilder {
     return null;
   }
 
+  private getEnclosingClassId(node: ts.Node, filePath: string): string | null {
+    const className = this.getEnclosingClassName(node);
+    if (!className) {
+      return null;
+    }
+    return `class:${className}@${filePath}`;
+  }
+
   private resolveInternalModulePath(importerFilePath: string, moduleSpecifier: string): string | null {
     if (!moduleSpecifier.startsWith('.')) {
       return null;
@@ -1162,7 +1245,7 @@ export class CodeTreeBuilder {
         file: relative,
         line: 1,
         isExported: true,
-        type: 'function',
+        type: 'module-anchor',
         code: '',
       });
     }

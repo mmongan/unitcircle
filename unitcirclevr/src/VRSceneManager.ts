@@ -12,10 +12,14 @@ import { Quest3GripController, type GripState, type GripGesture } from './Quest3
 import { FileColorService } from './FileColorService';
 import { collectCodeViewerConnections, drawCodeViewerConnectionButtons } from './CodeViewerPanel';
 import { computeDesktopCameraDestination } from './CameraFlightPlanner';
-import { SceneDeclutterService } from './SceneDeclutterService';
 import { LabelManager } from './LabelManager';
 import type { SceneState } from './SceneState';
 import { getDirectoryPath, getParentDirectoryPath, normalizePath, toProjectRelativePath } from './PathUtils';
+import {
+  LayoutPersistenceManager,
+  type PersistedLayoutSnapshot,
+  type PersistedVector3,
+} from './LayoutPersistenceManager';
 
 // VS Code Dark+ inspired token colours for Canvas 2D syntax rendering
 const PRISM_TOKEN_COLORS: Readonly<Record<string, string>> = {
@@ -84,13 +88,17 @@ export class VRSceneManager {
   private fileNodeIds: Map<string, Set<string>> = new Map();  // Map file names to their node IDs
   private graphNodeMap: Map<string, GraphNode> = new Map();  // Map node IDs to GraphNode data
   private fileBoxMeshes: Map<string, BABYLON.Mesh> = new Map();  // Map file names to their wireframe box meshes
+  private classBoxMeshes: Map<string, BABYLON.Mesh> = new Map();  // Map class IDs to their glass container meshes
+  private classNodeIds: Map<string, Set<string>> = new Map();  // Map class IDs to their member node IDs
   private directoryBoxMeshes: Map<string, BABYLON.Mesh> = new Map();  // Map directory paths to directory box meshes
   private currentGraphData: GraphData | null = null;  // Store full graph data for edge material selection
   
   private physicsActive = false;
   private physicsIterationCount = 0;
   private physicsLoopInitialized = false;
+  private physicsHeavyPassTick = 0;
   private labelCollisionTick = 0;
+    private pendingEdgeRender = false;
   private lastFileBoxScales: Map<string, BABYLON.Vector3> = new Map();
   private lastDirectoryBoxScales: Map<string, BABYLON.Vector3> = new Map();
   private fileBoxLabels: Map<string, BABYLON.Mesh> = new Map();
@@ -117,10 +125,12 @@ export class VRSceneManager {
   private labelScaleState: Map<number, number> = new Map();
   private graphUpdateInProgress = false;
   private lastGraphReloadAtMs = 0;
+  private graphPollingTimer: number | null = null;
+  private usePersistedLayoutSnapshot = false;
   private desktopStartupRecenterDone = false;
-  private declutterService: SceneDeclutterService;
   private labelManager: LabelManager;
   private layoutPipelineService: LayoutPipelineService;
+  private layoutPersistenceManager: LayoutPersistenceManager;
   private readonly xrNavigationDebug = ((import.meta.env.VITE_XR_NAV_DEBUG ?? 'false').toLowerCase() === 'true');
   private readonly exportedFaceCircleLayout = ((import.meta.env.VITE_EXPORTED_FACE_CIRCLE ?? 'false').toLowerCase() === 'true');
   private readonly useLegacyExportedFaceLayout = ((import.meta.env.VITE_LEGACY_EXPORTED_FACE_LAYOUT ?? 'false').toLowerCase() === 'true');
@@ -140,7 +150,7 @@ export class VRSceneManager {
     // Initialize services
     this.meshFactory = new MeshFactory(this.scene);
     this.graphLoader = new GraphLoader(SceneConfig.GRAPH_POLL_INTERVAL_MS);
-    this.declutterService = new SceneDeclutterService();
+    this.layoutPersistenceManager = new LayoutPersistenceManager();
     this.layoutPipelineService = new LayoutPipelineService(this.scene);
     this.labelManager = new LabelManager(
       this.scene,
@@ -195,6 +205,11 @@ export class VRSceneManager {
     let pendingFaceNormal: BABYLON.Vector3 = new BABYLON.Vector3(0, 0, 1);
     let pendingNodeId: string | null = null;
     let pendingEdge: { from: string; to: string } | null = null;
+    let pendingHubData: {
+      endpoint?: 'source' | 'target' | 'bundle';
+      sourceHubWorld?: BABYLON.Vector3;
+      targetHubWorld?: BABYLON.Vector3;
+    } | null = null;
     let pendingBox: BABYLON.AbstractMesh | null = null;
     let pendingPickedPoint: BABYLON.Vector3 | null = null;
     let pendingEditorUv: BABYLON.Vector2 | null = null;
@@ -216,6 +231,7 @@ export class VRSceneManager {
         downY = this.scene.pointerY;
         pendingMesh = null;
         pendingEdge = null;
+        pendingHubData = null;
         pendingBox = null;
         pendingPickedPoint = null;
         pendingEditorUv = null;
@@ -253,30 +269,54 @@ export class VRSceneManager {
 
           const clickedNode = (mesh as any).nodeData as GraphNode;
           const clickedEdge = (mesh as any).edgeData as { from: string; to: string } | undefined;
+          const clickedHub = (mesh as any).hubData as {
+            navigationNodeId?: string;
+            endpoint?: 'source' | 'target' | 'bundle';
+            sourceHubWorld?: BABYLON.Vector3;
+            targetHubWorld?: BABYLON.Vector3;
+          } | undefined;
           const isBoxSurface = mesh.name.startsWith('filebox_') || mesh.name.startsWith('dirbox_');
           let faceNormal = (prioritizedHit as any).normal || new BABYLON.Vector3(0, 0, 1);
           const pickedPoint = (prioritizedHit as any).pickedPoint as BABYLON.Vector3 | null;
-          const hubNavigation = this.resolveHubNavigationTarget(mesh as BABYLON.Mesh, pickedPoint, faceNormal);
+          const hubNavigation = clickedHub
+            ? this.resolveHubNavigationTarget(mesh as BABYLON.Mesh, pickedPoint, faceNormal)
+            : null;
+          let navigationMesh = mesh as BABYLON.Mesh;
+          let navigationFaceNormal = faceNormal.clone();
           if (clickedNode) {
             faceNormal = this.quantizeFaceNormalFromPickedPoint(mesh as BABYLON.Mesh, pickedPoint, faceNormal);
             pendingNodeId = clickedNode.id;
             pendingEdge = null;
+            pendingHubData = null;
             pendingBox = null;
-          } else if (hubNavigation) {
-            pendingNodeId = hubNavigation.nodeId;
+            navigationFaceNormal = faceNormal.clone();
+          } else if (clickedHub && hubNavigation) {
+            pendingNodeId = null;
             pendingEdge = null;
+            pendingHubData = null;
             pendingBox = null;
-            pendingMesh = hubNavigation.targetMesh;
-            pendingFaceNormal = hubNavigation.faceNormal.clone();
-            pendingPickedPoint = null;
-            return;
+            // Hub endpoints should route to their paired node across the conduit.
+            pendingNodeId = hubNavigation.nodeId;
+            navigationMesh = hubNavigation.targetMesh;
+            navigationFaceNormal = hubNavigation.faceNormal.clone();
+            this.logXRNavigationDebug('desktop:hub-route', {
+              meshName: mesh.name,
+              nodeId: hubNavigation.nodeId,
+            });
           } else {
             pendingNodeId = null;
             pendingEdge = clickedEdge || null;
+            pendingHubData = clickedHub
+              ? {
+                endpoint: clickedHub.endpoint,
+                sourceHubWorld: clickedHub.sourceHubWorld,
+                targetHubWorld: clickedHub.targetHubWorld,
+              }
+              : null;
             pendingBox = isBoxSurface ? mesh : null;
           }
-          pendingMesh = mesh;
-          pendingFaceNormal = faceNormal.clone();
+          pendingMesh = navigationMesh;
+          pendingFaceNormal = navigationFaceNormal;
           pendingPickedPoint = pickedPoint?.clone() || null;
         }
       }
@@ -295,6 +335,7 @@ export class VRSceneManager {
           this.handleEditorScreenClick(pendingEditorUv);
           pendingMesh = null;
           pendingEdge = null;
+          pendingHubData = null;
           pendingBox = null;
           pendingPickedPoint = null;
           pendingEditorUv = null;
@@ -306,6 +347,7 @@ export class VRSceneManager {
           this.navigateToFunctionMesh(targetMesh, pendingFaceNormal.clone());
           pendingMesh = null;
           pendingEdge = null;
+          pendingHubData = null;
           pendingBox = null;
           pendingPickedPoint = null;
           return;
@@ -318,16 +360,32 @@ export class VRSceneManager {
             const toPos = toMesh.getAbsolutePosition();
             const pickedPoint = pendingPickedPoint || pendingMesh.getAbsolutePosition();
 
-            const nearSource = BABYLON.Vector3.DistanceSquared(pickedPoint, fromPos)
-              <= BABYLON.Vector3.DistanceSquared(pickedPoint, toPos);
+            const sourceHubWorld = pendingHubData?.sourceHubWorld;
+            const targetHubWorld = pendingHubData?.targetHubWorld;
+            const hasConduitEndpoints = !!sourceHubWorld && !!targetHubWorld;
+
+            const nearSource = hasConduitEndpoints
+              ? BABYLON.Vector3.DistanceSquared(pickedPoint, sourceHubWorld!)
+                <= BABYLON.Vector3.DistanceSquared(pickedPoint, targetHubWorld!)
+              : BABYLON.Vector3.DistanceSquared(pickedPoint, fromPos)
+                <= BABYLON.Vector3.DistanceSquared(pickedPoint, toPos);
+
             const destinationMesh = nearSource ? toMesh : fromMesh;
             const destinationId = nearSource ? pendingEdge.to : pendingEdge.from;
+            const destinationWorldPos = hasConduitEndpoints
+              ? (nearSource ? targetHubWorld! : sourceHubWorld!)
+              : destinationMesh.getAbsolutePosition();
 
             this.currentFunctionId = destinationId;
             this.currentFaceNormal = null;
-            this.flyToWorldPosition(destinationMesh.getAbsolutePosition(), destinationMesh);
+            if (hasConduitEndpoints) {
+              this.flyToWorldPosition(destinationWorldPos);
+            } else {
+              this.flyToWorldPosition(destinationWorldPos, destinationMesh);
+            }
             pendingMesh = null;
             pendingEdge = null;
+            pendingHubData = null;
             pendingBox = null;
             pendingPickedPoint = null;
             return;
@@ -349,6 +407,7 @@ export class VRSceneManager {
             this.flyToWorldPosition(outsideTarget);
             pendingMesh = null;
             pendingEdge = null;
+            pendingHubData = null;
             pendingBox = null;
             pendingPickedPoint = null;
             return;
@@ -362,6 +421,7 @@ export class VRSceneManager {
           this.flyToWorldPosition(targetLabel.getAbsolutePosition(), targetLabel, 12);
           pendingMesh = null;
           pendingEdge = null;
+          pendingHubData = null;
           pendingBox = null;
           pendingPickedPoint = null;
           return;
@@ -376,6 +436,7 @@ export class VRSceneManager {
         }
         pendingMesh = null;
         pendingEdge = null;
+        pendingHubData = null;
         pendingBox = null;
         pendingPickedPoint = null;
         pendingEditorUv = null;
@@ -663,15 +724,21 @@ export class VRSceneManager {
     if (this.scene.registerBeforeRender) {
       this.scene.registerBeforeRender(() => {
         if (this.physicsActive && this.fileLayout && this.fileInternalLayouts.size > 0) {
-          this.meshFactory.markEdgesDirty();
+          this.physicsHeavyPassTick++;
+          const runHeavyPass = (this.physicsHeavyPassTick % 2) === 0;
 
-          // Re-anchor labels only while layout motion is active.
-          this.refreshLabelTransformsIfScaleChanged(false);
+          if (runHeavyPass) {
+            this.meshFactory.markEdgesDirty();
 
-          // Resolve function-vs-label overlap only while boxes are moving.
-          this.labelCollisionTick++;
-          if ((this.labelCollisionTick % 3) === 0) {
-            this.resolveFunctionLabelObstructions(1);
+            // Re-anchor labels only while layout motion is active.
+            this.refreshLabelTransformsIfScaleChanged(false);
+
+            // Resolve function-vs-label overlap while boxes are moving, but
+            // avoid doing this work every frame for large scenes.
+            this.labelCollisionTick++;
+            if ((this.labelCollisionTick % 2) === 0) {
+              this.resolveFunctionLabelObstructions(1);
+            }
           }
 
           // Step 1: Update file-level layout (positions the file boxes)
@@ -702,19 +769,21 @@ export class VRSceneManager {
             // during physics simulation - they were set in renderFileBoxes()
           }
           
-          // Step 3b: Apply repulsive forces to prevent file box intersections
-          this.applyFileBoxRepulsion(this.fileLayout);
+          if (runHeavyPass) {
+            // Step 3b: Apply repulsive forces to prevent file box intersections.
+            this.applyFileBoxRepulsion(this.fileLayout);
 
-          // Step 3c: Enforce deterministic non-overlap each frame so boxes
-          // cannot remain interpenetrating under ongoing layout forces.
-          this.resolveInitialFileBoxOverlaps(4);
+            // Step 3c: Enforce deterministic non-overlap so boxes
+            // cannot remain interpenetrating under ongoing layout forces.
+            this.resolveInitialFileBoxOverlaps(4);
 
-          // Step 3d: Enforce a minimum surface gap between file boxes.
-          this.enforceMinimumFileBoxGap(28.0, 4);
+            // Step 3d: Enforce a minimum surface gap between file boxes.
+            this.enforceMinimumFileBoxGap(28.0, 4);
 
-          // Step 3e: Enforce folder-group spacing so file clusters from
-          // different top-level directories do not interpenetrate.
-          this.enforceTopLevelDirectoryGap(36.0, 1);
+            // Step 3e: Enforce folder-group spacing so file clusters from
+            // different top-level directories do not interpenetrate.
+            this.enforceTopLevelDirectoryGap(36.0, 1);
+          }
 
           // Re-apply file box transforms after collision resolution so visual meshes
           // immediately match corrected file-level positions in the same frame.
@@ -733,6 +802,9 @@ export class VRSceneManager {
           const maxIterations = 500;  // Reasonable limit for convergence
           if (this.physicsIterationCount > maxIterations) {
             this.physicsActive = false;
+            this.meshFactory.markEdgesDirty();
+            this.refreshLabelTransformsIfScaleChanged(true);
+            this.finalizeEdgeRenderingAfterLayoutSettles();
             console.log(`✓ Physics converged after ${this.physicsIterationCount} iterations`);
           }
         }
@@ -975,6 +1047,20 @@ export class VRSceneManager {
 
   private async initializeCodeVisualization(): Promise<void> {
     try {
+      const persistedSnapshot = this.layoutPersistenceManager.loadSnapshot();
+      if (persistedSnapshot) {
+        const snapshotGraph = this.sanitizeGraphData(persistedSnapshot.graph);
+        if (snapshotGraph?.nodes?.length) {
+          console.log(`✓ Restoring persisted layout snapshot: ${snapshotGraph.nodes.length} nodes, ${snapshotGraph.edges?.length || 0} edges`);
+          this.usePersistedLayoutSnapshot = true;
+          this.validateGraphData(snapshotGraph);
+          this.renderCodeGraph(snapshotGraph);
+          this.applyPersistedLayoutSnapshot(persistedSnapshot);
+          return;
+        }
+      }
+
+      this.usePersistedLayoutSnapshot = false;
       const rawGraph = await this.graphLoader.loadGraph();
       const graph = rawGraph ? this.sanitizeGraphData(rawGraph) : null;
       
@@ -1001,7 +1087,20 @@ export class VRSceneManager {
   }
 
   private setupGraphPolling(): void {
-    setInterval(async () => {
+    if (!SceneConfig.ENABLE_GRAPH_POLLING) {
+      return;
+    }
+
+    if (this.graphPollingTimer !== null) {
+      window.clearInterval(this.graphPollingTimer);
+      this.graphPollingTimer = null;
+    }
+
+    this.graphPollingTimer = window.setInterval(async () => {
+      if (this.usePersistedLayoutSnapshot) {
+        return;
+      }
+
       if (this.graphUpdateInProgress) {
         return;
       }
@@ -1186,10 +1285,13 @@ export class VRSceneManager {
     this.prepareRenderState(graph);
 
     const fileMap = this.buildFileNodeMaps(graph);
+    const classMap = this.buildClassNodeMaps(graph);
     this.createAndSettleInternalLayouts(graph, fileMap);
+    this.createAndSettleClassLayouts(graph, classMap);
 
     const indegreeMap = this.calculateIndegree(graph.edges);
     this.renderFileBoxes();
+    this.renderClassBoxes();
 
     const files = this.createAndSettleFileLevelLayout(graph, fileMap);
     this.applyFileLayoutPositions();
@@ -1229,18 +1331,23 @@ export class VRSceneManager {
 
     this.frameCameraToExportedFunctions();
     this.recenterGraphInFrontOfDesktopCameraOnce();
-    this.renderEdges();
-    this.meshFactory.updateEdges();
+    // Keep edges and conduits absent until all non-edge layout stages settle.
+    this.pendingEdgeRender = true;
     this.startNavigationAtIndexHtmlIfAvailable();
 
     this.physicsActive = false;
     this.physicsIterationCount = 0;
     this.setupPhysicsLoop();
+    this.finalizeEdgeRenderingAfterLayoutSettles();
 
     console.log(`✓ Rendered code graph with ${graph.nodes.length} functions in ${files.length} files and ${graph.edges.length} calls`);
   }
 
   private startNavigationAtIndexHtmlIfAvailable(): void {
+    if (!SceneConfig.AUTO_FOCUS_INDEX_ON_STARTUP) {
+      return;
+    }
+
     const indexNode = this.currentGraphData?.nodes.find((n) => n.id === 'html:index.html');
     if (!indexNode) {
       return;
@@ -1364,6 +1471,24 @@ export class VRSceneManager {
     return fileMap;
   }
 
+  private buildClassNodeMaps(graph: GraphData): Map<string, string> {
+    const classMap = new Map<string, string>();
+
+    for (const node of graph.nodes) {
+      if (!node.containerId || node.type === 'class') {
+        continue;
+      }
+
+      classMap.set(node.id, node.containerId);
+
+      if (!this.classNodeIds.has(node.containerId)) {
+        this.classNodeIds.set(node.containerId, new Set());
+      }
+      this.classNodeIds.get(node.containerId)!.add(node.id);
+    }
+    return classMap;
+  }
+
   private createAndSettleInternalLayouts(graph: GraphData, fileMap: Map<string, string>): void {
     this.fileInternalLayouts = this.layoutPipelineService.createAndSettleInternalLayouts(
       graph,
@@ -1372,6 +1497,22 @@ export class VRSceneManager {
     );
 
     this.recenterInternalLayouts();
+  }
+
+  private createAndSettleClassLayouts(_graph: GraphData, classMap: Map<string, string>): void {
+    // Create separate force-directed layouts for members within each class
+    for (const [classId, memberIds] of this.classNodeIds.entries()) {
+      if (memberIds.size === 0) {
+        continue;
+      }
+
+      const memberArray = Array.from(memberIds);
+      const layout = new ForceDirectedLayout(memberArray, [], classMap, undefined, undefined);
+      this.fileInternalLayouts.set(classId, layout);
+      
+      // Run physics simulation for class member layout
+      layout.simulate(100);
+    }
   }
 
   private createAndSettleFileLevelLayout(graph: GraphData, fileMap: Map<string, string>): string[] {
@@ -1646,10 +1787,26 @@ export class VRSceneManager {
   private populateCurrentEdges(graph: GraphData): void {
     this.currentEdges.clear();
     this.currentEdgeKinds.clear();
+    const nodeIds = new Set(graph.nodes.map(n => n.id));
+    let invalidEdgeCount = 0;
+
     for (const edge of graph.edges) {
+      // Validate both endpoints exist
+      if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) {
+        invalidEdgeCount++;
+        if (invalidEdgeCount <= 10) {  // Show first 10 invalid edges
+          console.warn(`⚠️ Edge references missing node: ${edge.from} → ${edge.to}`);
+        }
+        continue;  // Skip edges with missing endpoints
+      }
+
       const key = `${edge.from}→${edge.to}`;
       this.currentEdges.add(key);
       this.currentEdgeKinds.set(key, edge.kind ?? 'call');
+    }
+
+    if (invalidEdgeCount > 0) {
+      console.warn(`⚠️ Filtered out ${invalidEdgeCount} edges with missing node endpoints`);
     }
   }
 
@@ -1662,6 +1819,131 @@ export class VRSceneManager {
     // TODO: Implement incremental updates for better performance
     this.clearScene();
     this.renderCodeGraph(graph);
+  }
+
+  private toPersistedVector3(value: BABYLON.Vector3): PersistedVector3 {
+    return { x: value.x, y: value.y, z: value.z };
+  }
+
+  private fromPersistedVector3(value: PersistedVector3): BABYLON.Vector3 {
+    return new BABYLON.Vector3(value.x, value.y, value.z);
+  }
+
+  private applyPersistedLayoutSnapshot(snapshot: PersistedLayoutSnapshot): void {
+    for (const [file, transform] of Object.entries(snapshot.fileBoxes)) {
+      const fileBox = this.fileBoxMeshes.get(file);
+      if (!fileBox) {
+        continue;
+      }
+
+      fileBox.position = this.fromPersistedVector3(transform.position);
+      fileBox.scaling = this.fromPersistedVector3(transform.scaling);
+    }
+
+    for (const [nodeId, persistedPosition] of Object.entries(snapshot.nodeWorldPositions)) {
+      const mesh = this.nodeMeshMap.get(nodeId);
+      if (!mesh) {
+        continue;
+      }
+
+      const worldPosition = this.fromPersistedVector3(persistedPosition);
+      const parent = mesh.parent;
+      if (parent && (parent as any).getWorldMatrix) {
+        const parentWorld = (parent as any).getWorldMatrix() as BABYLON.Matrix;
+        const parentInverse = BABYLON.Matrix.Invert(parentWorld);
+        mesh.position = BABYLON.Vector3.TransformCoordinates(worldPosition, parentInverse);
+      } else {
+        mesh.position = worldPosition;
+      }
+    }
+
+    this.renderDirectoryBoxes();
+    this.refreshLabelTransformsIfScaleChanged(true);
+    this.finalizeEdgeRenderingAfterLayoutSettles(true);
+  }
+
+  private finalizeEdgeRenderingAfterLayoutSettles(force: boolean = false): void {
+    if (!force && !this.pendingEdgeRender) {
+      return;
+    }
+
+    if (!force && this.physicsActive) {
+      return;
+    }
+
+    // Deferred one-shot edge creation must use fresh world matrices; otherwise
+    // tubes can be built from stale absolute positions from the previous frame.
+    this.sceneRoot.computeWorldMatrix(true);
+    for (const fileBox of this.fileBoxMeshes.values()) {
+      fileBox.computeWorldMatrix(true);
+    }
+    for (const mesh of this.nodeMeshMap.values()) {
+      mesh.computeWorldMatrix(true);
+    }
+
+    this.meshFactory.setSameFileEdgesStatic(false);
+    this.meshFactory.setCrossFileEdgesStatic(false);
+    this.renderEdges();
+    // Finalize all edge geometry once after layout settles, then freeze edges.
+    this.meshFactory.updateEdges(true);
+    this.meshFactory.setSameFileEdgesStatic(true);
+    this.meshFactory.setCrossFileEdgesStatic(true);
+    this.pendingEdgeRender = false;
+  }
+
+  public saveCurrentLayoutSnapshot(): boolean {
+    if (!this.currentGraphData || this.currentGraphData.nodes.length === 0) {
+      return false;
+    }
+
+    const fileBoxes: PersistedLayoutSnapshot['fileBoxes'] = {};
+    for (const [file, box] of this.fileBoxMeshes.entries()) {
+      fileBoxes[file] = {
+        position: this.toPersistedVector3(box.position),
+        scaling: this.toPersistedVector3(box.scaling),
+      };
+    }
+
+    const nodeWorldPositions: PersistedLayoutSnapshot['nodeWorldPositions'] = {};
+    for (const [nodeId, mesh] of this.nodeMeshMap.entries()) {
+      nodeWorldPositions[nodeId] = this.toPersistedVector3(mesh.getAbsolutePosition());
+    }
+
+    const snapshot: PersistedLayoutSnapshot = {
+      schemaVersion: 1,
+      savedAt: new Date().toISOString(),
+      graph: this.currentGraphData,
+      fileBoxes,
+      nodeWorldPositions,
+    };
+
+    const saved = this.layoutPersistenceManager.saveSnapshot(snapshot);
+    if (saved) {
+      this.usePersistedLayoutSnapshot = true;
+    }
+    return saved;
+  }
+
+  public restoreSavedLayoutSnapshot(): boolean {
+    const snapshot = this.layoutPersistenceManager.loadSnapshot();
+    if (!snapshot) {
+      return false;
+    }
+
+    const graph = this.sanitizeGraphData(snapshot.graph);
+    if (!graph || !graph.nodes || graph.nodes.length === 0) {
+      return false;
+    }
+
+    this.usePersistedLayoutSnapshot = true;
+    this.renderCodeGraph(graph);
+    this.applyPersistedLayoutSnapshot(snapshot);
+    return true;
+  }
+
+  public clearSavedLayoutSnapshot(): void {
+    this.layoutPersistenceManager.clearSnapshot();
+    this.usePersistedLayoutSnapshot = false;
   }
 
   private clearScene(): void {
@@ -1774,7 +2056,67 @@ export class VRSceneManager {
       });
     }
 
+    this.reparentContainedNodesToContainers();
+
     console.log(`📦 Rendered in-file nodes: ${renderCount}`);
+  }
+
+  private reparentContainedNodesToContainers(): void {
+    for (const [nodeId, node] of this.graphNodeMap.entries()) {
+      const containerId = node.containerId;
+      if (!containerId) {
+        continue;
+      }
+
+      const childMesh = this.nodeMeshMap.get(nodeId);
+      
+      // Check both nodeMeshMap (for nested nodes) and classBoxMeshes (for class containers)
+      let containerMesh = this.nodeMeshMap.get(containerId);
+      if (!containerMesh) {
+        containerMesh = this.classBoxMeshes.get(containerId);
+      }
+      
+      if (!childMesh || !containerMesh || childMesh === containerMesh || childMesh.parent === containerMesh) {
+        continue;
+      }
+
+      this.reparentMeshPreservingWorldTransform(childMesh, containerMesh);
+    }
+  }
+
+  private reparentMeshPreservingWorldTransform(
+    childMesh: BABYLON.Mesh,
+    newParent: BABYLON.Mesh,
+  ): void {
+    childMesh.computeWorldMatrix(true);
+    newParent.computeWorldMatrix(true);
+
+    const childAny = childMesh as any;
+    const parentAny = newParent as any;
+
+    const worldPosition = childMesh.getAbsolutePosition().clone();
+    const worldScaling = typeof childAny.getAbsoluteScaling === 'function'
+      ? (childAny.getAbsoluteScaling() as BABYLON.Vector3).clone()
+      : childMesh.scaling.clone();
+
+    childMesh.parent = newParent;
+
+    if (typeof parentAny.getWorldMatrix === 'function') {
+      const parentWorld = parentAny.getWorldMatrix() as BABYLON.Matrix;
+      const inverseParent = BABYLON.Matrix.Invert(parentWorld);
+      childMesh.position = BABYLON.Vector3.TransformCoordinates(worldPosition, inverseParent);
+    } else {
+      childMesh.position = worldPosition;
+    }
+
+    const parentScaling = typeof parentAny.getAbsoluteScaling === 'function'
+      ? (parentAny.getAbsoluteScaling() as BABYLON.Vector3)
+      : new BABYLON.Vector3(1, 1, 1);
+    childMesh.scaling = new BABYLON.Vector3(
+      worldScaling.x / Math.max(0.0001, parentScaling.x),
+      worldScaling.y / Math.max(0.0001, parentScaling.y),
+      worldScaling.z / Math.max(0.0001, parentScaling.z),
+    );
   }
 
   private layoutAndPopulateExternalLibraries(graph: GraphData): void {
@@ -2505,6 +2847,19 @@ export class VRSceneManager {
     }
   }
 
+  private isFunctionBoxNodeType(type: GraphNode['type'] | undefined): boolean {
+    return type === 'function'
+      || type === 'class'
+      || type === 'interface'
+      || type === 'type-alias'
+      || type === 'enum'
+      || type === 'namespace';
+  }
+
+  private isFacePinnedExportedFunction(node: GraphNode | undefined): boolean {
+    return !!node && node.type === 'function' && !!node.isExported;
+  }
+
   /**
    * Clamp child node meshes so they remain fully contained in their file box.
    */
@@ -2514,7 +2869,9 @@ export class VRSceneManager {
         continue;
       }
 
-      fileBox.computeWorldMatrix(true);
+      if (typeof (fileBox as any).computeWorldMatrix === 'function') {
+        (fileBox as any).computeWorldMatrix(true);
+      }
       const localHalfExtent = 0.5;
 
       for (const child of fileBox.getChildren()) {
@@ -2526,7 +2883,7 @@ export class VRSceneManager {
         // Exported function nodes are intentionally placed on/outside faces.
         // Do not clamp them back inside the file box volume.
         const nodeData = (mesh as any).nodeData as GraphNode | undefined;
-        if (nodeData?.isExported) {
+        if (this.isFacePinnedExportedFunction(nodeData)) {
           continue;
         }
 
@@ -2555,7 +2912,10 @@ export class VRSceneManager {
         .map((child) => child as BABYLON.Mesh)
         .filter((mesh) => {
           const nodeData = (mesh as any).nodeData as GraphNode | undefined;
-          return !!nodeData && !nodeData.isExported && !!mesh.getBoundingInfo;
+          return !!nodeData
+            && this.isFunctionBoxNodeType(nodeData.type)
+            && !this.isFacePinnedExportedFunction(nodeData)
+            && !!mesh.getBoundingInfo;
         });
 
       if (children.length < 2) {
@@ -2710,6 +3070,60 @@ export class VRSceneManager {
     }
   }
 
+  private renderClassBoxes(): void {
+    for (const classId of this.classNodeIds.keys()) {
+      const memberIds = this.classNodeIds.get(classId);
+      if (!memberIds || memberIds.size === 0) {
+        continue;
+      }
+
+      // Create a glass container for the class
+      const boxSize = Math.max(4.0, Math.sqrt(memberIds.size) * 2.0);  // Scale based on member count
+
+      const boxMesh = BABYLON.MeshBuilder.CreateBox(
+        `classbox_${classId}`,
+        { size: 1 },
+        this.scene
+      );
+
+      boxMesh.scaling = new BABYLON.Vector3(boxSize, boxSize, boxSize);
+
+      // Use a subtle glass material for class containers (slightly different from file boxes)
+      const material = new BABYLON.StandardMaterial(`classboxmat_${classId}`, this.scene);
+      material.diffuseColor = new BABYLON.Color3(0.5, 0.6, 0.7);  // Cool blue-gray tone
+      material.emissiveColor = new BABYLON.Color3(0.15, 0.18, 0.21);
+      material.specularColor = new BABYLON.Color3(1, 1, 1);
+      material.specularPower = 96;
+      material.backFaceCulling = true;
+      material.alpha = 0.12;  // Slightly more transparent than file boxes
+      material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+      material.needDepthPrePass = true;
+      material.disableDepthWrite = true;
+      material.indexOfRefraction = 1.5;
+      material.wireframe = false;
+
+      boxMesh.material = material;
+      boxMesh.enableEdgesRendering();
+      boxMesh.edgesColor = new BABYLON.Color4(0.4, 0.5, 0.6, 1.0);
+      boxMesh.edgesWidth = 2;
+      boxMesh.parent = this.sceneRoot;
+      boxMesh.position = BABYLON.Vector3.Zero();
+
+      this.classBoxMeshes.set(classId, boxMesh);
+
+      // Add class name label
+      this.createClassBoxLabel(classId, boxMesh);
+    }
+  }
+
+  private createClassBoxLabel(classId: string, boxMesh: BABYLON.Mesh): void {
+    // Extract class name from ID format like "class:MyClass@filepath"
+    const className = classId.split(':')[1]?.split('@')[0] || classId;
+    
+    // Simple label: just store for now, could be enhanced with proper texture rendering
+    (boxMesh as any).classLabel = className;
+  }
+
   /**
    * Create nested directory boxes that mirror file-system hierarchy and
    * enclose file boxes under each directory.
@@ -2821,7 +3235,9 @@ export class VRSceneManager {
       let maxX = -Infinity; let maxY = -Infinity; let maxZ = -Infinity;
 
       for (const child of childMeshes) {
-        child.computeWorldMatrix(true);
+        if (typeof (child as any).computeWorldMatrix === 'function') {
+          (child as any).computeWorldMatrix(true);
+        }
         const bounds = child.getBoundingInfo().boundingBox;
         minX = Math.min(minX, bounds.minimumWorld.x);
         minY = Math.min(minY, bounds.minimumWorld.y);
@@ -3086,11 +3502,44 @@ export class VRSceneManager {
       const currentScaleX = fileBox.scaling.x;
       const currentScaleY = fileBox.scaling.y;
       const currentScaleZ = fileBox.scaling.z;
-      let maxLocalExtentX = 0, maxLocalExtentY = 0, maxLocalExtentZ = 0;
+
+      // Measure the true occupied child bounds in WORLD space so box sizing
+      // stays independent of file-to-file spacing and prior file-box scaling.
+      if (typeof (fileBox as any).computeWorldMatrix === 'function') {
+        (fileBox as any).computeWorldMatrix(true);
+      }
+      let minWorldX = Infinity, maxWorldX = -Infinity;
+      let minWorldY = Infinity, maxWorldY = -Infinity;
+      let minWorldZ = Infinity, maxWorldZ = -Infinity;
       for (const child of children) {
-        maxLocalExtentX = Math.max(maxLocalExtentX, Math.abs(child.position.x));
-        maxLocalExtentY = Math.max(maxLocalExtentY, Math.abs(child.position.y));
-        maxLocalExtentZ = Math.max(maxLocalExtentZ, Math.abs(child.position.z));
+        if (typeof (child as any).computeWorldMatrix === 'function') {
+          (child as any).computeWorldMatrix(true);
+        }
+        const bounds = child.getBoundingInfo().boundingBox as any;
+        if (bounds?.minimumWorld && bounds?.maximumWorld) {
+          minWorldX = Math.min(minWorldX, bounds.minimumWorld.x);
+          maxWorldX = Math.max(maxWorldX, bounds.maximumWorld.x);
+          minWorldY = Math.min(minWorldY, bounds.minimumWorld.y);
+          maxWorldY = Math.max(maxWorldY, bounds.maximumWorld.y);
+          minWorldZ = Math.min(minWorldZ, bounds.minimumWorld.z);
+          maxWorldZ = Math.max(maxWorldZ, bounds.maximumWorld.z);
+          continue;
+        }
+
+        const boxPosX = (fileBox as any).position?.x ?? 0;
+        const boxPosY = (fileBox as any).position?.y ?? 0;
+        const boxPosZ = (fileBox as any).position?.z ?? 0;
+        const childWorldX = boxPosX + (child.position.x * currentScaleX);
+        const childWorldY = boxPosY + (child.position.y * currentScaleY);
+        const childWorldZ = boxPosZ + (child.position.z * currentScaleZ);
+        const halfNode = nodeWorldSize * 0.5;
+
+        minWorldX = Math.min(minWorldX, childWorldX - halfNode);
+        maxWorldX = Math.max(maxWorldX, childWorldX + halfNode);
+        minWorldY = Math.min(minWorldY, childWorldY - halfNode);
+        maxWorldY = Math.max(maxWorldY, childWorldY + halfNode);
+        minWorldZ = Math.min(minWorldZ, childWorldZ - halfNode);
+        maxWorldZ = Math.max(maxWorldZ, childWorldZ + halfNode);
       }
 
       // ── Step 4: compute desired per-axis world scale ──
@@ -3098,17 +3547,21 @@ export class VRSceneManager {
       // Dense files (many function nodes) get extra volume to reduce edge clutter.
       const functionCount = children.filter((child) => {
         const node = (child as any).nodeData as GraphNode | undefined;
-        return node?.type === 'function';
+        return this.isFunctionBoxNodeType(node?.type);
       }).length;
       const densityBoost = functionCount > 1
         ? Math.min(2.0, 1.0 + (Math.log2(functionCount) * 0.20))
         : 1.0;
 
-      const axisPadding = nodeWorldSize * 8 * densityBoost;
-      const minAxisSize = nodeWorldSize * 8 * densityBoost;
-      const desiredScaleX = Math.max(minAxisSize, (maxLocalExtentX * currentScaleX + axisPadding) * 2);
-      const desiredScaleY = Math.max(minAxisSize, (maxLocalExtentY * currentScaleY + axisPadding) * 2);
-      const desiredScaleZ = Math.max(minAxisSize, (maxLocalExtentZ * currentScaleZ + axisPadding) * 2);
+      const worldSpanX = Math.max(0, maxWorldX - minWorldX);
+      const worldSpanY = Math.max(0, maxWorldY - minWorldY);
+      const worldSpanZ = Math.max(0, maxWorldZ - minWorldZ);
+
+      const axisPadding = nodeWorldSize * 2.0 * densityBoost;
+      const minAxisSize = nodeWorldSize * 3.0;
+      const desiredScaleX = Math.max(minAxisSize, worldSpanX + (axisPadding * 2));
+      const desiredScaleY = Math.max(minAxisSize, worldSpanY + (axisPadding * 2));
+      const desiredScaleZ = Math.max(minAxisSize, worldSpanZ + (axisPadding * 2));
 
       // ── Step 5: rescale LOCAL positions per axis to preserve world positions ──
       // world = scale * local  →  new_local = old_local * (oldScale / newScale)
@@ -3701,8 +4154,8 @@ export class VRSceneManager {
       const children: BABYLON.Mesh[] = [];
       for (const [nodeId, mesh] of this.nodeMeshMap.entries()) {
         const node = this.graphNodeMap.get(nodeId);
-        if (!node || node.type !== 'function') continue;
-        if (!includeExported && node.isExported) continue;
+        if (!node || !this.isFunctionBoxNodeType(node.type)) continue;
+        if (!includeExported && this.isFacePinnedExportedFunction(node)) continue;
         if (mesh.parent !== fileBox) continue;
         children.push(mesh);
       }
@@ -4265,10 +4718,42 @@ export class VRSceneManager {
   }
 
   private renderEdges(): void {
+    if (!SceneConfig.ENABLE_EDGE_RENDERING) {
+      this.meshFactory.clearEdges();
+      return;
+    }
+
+    const hiddenEdgeEndpointNodeIds = new Set<string>();
+    if (this.currentGraphData?.nodes) {
+      for (const node of this.currentGraphData.nodes) {
+        const isExternalNode = node.type === 'external' || node.file === 'external' || node.id.startsWith('ext:');
+        const isModuleAnchorNode = node.type === 'module-anchor'
+          || node.id.startsWith('module:')
+          || node.name.startsWith('[module] ');
+        if (isExternalNode || isModuleAnchorNode) {
+          hiddenEdgeEndpointNodeIds.add(node.id);
+        }
+      }
+    }
+
     // Get the current graph edges in correct format for MeshFactory
     const graphEdges = Array.from(this.currentEdges).map(edgeId => {
       const [from, to] = edgeId.split('→');
       return { from, to, kind: this.currentEdgeKinds.get(edgeId) ?? 'call' as const };
+    }).filter((edge) => {
+      // Skip module edges
+      if (edge.from.startsWith('module:') || edge.to.startsWith('module:')) {
+        return false;
+      }
+      // Skip edges to/from hidden nodes
+      if (hiddenEdgeEndpointNodeIds.has(edge.from) || hiddenEdgeEndpointNodeIds.has(edge.to)) {
+        return false;
+      }
+      // Skip edges where either endpoint has no mesh in the scene
+      if (!this.nodeMeshMap.has(edge.from) || !this.nodeMeshMap.has(edge.to)) {
+        return false;
+      }
+      return true;
     });
     
     // Build a map of node IDs to their exported status for edge material selection
@@ -5095,24 +5580,6 @@ export class VRSceneManager {
     return activeCamera.position.clone();
   }
 
-  private applySceneDeclutter(): void {
-    this.declutterService.apply({
-      scene: this.scene,
-      camera: this.camera,
-      meshFactory: this.meshFactory,
-      currentFunctionId: this.currentFunctionId,
-      editorVisibleForNodeId: this.editorVisibleForNodeId,
-      graphNodeMap: this.graphNodeMap,
-      fileBoxMeshes: this.fileBoxMeshes,
-      directoryBoxMeshes: this.directoryBoxMeshes,
-      nodeMeshMap: this.nodeMeshMap,
-      fileBoxLabels: this.fileBoxLabels,
-      directoryBoxLabels: this.directoryBoxLabels,
-      labelsVisible: this.labelsVisible,
-      setBreadcrumbAnchorInteractivity: this.setBreadcrumbAnchorInteractivity.bind(this),
-    });
-  }
-
   private async setupWebXR(): Promise<void> {
     this.setXRLoadingPanelVisible(false);
     try {
@@ -5296,10 +5763,6 @@ export class VRSceneManager {
     console.log(`🏷️ Navigation labels ${this.labelsVisible ? 'shown' : 'hidden'} via secondary/menu button`);
   }
 
-  private setBreadcrumbAnchorInteractivity(labelAnchor: BABYLON.Mesh, enabled: boolean): void {
-    this.labelManager.setBreadcrumbAnchorInteractivity(labelAnchor, enabled);
-  }
-
   private setLabelsVisibility(visible: boolean): void {
     this.labelManager.setLabelsVisibility(visible);
   }
@@ -5361,7 +5824,10 @@ export class VRSceneManager {
       this.resolveEdgeObstructions(30);
       this.resolveNodeEdgeObstructions(20);
       this.renderEdges();
-      this.meshFactory.updateEdges();
+      // force=true bypasses the sameFileEdgesStatic/crossFileEdgesStatic freeze so
+      // the freshly-created tubes (which start life at the origin) are positioned
+      // immediately, regardless of the post-load static edge optimisation.
+      this.meshFactory.updateEdges(true);
     }
   }
 
@@ -5478,11 +5944,14 @@ export class VRSceneManager {
     const pickedMesh = hit.pickedMesh as BABYLON.Mesh;
     const pickedPoint = hit.pickedPoint || pickedMesh.getAbsolutePosition();
     const pickedEdge = (pickedMesh as any).edgeData as { from: string; to: string } | undefined;
-    const hubNavigation = this.resolveHubNavigationTarget(
-      pickedMesh,
-      pickedPoint,
-      hit.getNormal(true) || new BABYLON.Vector3(0, 0, 1),
-    );
+    const pickedHub = (pickedMesh as any).hubData as { navigationNodeId?: string } | undefined;
+    const hubNavigation = pickedHub
+      ? this.resolveHubNavigationTarget(
+        pickedMesh,
+        pickedPoint,
+        hit.getNormal(true) || new BABYLON.Vector3(0, 0, 1),
+      )
+      : null;
     const pickedLabel = (pickedMesh as any).labelData as { kind: 'file' | 'directory'; path: string } | undefined;
 
     this.logXRNavigationDebug('teleport:pick', {
@@ -5497,12 +5966,11 @@ export class VRSceneManager {
       hitDistance: Number(((hit as any).distance ?? 0).toFixed(3)),
     });
 
-    if (hubNavigation) {
-      this.logXRNavigationDebug('teleport:hub-destination', {
+    if (pickedHub && hubNavigation) {
+      this.logXRNavigationDebug('teleport:hub-route', {
         meshName: pickedMesh.name,
-        nodeId: hubNavigation.nodeId,
-        destinationWorldPos: this.formatDebugVector(hubNavigation.targetMesh.getAbsolutePosition()),
-        faceNormal: this.formatDebugVector(hubNavigation.faceNormal),
+        nodeId: hubNavigation?.nodeId,
+        hubWorldPos: this.formatDebugVector(pickedMesh.getAbsolutePosition()),
       });
       this.navigateToFunctionMesh(hubNavigation.targetMesh, hubNavigation.faceNormal);
       return;
@@ -5611,6 +6079,7 @@ export class VRSceneManager {
     for (const mesh of heldObjects) {
       // Move held object with the grip position
       mesh.position = gripState.position.clone();
+      mesh.computeWorldMatrix(true);
       
       // Apply grip velocity for physics-based interaction
       if ((mesh as any).physicsImpostor) {
@@ -5618,11 +6087,18 @@ export class VRSceneManager {
         (mesh as any).physicsImpostor.setLinearVelocity(newVel);
       }
     }
+
+    // Grabbing repositions nodes after static-edge freeze, so force a full edge refresh.
+    this.meshFactory.markEdgesDirty();
+    this.meshFactory.updateEdges(true);
   }
 
   public run(): void {
     this.engine.runRenderLoop(() => {
-      this.applySceneDeclutter();
+      if (!SceneConfig.ENABLE_EDGE_RENDERING) {
+        this.scene.render();
+        return;
+      }
 
       const edgeVisibilitySignature = `${this.currentFunctionId ?? ''}|${this.editorVisibleForNodeId ?? ''}`;
       if (edgeVisibilitySignature !== this.lastEdgeVisibilitySignature) {
@@ -5637,6 +6113,10 @@ export class VRSceneManager {
   }
 
   public dispose(): void {
+    if (this.graphPollingTimer !== null) {
+      window.clearInterval(this.graphPollingTimer);
+      this.graphPollingTimer = null;
+    }
     if (this.xrLoadingHideTimer !== null) {
       window.clearTimeout(this.xrLoadingHideTimer);
       this.xrLoadingHideTimer = null;

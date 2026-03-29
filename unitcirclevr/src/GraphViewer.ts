@@ -11,6 +11,7 @@ export interface GraphData {
 
 export type CodeNode =
   | FunctionNode
+  | ModuleAnchorNode
   | ClassNode
   | InterfaceNode
   | TypeAliasNode
@@ -26,6 +27,15 @@ export interface FunctionNode {
   line: number;
   isExported: boolean;
   type: 'function';
+}
+
+export interface ModuleAnchorNode {
+  id: string;
+  name: string;
+  file: string;
+  line: number;
+  isExported: boolean;
+  type: 'module-anchor';
 }
 
 export interface ClassNode {

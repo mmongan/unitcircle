@@ -309,13 +309,47 @@ export class BoxManagerService {
       const currentScaleX = fileBox.scaling.x;
       const currentScaleY = fileBox.scaling.y;
       const currentScaleZ = fileBox.scaling.z;
-      let maxLocalExtentX = 0;
-      let maxLocalExtentY = 0;
-      let maxLocalExtentZ = 0;
+
+      // Measure occupied child bounds in world space so file-box sizing
+      // reflects node content only and not previous box scale.
+      if (typeof (fileBox as any).computeWorldMatrix === 'function') {
+        (fileBox as any).computeWorldMatrix(true);
+      }
+      let minWorldX = Infinity;
+      let maxWorldX = -Infinity;
+      let minWorldY = Infinity;
+      let maxWorldY = -Infinity;
+      let minWorldZ = Infinity;
+      let maxWorldZ = -Infinity;
       for (const child of children) {
-        maxLocalExtentX = Math.max(maxLocalExtentX, Math.abs(child.position.x));
-        maxLocalExtentY = Math.max(maxLocalExtentY, Math.abs(child.position.y));
-        maxLocalExtentZ = Math.max(maxLocalExtentZ, Math.abs(child.position.z));
+        if (typeof (child as any).computeWorldMatrix === 'function') {
+          (child as any).computeWorldMatrix(true);
+        }
+        const bounds = child.getBoundingInfo().boundingBox as any;
+        if (bounds?.minimumWorld && bounds?.maximumWorld) {
+          minWorldX = Math.min(minWorldX, bounds.minimumWorld.x);
+          maxWorldX = Math.max(maxWorldX, bounds.maximumWorld.x);
+          minWorldY = Math.min(minWorldY, bounds.minimumWorld.y);
+          maxWorldY = Math.max(maxWorldY, bounds.maximumWorld.y);
+          minWorldZ = Math.min(minWorldZ, bounds.minimumWorld.z);
+          maxWorldZ = Math.max(maxWorldZ, bounds.maximumWorld.z);
+          continue;
+        }
+
+        const boxPosX = (fileBox as any).position?.x ?? 0;
+        const boxPosY = (fileBox as any).position?.y ?? 0;
+        const boxPosZ = (fileBox as any).position?.z ?? 0;
+        const childWorldX = boxPosX + (child.position.x * currentScaleX);
+        const childWorldY = boxPosY + (child.position.y * currentScaleY);
+        const childWorldZ = boxPosZ + (child.position.z * currentScaleZ);
+        const halfNode = nodeWorldSize * 0.5;
+
+        minWorldX = Math.min(minWorldX, childWorldX - halfNode);
+        maxWorldX = Math.max(maxWorldX, childWorldX + halfNode);
+        minWorldY = Math.min(minWorldY, childWorldY - halfNode);
+        maxWorldY = Math.max(maxWorldY, childWorldY + halfNode);
+        minWorldZ = Math.min(minWorldZ, childWorldZ - halfNode);
+        maxWorldZ = Math.max(maxWorldZ, childWorldZ + halfNode);
       }
 
       const functionCount = children.filter((child) => {
@@ -331,11 +365,15 @@ export class BoxManagerService {
         ? Math.min(2.0, 1.0 + (Math.log2(functionCount) * 0.20))
         : 1.0;
 
-      const axisPadding = nodeWorldSize * 8 * densityBoost;
-      const minAxisSize = nodeWorldSize * 8 * densityBoost;
-      const desiredScaleX = Math.max(minAxisSize, (maxLocalExtentX * currentScaleX + axisPadding) * 2);
-      const desiredScaleY = Math.max(minAxisSize, (maxLocalExtentY * currentScaleY + axisPadding) * 2);
-      const desiredScaleZ = Math.max(minAxisSize, (maxLocalExtentZ * currentScaleZ + axisPadding) * 2);
+      const worldSpanX = Math.max(0, maxWorldX - minWorldX);
+      const worldSpanY = Math.max(0, maxWorldY - minWorldY);
+      const worldSpanZ = Math.max(0, maxWorldZ - minWorldZ);
+
+      const axisPadding = nodeWorldSize * 2.0 * densityBoost;
+      const minAxisSize = nodeWorldSize * 3.0;
+      const desiredScaleX = Math.max(minAxisSize, worldSpanX + (axisPadding * 2));
+      const desiredScaleY = Math.max(minAxisSize, worldSpanY + (axisPadding * 2));
+      const desiredScaleZ = Math.max(minAxisSize, worldSpanZ + (axisPadding * 2));
 
       for (const child of children) {
         if (desiredScaleX !== currentScaleX) {

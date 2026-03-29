@@ -8,6 +8,7 @@ const log = createLogger('main')
 const LOADING_OVERLAY_ID = 'startupLoadingOverlay';
 const LOADING_OVERLAY_MIN_VISIBLE_MS = 1200;
 let loadingOverlayShownAt = 0;
+let activeVRScene: VRSceneManager | null = null;
 
 // Log build version timestamp
 async function logBuildVersion(): Promise<void> {
@@ -61,7 +62,13 @@ async function initializeApplication(canvas: HTMLCanvasElement): Promise<void> {
 }
 
 async function createVRScene(canvas: HTMLCanvasElement): Promise<void> {
+  if (activeVRScene) {
+    activeVRScene.dispose();
+    activeVRScene = null;
+  }
+
   const vrScene = new VRSceneManager(canvas);
+  activeVRScene = vrScene;
   await runVRScene(vrScene);
 }
 
@@ -70,6 +77,7 @@ async function runVRScene(vrScene: VRSceneManager): Promise<void> {
   await vrScene.initialize();
   setupAltKeyLabelToggle(vrScene);
   setupLayoutRebuildShortcut(vrScene);
+  setupLayoutPersistenceShortcuts(vrScene);
   vrScene.run();
   hideLoadingOverlay();
 }
@@ -143,11 +151,55 @@ function setupLayoutRebuildShortcut(vrScene: VRSceneManager): void {
   });
 }
 
+function setupLayoutPersistenceShortcuts(vrScene: VRSceneManager): void {
+  document.addEventListener('keydown', (event) => {
+    const target = event.target as HTMLElement | null;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+      return;
+    }
+
+    const key = event.key.toLowerCase();
+    const hasPersistenceChord = event.ctrlKey && event.shiftKey;
+    if (!hasPersistenceChord) {
+      return;
+    }
+
+    if (key === 's') {
+      event.preventDefault();
+      const saved = vrScene.saveCurrentLayoutSnapshot();
+      if (saved) {
+        log.info('Saved static layout snapshot (Ctrl+Shift+S).');
+      } else {
+        log.warn('Could not save layout snapshot.');
+      }
+      return;
+    }
+
+    if (key === 'l') {
+      event.preventDefault();
+      const restored = vrScene.restoreSavedLayoutSnapshot();
+      if (restored) {
+        log.info('Restored static layout snapshot (Ctrl+Shift+L).');
+      } else {
+        log.warn('No saved layout snapshot found to restore.');
+      }
+      return;
+    }
+
+    if (key === 'x') {
+      event.preventDefault();
+      vrScene.clearSavedLayoutSnapshot();
+      log.info('Cleared saved static layout snapshot (Ctrl+Shift+X).');
+    }
+  });
+}
+
 
 
 function setupWindowCleanup(): void {
   window.addEventListener('beforeunload', () => {
-    // Cleanup placeholder
+    activeVRScene?.dispose();
+    activeVRScene = null;
   });
 }
 
@@ -224,3 +276,10 @@ function hideLoadingOverlay(removeImmediately: boolean = false): void {
 }
 
 initializeScene();
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    activeVRScene?.dispose();
+    activeVRScene = null;
+  });
+}

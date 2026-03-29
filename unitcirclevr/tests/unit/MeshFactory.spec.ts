@@ -323,139 +323,35 @@ describe('MeshFactory', () => {
     });
   });
 
-  describe('same-file edge visibility gating', () => {
-    it('fades same-file edges when the viewer is outside the shared file box', () => {
-      const factoryWithCamera = new MeshFactory({
-        activeCamera: {
-          position: { x: 40, y: 0, z: 0, clone: vi.fn(() => ({ x: 40, y: 0, z: 0 })) },
-        },
-      } as any);
-
-      const sharedFileBox = {
-        getBoundingInfo: vi.fn(() => ({
-          boundingBox: {
-            intersectsPoint: vi.fn(() => false),
-          },
-        })),
-      } as any;
-
-      const sourceMesh = { parent: sharedFileBox } as any;
-      const targetMesh = { parent: sharedFileBox } as any;
-
-      const visibility = (factoryWithCamera as any).getEdgeVisibilityFactor(
+  describe('edge visibility', () => {
+    it('keeps same-file edges visible when both endpoints are visible', () => {
+      const visibility = (factory as any).getEdgeVisibilityFactor(
         { from: 'a', to: 'b', isCrossFile: false, isSelfLoop: false, bidirectionalOffsetSign: 0 },
-        sourceMesh,
-        targetMesh,
-      );
-
-      expect(visibility).toBeLessThan(1);
-      expect(visibility).toBeGreaterThan(0);
-    });
-
-    it('shows same-file edges when the viewer is inside the shared file box', () => {
-      const factoryWithCamera = new MeshFactory({
-        activeCamera: {
-          position: { x: 0, y: 0, z: 0, clone: vi.fn(() => ({ x: 0, y: 0, z: 0 })) },
-        },
-      } as any);
-
-      const sharedFileBox = {
-        getBoundingInfo: vi.fn(() => ({
-          boundingBox: {
-            intersectsPoint: vi.fn(() => true),
-          },
-        })),
-      } as any;
-
-      const sourceMesh = { parent: sharedFileBox } as any;
-      const targetMesh = { parent: sharedFileBox } as any;
-
-      const visibility = (factoryWithCamera as any).getEdgeVisibilityFactor(
-        { from: 'a', to: 'b', isCrossFile: false, isSelfLoop: false, bidirectionalOffsetSign: 0 },
-        sourceMesh,
-        targetMesh,
+        { parent: {}, isVisible: true, isEnabled: vi.fn(() => true) } as any,
+        { parent: {}, isVisible: true, isEnabled: vi.fn(() => true) } as any,
       );
 
       expect(visibility).toBe(1);
     });
 
-    it('refreshes the shared file box world matrix before checking containment', () => {
-      const factoryWithCamera = new MeshFactory({
-        activeCamera: {
-          position: { x: 0, y: 0, z: 0, clone: vi.fn(() => ({ x: 0, y: 0, z: 0 })) },
-        },
-      } as any);
-
-      const sharedFileBox = {
-        computeWorldMatrix: vi.fn(),
-        getBoundingInfo: vi.fn(() => ({
-          boundingBox: {
-            intersectsPoint: vi.fn(() => true),
-          },
-        })),
-      } as any;
-
-      const visibility = (factoryWithCamera as any).getEdgeVisibilityFactor(
-        { from: 'a', to: 'b', isCrossFile: false, isSelfLoop: false, bidirectionalOffsetSign: 0 },
-        { parent: sharedFileBox } as any,
-        { parent: sharedFileBox } as any,
-      );
-
-      expect(visibility).toBe(1);
-      expect(sharedFileBox.computeWorldMatrix).toHaveBeenCalledWith(true);
-    });
-
-    it('falls back to world min/max bounds when intersectsPoint is unavailable', () => {
-      const factoryWithCamera = new MeshFactory({
-        activeCamera: {
-          position: { x: 1, y: 1, z: 1, clone: vi.fn(() => ({ x: 1, y: 1, z: 1 })) },
-        },
-      } as any);
-
-      const sharedFileBox = {
-        computeWorldMatrix: vi.fn(),
-        getBoundingInfo: vi.fn(() => ({
-          boundingBox: {
-            minimumWorld: { x: -2, y: -2, z: -2 },
-            maximumWorld: { x: 2, y: 2, z: 2 },
-          },
-        })),
-      } as any;
-
-      const visibility = (factoryWithCamera as any).getEdgeVisibilityFactor(
-        { from: 'a', to: 'b', isCrossFile: false, isSelfLoop: false, bidirectionalOffsetSign: 0 },
-        { parent: sharedFileBox } as any,
-        { parent: sharedFileBox } as any,
-      );
-
-      expect(visibility).toBe(1);
-    });
-
-    it('keeps cross-file edges visible even when the viewer is outside a file box', () => {
-      const factoryWithCamera = new MeshFactory({
-        activeCamera: {
-          position: { x: 40, y: 0, z: 0, clone: vi.fn(() => ({ x: 40, y: 0, z: 0 })) },
-        },
-      } as any);
-
-      const sharedFileBox = {
-        getBoundingInfo: vi.fn(() => ({
-          boundingBox: {
-            intersectsPoint: vi.fn(() => false),
-          },
-        })),
-      } as any;
-
-      const sourceMesh = { parent: sharedFileBox } as any;
-      const targetMesh = { parent: sharedFileBox } as any;
-
-      const visibility = (factoryWithCamera as any).getEdgeVisibilityFactor(
+    it('keeps cross-file edges visible when both endpoints are visible', () => {
+      const visibility = (factory as any).getEdgeVisibilityFactor(
         { from: 'a', to: 'b', isCrossFile: true, isSelfLoop: false, bidirectionalOffsetSign: 0 },
-        sourceMesh,
-        targetMesh,
+        { parent: {}, isVisible: true, isEnabled: vi.fn(() => true) } as any,
+        { parent: {}, isVisible: true, isEnabled: vi.fn(() => true) } as any,
       );
 
       expect(visibility).toBe(1);
+    });
+
+    it('hides edges when either endpoint is hidden', () => {
+      const visibility = (factory as any).getEdgeVisibilityFactor(
+        { from: 'module:anchor', to: 'func@src/a.ts', isCrossFile: false, isSelfLoop: false, bidirectionalOffsetSign: 0 },
+        { parent: {}, isVisible: false, isEnabled: vi.fn(() => true) } as any,
+        { parent: {}, isVisible: true, isEnabled: vi.fn(() => true) } as any,
+      );
+
+      expect(visibility).toBe(0);
     });
 
     it('re-enables a previously hidden non-self edge when it becomes visible again', () => {
@@ -467,42 +363,6 @@ describe('MeshFactory', () => {
       (factory as any).ensureMeshEnabled(cylinder);
 
       expect(cylinder.setEnabled).toHaveBeenCalledWith(true);
-    });
-
-    it('keeps unrelated cross-file edges fully visible when a focus file is active', () => {
-      (factory as any).setDeclutterContext('src/main.ts', ['src']);
-
-      const visibility = (factory as any).getCrossFileEdgeVisibilityFactor({
-        fromFile: 'scripts/build-graph.ts',
-        toFile: 'viewer.html',
-        targetsExternalLibrary: false,
-      });
-
-      expect(visibility).toBe(1);
-    });
-
-    it('keeps cross-file edges visible when they connect to the focus file', () => {
-      (factory as any).setDeclutterContext('src/main.ts', ['src']);
-
-      const visibility = (factory as any).getCrossFileEdgeVisibilityFactor({
-        fromFile: 'src/main.ts',
-        toFile: 'src/VRSceneManager.ts',
-        targetsExternalLibrary: false,
-      });
-
-      expect(visibility).toBe(1);
-    });
-
-    it('keeps cross-file edges visible when no focus file is active', () => {
-      (factory as any).setDeclutterContext(null, []);
-
-      const visibility = (factory as any).getCrossFileEdgeVisibilityFactor({
-        fromFile: 'scripts/build-graph.ts',
-        toFile: 'viewer.html',
-        targetsExternalLibrary: true,
-      });
-
-      expect(visibility).toBe(1);
     });
   });
 
@@ -593,12 +453,14 @@ describe('MeshFactory', () => {
 
       const linkBoxes = (factory as any).crossFileConduitLinkBoxes as Map<string, { source: any; target: any }>;
       const junctions = (factory as any).crossFileConduitJunctions as Map<string, { source: any; target: any }>;
+      const conduits = (factory as any).crossFileConduits as Map<string, any>;
 
       const pairKey = Array.from(linkBoxes.keys())[0];
       expect(pairKey).toBeDefined();
 
       const linkPair = linkBoxes.get(pairKey)!;
       const junctionPair = junctions.get(pairKey)!;
+      const conduit = conduits.get(pairKey);
 
       expect(linkPair.source.edgeData).toEqual({ from: 'funcA@src/a.ts', to: 'funcB@src/b.ts' });
       expect(linkPair.target.edgeData).toEqual({ from: 'funcA@src/a.ts', to: 'funcB@src/b.ts' });
@@ -617,6 +479,7 @@ describe('MeshFactory', () => {
       expect(linkPair.target.isPickable).toBe(true);
       expect(junctionPair.source.isPickable).toBe(true);
       expect(junctionPair.target.isPickable).toBe(true);
+      expect(conduit?.isPickable).toBe(true);
     });
 
     it('clearEdges disposes link boxes and clears the map', () => {
@@ -670,6 +533,224 @@ describe('MeshFactory', () => {
       expect(singleSlotHub.sourceHub.x).toBeCloseTo(defaultHub.sourceHub.x, 4);
       expect(singleSlotHub.sourceHub.y).toBeCloseTo(defaultHub.sourceHub.y, 4);
       expect(singleSlotHub.sourceHub.z).toBeCloseTo(defaultHub.sourceHub.z, 4);
+    });
+  });
+
+  describe('performance edge freeze modes', () => {
+    it('hides stale edge meshes when endpoint nodes are missing', () => {
+      const staleTube = {
+        name: 'staleEdge',
+        setEnabled: vi.fn(),
+      } as any;
+      const staleArrow = {
+        setEnabled: vi.fn(),
+      } as any;
+
+      (factory as any).edgeTubes.set('staleEdge', staleTube);
+      (factory as any).edgeArrows.set('staleEdge', staleArrow);
+      (factory as any).edgeMetadata.set('staleEdge', {
+        from: 'missingFrom',
+        to: 'missingTo',
+        fromFile: 'src/a.ts',
+        toFile: 'src/b.ts',
+        isCrossFile: true,
+        isSelfLoop: false,
+        bidirectionalOffsetSign: 0,
+        targetsExternalLibrary: false,
+        crossFilePairKey: 'src/a.ts<->src/b.ts',
+      });
+
+      factory.updateEdges(true);
+
+      expect(staleTube.setEnabled).toHaveBeenCalledWith(false);
+      expect(staleArrow.setEnabled).toHaveBeenCalledWith(false);
+    });
+
+    it('skips same-file edge geometry updates when same-file static mode is enabled', () => {
+      const sourceMesh = {
+        parent: null,
+        getAbsolutePosition: vi.fn(() => new (BABYLON.Vector3 as any)(0, 0, 0)),
+      } as any;
+      const targetMesh = {
+        parent: null,
+        getAbsolutePosition: vi.fn(() => new (BABYLON.Vector3 as any)(10, 0, 0)),
+      } as any;
+
+      (factory as any).nodeMeshes.set('sameFrom', sourceMesh);
+      (factory as any).nodeMeshes.set('sameTo', targetMesh);
+      (factory as any).nodeMeshes.set('crossFrom', sourceMesh);
+      (factory as any).nodeMeshes.set('crossTo', targetMesh);
+
+      (factory as any).edgeTubes.set('sameEdge', { name: 'sameEdge' });
+      (factory as any).edgeTubes.set('crossEdge', { name: 'crossEdge' });
+
+      (factory as any).edgeMetadata.set('sameEdge', {
+        from: 'sameFrom',
+        to: 'sameTo',
+        fromFile: 'src/a.ts',
+        toFile: 'src/a.ts',
+        isCrossFile: false,
+        isSelfLoop: false,
+        bidirectionalOffsetSign: 0,
+        targetsExternalLibrary: false,
+        crossFilePairKey: null,
+      });
+
+      (factory as any).edgeMetadata.set('crossEdge', {
+        from: 'crossFrom',
+        to: 'crossTo',
+        fromFile: 'src/a.ts',
+        toFile: 'src/b.ts',
+        isCrossFile: true,
+        isSelfLoop: false,
+        bidirectionalOffsetSign: 0,
+        targetsExternalLibrary: false,
+        crossFilePairKey: 'src/a.ts<->src/b.ts',
+      });
+
+      const edgeSpy = vi.spyOn(factory as any, 'updateSingleEdge').mockImplementation(() => {});
+      const conduitSpy = vi.spyOn(factory as any, 'updateSingleConduit').mockImplementation(() => {});
+
+      factory.setSameFileEdgesStatic(true);
+      factory.updateEdges(false);
+
+      expect(edgeSpy).toHaveBeenCalledTimes(1);
+      const updatedEdgeId = edgeSpy.mock.calls[0][0];
+      expect(updatedEdgeId).toBe('crossEdge');
+      expect(conduitSpy).not.toHaveBeenCalled();
+    });
+
+    it('skips cross-file edge and conduit updates when cross-file static mode is enabled', () => {
+      const sourceNode = {
+        getAbsolutePosition: vi.fn(() => new (BABYLON.Vector3 as any)(0, 0, 0)),
+      } as any;
+      const targetNode = {
+        getAbsolutePosition: vi.fn(() => new (BABYLON.Vector3 as any)(20, 0, 0)),
+      } as any;
+
+      (factory as any).nodeMeshes.set('sameFrom', sourceNode);
+      (factory as any).nodeMeshes.set('sameTo', targetNode);
+      (factory as any).nodeMeshes.set('crossFrom', sourceNode);
+      (factory as any).nodeMeshes.set('crossTo', targetNode);
+
+      (factory as any).edgeTubes.set('sameEdge', { name: 'sameEdge' });
+      (factory as any).edgeTubes.set('crossEdge', { name: 'crossEdge' });
+
+      (factory as any).edgeMetadata.set('sameEdge', {
+        from: 'sameFrom',
+        to: 'sameTo',
+        fromFile: 'src/a.ts',
+        toFile: 'src/a.ts',
+        isCrossFile: false,
+        isSelfLoop: false,
+        bidirectionalOffsetSign: 0,
+        targetsExternalLibrary: false,
+        crossFilePairKey: null,
+      });
+
+      (factory as any).edgeMetadata.set('crossEdge', {
+        from: 'crossFrom',
+        to: 'crossTo',
+        fromFile: 'src/a.ts',
+        toFile: 'src/b.ts',
+        isCrossFile: true,
+        isSelfLoop: false,
+        bidirectionalOffsetSign: 0,
+        targetsExternalLibrary: false,
+        crossFilePairKey: 'src/a.ts<->src/b.ts',
+      });
+
+      (factory as any).crossFileConduits.set('src/a.ts<->src/b.ts', {
+        setEnabled: vi.fn(),
+      });
+      (factory as any).crossFileConduitMetadata.set('src/a.ts<->src/b.ts', {
+        sourceNodeId: 'crossFrom',
+        targetNodeId: 'crossTo',
+        sourceFile: 'src/a.ts',
+        targetFile: 'src/b.ts',
+        edgeCount: 1,
+        sourceHubSlot: 0,
+        sourceHubSlotCount: 1,
+        targetHubSlot: 0,
+        targetHubSlotCount: 1,
+      });
+
+      const edgeSpy = vi.spyOn(factory as any, 'updateSingleEdge').mockImplementation(() => {});
+      const conduitSpy = vi.spyOn(factory as any, 'updateSingleConduit').mockImplementation(() => {});
+
+      factory.setCrossFileEdgesStatic(true);
+      factory.updateEdges(false);
+
+      expect(edgeSpy).toHaveBeenCalledTimes(1);
+      const updatedEdgeId = edgeSpy.mock.calls[0][0];
+      expect(updatedEdgeId).toBe('sameEdge');
+      expect(conduitSpy).not.toHaveBeenCalled();
+    });
+
+    it('force updates still run full reconciliation even when both static modes are enabled', () => {
+      const sourceNode = {
+        getAbsolutePosition: vi.fn(() => new (BABYLON.Vector3 as any)(0, 0, 0)),
+      } as any;
+      const targetNode = {
+        getAbsolutePosition: vi.fn(() => new (BABYLON.Vector3 as any)(20, 0, 0)),
+      } as any;
+
+      (factory as any).nodeMeshes.set('sameFrom', sourceNode);
+      (factory as any).nodeMeshes.set('sameTo', targetNode);
+      (factory as any).nodeMeshes.set('crossFrom', sourceNode);
+      (factory as any).nodeMeshes.set('crossTo', targetNode);
+
+      (factory as any).edgeTubes.set('sameEdge', { name: 'sameEdge' });
+      (factory as any).edgeTubes.set('crossEdge', { name: 'crossEdge' });
+
+      (factory as any).edgeMetadata.set('sameEdge', {
+        from: 'sameFrom',
+        to: 'sameTo',
+        fromFile: 'src/a.ts',
+        toFile: 'src/a.ts',
+        isCrossFile: false,
+        isSelfLoop: false,
+        bidirectionalOffsetSign: 0,
+        targetsExternalLibrary: false,
+        crossFilePairKey: null,
+      });
+
+      (factory as any).edgeMetadata.set('crossEdge', {
+        from: 'crossFrom',
+        to: 'crossTo',
+        fromFile: 'src/a.ts',
+        toFile: 'src/b.ts',
+        isCrossFile: true,
+        isSelfLoop: false,
+        bidirectionalOffsetSign: 0,
+        targetsExternalLibrary: false,
+        crossFilePairKey: 'src/a.ts<->src/b.ts',
+      });
+
+      (factory as any).crossFileConduits.set('src/a.ts<->src/b.ts', {
+        setEnabled: vi.fn(),
+      });
+      (factory as any).crossFileConduitMetadata.set('src/a.ts<->src/b.ts', {
+        sourceNodeId: 'crossFrom',
+        targetNodeId: 'crossTo',
+        sourceFile: 'src/a.ts',
+        targetFile: 'src/b.ts',
+        edgeCount: 1,
+        sourceHubSlot: 0,
+        sourceHubSlotCount: 1,
+        targetHubSlot: 0,
+        targetHubSlotCount: 1,
+      });
+
+      const edgeSpy = vi.spyOn(factory as any, 'updateSingleEdge').mockImplementation(() => {});
+      const conduitSpy = vi.spyOn(factory as any, 'updateSingleConduit').mockImplementation(() => {});
+
+      factory.setSameFileEdgesStatic(true);
+      factory.setCrossFileEdgesStatic(true);
+      factory.updateEdges(true);
+
+      expect(edgeSpy).toHaveBeenCalledTimes(2);
+      expect(conduitSpy).toHaveBeenCalledTimes(1);
     });
   });
 });

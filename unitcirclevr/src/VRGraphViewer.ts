@@ -13,6 +13,7 @@ export interface GraphData {
 
 export type CodeNode =
   | FunctionNode
+  | ModuleAnchorNode
   | ClassNode
   | InterfaceNode
   | TypeAliasNode
@@ -28,6 +29,15 @@ export interface FunctionNode {
   line: number;
   isExported: boolean;
   type: 'function';
+}
+
+export interface ModuleAnchorNode {
+  id: string;
+  name: string;
+  file: string;
+  line: number;
+  isExported: boolean;
+  type: 'module-anchor';
 }
 
 export interface ClassNode {
@@ -190,7 +200,7 @@ export class VRGraphViewer {
    * Filter and re-render with only specific node types
    * @param types Array of node types to show
    */
-  showNodeTypes(...types: Array<'function' | 'class' | 'interface' | 'type-alias' | 'enum' | 'namespace' | 'variable' | 'external'>): void {
+  showNodeTypes(...types: Array<'function' | 'module-anchor' | 'class' | 'interface' | 'type-alias' | 'enum' | 'namespace' | 'variable' | 'external'>): void {
     if (!this.graphData) return;
 
     const filteredData: GraphData = {

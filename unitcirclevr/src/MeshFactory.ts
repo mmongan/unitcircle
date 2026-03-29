@@ -17,9 +17,11 @@ export class MeshFactory {
   private scene: BABYLON.Scene;
   private functionBoxFactory: FunctionBoxCreator;
   private edgesDirty = true;
+  private sameFileEdgesStatic = false;
+  private crossFileEdgesStatic = false;
   
   // Edge batching system to avoid RAF violations
-  private static readonly EDGES_PER_FRAME = 150;  // Process this many edges per frame
+  private static readonly EDGES_PER_FRAME = 40;  // Process this many edges per frame
   private edgeBatchUpdateIndex = 0;  // Track position in edge update cycle
   
   private nodeMeshes: Map<string, BABYLON.Mesh> = new Map();  // Track meshes for raycasting
@@ -77,6 +79,22 @@ export class MeshFactory {
   public setDeclutterContext(focusedFile: string | null, focusedDirectories: Iterable<string>): void {
     void focusedFile;
     void focusedDirectories;
+  }
+
+  public setSameFileEdgesStatic(staticMode: boolean): void {
+    if (this.sameFileEdgesStatic === staticMode) {
+      return;
+    }
+    this.sameFileEdgesStatic = staticMode;
+    this.edgesDirty = true;
+  }
+
+  public setCrossFileEdgesStatic(staticMode: boolean): void {
+    if (this.crossFileEdgesStatic === staticMode) {
+      return;
+    }
+    this.crossFileEdgesStatic = staticMode;
+    this.edgesDirty = true;
   }
 
   private getCrossFilePairKey(fileA: string, fileB: string): string {
@@ -226,6 +244,51 @@ export class MeshFactory {
     };
   }
 
+  private isHubParentCandidate(node: BABYLON.Node | null | undefined): node is BABYLON.Mesh {
+    if (!node) {
+      return false;
+    }
+
+    const candidate = node as any;
+    return typeof candidate.getBoundingInfo === 'function'
+      && typeof candidate.getAbsolutePosition === 'function';
+  }
+
+  private findFileBoxAncestor(node: BABYLON.Node | null | undefined): BABYLON.Mesh | null {
+    let current: BABYLON.Node | null | undefined = node;
+    while (current) {
+      const candidate = current as any;
+      if (
+        typeof candidate.name === 'string'
+        && candidate.name.startsWith('filebox_')
+        && this.isHubParentCandidate(current)
+      ) {
+        return current;
+      }
+      current = current.parent;
+    }
+    return null;
+  }
+
+  private resolveCrossFileHubParents(
+    sourceMesh: BABYLON.Mesh,
+    targetMesh: BABYLON.Mesh,
+  ): { sourceParent: BABYLON.Mesh; targetParent: BABYLON.Mesh } | null {
+    const sourceFileBox = this.findFileBoxAncestor(sourceMesh);
+    const targetFileBox = this.findFileBoxAncestor(targetMesh);
+
+    const sourceParent = sourceFileBox
+      ?? (this.isHubParentCandidate(sourceMesh.parent) ? sourceMesh.parent : null);
+    const targetParent = targetFileBox
+      ?? (this.isHubParentCandidate(targetMesh.parent) ? targetMesh.parent : null);
+
+    if (!sourceParent || !targetParent || sourceParent === targetParent) {
+      return null;
+    }
+
+    return { sourceParent, targetParent };
+  }
+
   private assignCrossFileHubSlots(): void {
     const peersByFile = new Map<string, Set<string>>();
     for (const meta of this.crossFileConduitMetadata.values()) {
@@ -284,11 +347,61 @@ export class MeshFactory {
   ): void {
     if (node.type === 'external') {
       this.createExternalModuleMesh(node, position, onNodeInteraction);
+    } else if (node.type === 'class') {
+      this.createClassMesh(node, position, fileColor, onNodeInteraction);
     } else if (node.type === 'variable') {
       this.createVariableMesh(node, position, onNodeInteraction);
     } else {
       this.createFunctionMesh(node, position, fileColor, indegree, onNodeInteraction);
     }
+  }
+
+  /**
+   * Create a class node as an icosahedron-like mesh.
+   */
+  private createClassMesh(
+    node: GraphNode,
+    position: BABYLON.Vector3,
+    fileColor: BABYLON.Color3 | null,
+    onNodeInteraction: (mesh: BABYLON.Mesh, material: BABYLON.StandardMaterial, node: GraphNode) => void
+  ): void {
+    const diameter = Math.max(1.8, SceneConfig.INTERNAL_FUNCTION_BOX_SIZE * 0.82);
+    const createIcoSphere = (BABYLON.MeshBuilder as any).CreateIcoSphere as
+      | ((name: string, options: any, scene: BABYLON.Scene) => BABYLON.Mesh)
+      | undefined;
+
+    const classMesh = createIcoSphere
+      ? createIcoSphere(`class_${node.id}`, { radius: diameter * 0.5, flat: true, subdivisions: 1 }, this.scene)
+      : BABYLON.MeshBuilder.CreateSphere(
+          `class_${node.id}`,
+          { diameter, segments: 12 },
+          this.scene,
+        );
+
+    classMesh.position = position;
+    classMesh.isPickable = true;
+
+    const material = new BABYLON.StandardMaterial(`classMat_${node.id}`, this.scene);
+    const tint = fileColor ?? new BABYLON.Color3(0.42, 0.58, 0.90);
+    material.diffuseColor = new BABYLON.Color3(
+      Math.min(1, tint.r * 0.85 + 0.12),
+      Math.min(1, tint.g * 0.85 + 0.12),
+      Math.min(1, tint.b * 0.95 + 0.10),
+    );
+    material.emissiveColor = new BABYLON.Color3(
+      Math.min(1, tint.r * 0.20 + 0.06),
+      Math.min(1, tint.g * 0.20 + 0.06),
+      Math.min(1, tint.b * 0.22 + 0.08),
+    );
+    material.specularColor = new BABYLON.Color3(0.45, 0.45, 0.52);
+    material.specularPower = 44;
+    material.alpha = 1.0;
+    material.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
+    classMesh.material = material;
+
+    this.nodeMeshes.set(node.id, classMesh);
+    this.createLabel(node.name, classMesh as BABYLON.Mesh);
+    onNodeInteraction(classMesh as BABYLON.Mesh, material, node);
   }
 
   /**
@@ -940,7 +1053,7 @@ export class MeshFactory {
         updatable: true,
       }, this.scene);
       conduit.material = conduitMaterial;
-      conduit.isPickable = false;
+      conduit.isPickable = true;
       conduit.alwaysSelectAsActiveMesh = true;
       conduit.renderingGroupId = 1;
       if (sceneRoot) {
@@ -1232,6 +1345,24 @@ export class MeshFactory {
     }
 
     if (this.nodeMeshes.size === 0) {
+      for (const tube of this.edgeTubes.values()) {
+        tube.setEnabled(false);
+      }
+      for (const arrow of this.edgeArrows.values()) {
+        arrow.setEnabled(false);
+      }
+      for (const conduit of this.crossFileConduits.values()) {
+        conduit.setEnabled(false);
+      }
+      for (const pair of this.crossFileConduitJunctions.values()) {
+        pair.source.setEnabled(false);
+        pair.target.setEnabled(false);
+      }
+      for (const pair of this.crossFileConduitLinkBoxes.values()) {
+        pair.source.setEnabled(false);
+        pair.target.setEnabled(false);
+      }
+      this.edgesDirty = true;
       return;
     }
 
@@ -1244,8 +1375,28 @@ export class MeshFactory {
     let hasMissingNodeReferences = false;
 
     // When force=true, process ALL edges at once (initialization)
-    // When force=false, batch process EDGES_PER_FRAME edges per frame
-    const edgeIds = Array.from(this.edgeTubes.keys());
+    // When force=false, batch process EDGES_PER_FRAME edges per frame.
+    // In static mode, same-file edges are frozen and skipped here.
+    const edgeIds = Array.from(this.edgeTubes.keys()).filter((edgeId) => {
+      if (force) {
+        return true;
+      }
+      const metadata = this.edgeMetadata.get(edgeId);
+      const isCrossFile = metadata?.isCrossFile ?? true;
+      if (!isCrossFile && this.sameFileEdgesStatic) {
+        return false;
+      }
+      if (isCrossFile && this.crossFileEdgesStatic) {
+        return false;
+      }
+      return true;
+    });
+
+    if (edgeIds.length === 0) {
+      this.edgesDirty = hasMissingNodeReferences;
+      return;
+    }
+
     let edgesToProcess: string[];
     
     if (force) {
@@ -1274,6 +1425,11 @@ export class MeshFactory {
 
       if (!sourceMesh || !targetMesh) {
         hasMissingNodeReferences = true;
+        cylinder.setEnabled(false);
+        const arrow = this.edgeArrows.get(edgeId);
+        if (arrow) {
+          arrow.setEnabled(false);
+        }
         continue;  // Skip if nodes not found
       }
 
@@ -1288,8 +1444,10 @@ export class MeshFactory {
       );
     }
 
-    // Always process all conduits (fewer than edges, simpler updates)
-    for (const [pairKey, conduit] of this.crossFileConduits.entries()) {
+    const shouldUpdateCrossFileConduits = force || !this.crossFileEdgesStatic;
+    // Cross-file conduits can be frozen after hub positioning has converged.
+    if (shouldUpdateCrossFileConduits) {
+      for (const [pairKey, conduit] of this.crossFileConduits.entries()) {
       const conduitMeta = this.crossFileConduitMetadata.get(pairKey);
       const junctions = this.crossFileConduitJunctions.get(pairKey);
       const linkBoxes = this.crossFileConduitLinkBoxes.get(pairKey);
@@ -1333,6 +1491,7 @@ export class MeshFactory {
         linkBoxes,
       );
     }
+    }
 
     this.edgesDirty = hasMissingNodeReferences;
   }
@@ -1362,6 +1521,14 @@ export class MeshFactory {
   ): void {
     const arrow = this.edgeArrows.get(edgeId);
     const edgeVisibility = this.getEdgeVisibilityFactor(metadata, sourceMesh, targetMesh);
+
+    if (edgeVisibility <= 0.0001) {
+      cylinder.setEnabled(false);
+      if (arrow) {
+        arrow.setEnabled(false);
+      }
+      return;
+    }
 
     if (metadata.isSelfLoop) {
       const sourceCenterPos = sourceMesh.getAbsolutePosition().clone();
@@ -1502,15 +1669,14 @@ export class MeshFactory {
           : SceneConfig.INTERNAL_EDGE_RADIUS * 2;
     const edgeRadius = edgeDiameter * 0.5;
 
-    const sourceParent = sourceMesh.parent as BABYLON.Mesh | null;
-    const targetParent = targetMesh.parent as BABYLON.Mesh | null;
+    const resolvedHubParents = this.resolveCrossFileHubParents(sourceMesh, targetMesh);
+    const sourceParent = resolvedHubParents?.sourceParent ?? null;
+    const targetParent = resolvedHubParents?.targetParent ?? null;
     const canBundleCrossFile = metadata.isCrossFile
       && !metadata.targetsExternalLibrary
       && !!sourceParent
       && !!targetParent
-      && sourceParent !== targetParent
-      && typeof sourceParent.getBoundingInfo === 'function'
-      && typeof targetParent.getBoundingInfo === 'function';
+      && sourceParent !== targetParent;
 
     const pairMeta = metadata.crossFilePairKey
       ? this.crossFileConduitMetadata.get(metadata.crossFilePairKey)
@@ -1582,6 +1748,7 @@ export class MeshFactory {
 
     // Update tube with new path
     const tubeRadius = Math.max(0.06, edgeDiameter * 0.5);
+    let activeTube = cylinder;
     try {
       BABYLON.MeshBuilder.CreateTube(cylinder.name, {
         path: localWaypoints,
@@ -1590,7 +1757,7 @@ export class MeshFactory {
         instance: cylinder,
       }, this.scene);
     } catch {
-      // If tube update fails, recreate the tube
+      // If tube update fails, recreate the tube and continue with the replacement.
       cylinder.dispose();
       const newTube = BABYLON.MeshBuilder.CreateTube(cylinder.name, {
         path: localWaypoints,
@@ -1602,15 +1769,17 @@ export class MeshFactory {
       newTube.alwaysSelectAsActiveMesh = true;
       newTube.renderingGroupId = 1;
       (newTube as any).edgeData = (cylinder as any).edgeData;
+      (newTube as any).edgeKind = (cylinder as any).edgeKind;
       if (cylinder.parent) {
         newTube.parent = cylinder.parent;
       }
       this.edgeTubes.set(edgeId, newTube);
+      activeTube = newTube;
     }
 
-    // Ensure cylinder is visible
-    this.ensureMeshEnabled(cylinder);
-    cylinder.visibility = edgeVisibility;
+    // Ensure tube is visible
+    this.ensureMeshEnabled(activeTube);
+    activeTube.visibility = edgeVisibility;
 
     // Position and orient arrowhead at the target surface
     if (arrow) {
@@ -1656,8 +1825,9 @@ export class MeshFactory {
     junctions: { source: BABYLON.Mesh; target: BABYLON.Mesh } | null | undefined,
     linkBoxes: { source: BABYLON.Mesh; target: BABYLON.Mesh } | null | undefined,
   ): void {
-    const sourceParent = sourceNode.parent as BABYLON.Mesh | null;
-    const targetParent = targetNode.parent as BABYLON.Mesh | null;
+    const resolvedHubParents = this.resolveCrossFileHubParents(sourceNode, targetNode);
+    const sourceParent = resolvedHubParents?.sourceParent ?? null;
+    const targetParent = resolvedHubParents?.targetParent ?? null;
     if (!sourceParent || !targetParent || sourceParent === targetParent) {
       conduit.setEnabled(false);
       if (junctions) {
@@ -1731,6 +1901,8 @@ export class MeshFactory {
       targetNodeId: conduitMeta.targetNodeId,
       sourceFile: conduitMeta.sourceFile,
       targetFile: conduitMeta.targetFile,
+      sourceHubWorld: hubs.sourceHub.clone(),
+      targetHubWorld: hubs.targetHub.clone(),
       endpoint: 'bundle',
     };
 
@@ -1748,6 +1920,8 @@ export class MeshFactory {
         navigationNodeId: conduitMeta.targetNodeId,
         sourceFile: conduitMeta.sourceFile,
         targetFile: conduitMeta.targetFile,
+        sourceHubWorld: hubs.sourceHub.clone(),
+        targetHubWorld: hubs.targetHub.clone(),
         endpoint: 'source',
       };
       (junctions.target as any).edgeData = {
@@ -1760,6 +1934,8 @@ export class MeshFactory {
         navigationNodeId: conduitMeta.sourceNodeId,
         sourceFile: conduitMeta.sourceFile,
         targetFile: conduitMeta.targetFile,
+        sourceHubWorld: hubs.sourceHub.clone(),
+        targetHubWorld: hubs.targetHub.clone(),
         endpoint: 'target',
       };
 
@@ -1799,6 +1975,8 @@ export class MeshFactory {
         navigationNodeId: conduitMeta.targetNodeId,
         sourceFile: conduitMeta.sourceFile,
         targetFile: conduitMeta.targetFile,
+        sourceHubWorld: hubs.sourceHub.clone(),
+        targetHubWorld: hubs.targetHub.clone(),
         endpoint: 'source',
       };
       (linkBoxes.target as any).edgeData = {
@@ -1811,6 +1989,8 @@ export class MeshFactory {
         navigationNodeId: conduitMeta.sourceNodeId,
         sourceFile: conduitMeta.sourceFile,
         targetFile: conduitMeta.targetFile,
+        sourceHubWorld: hubs.sourceHub.clone(),
+        targetHubWorld: hubs.targetHub.clone(),
         endpoint: 'target',
       };
 
@@ -1863,6 +2043,25 @@ export class MeshFactory {
     if (!isCurrentlyEnabled) {
       mesh.setEnabled(true);
     }
+  }
+
+  private isMeshRenderable(mesh: BABYLON.Mesh | null | undefined): boolean {
+    if (!mesh) {
+      return false;
+    }
+
+    if ((mesh as any).isVisible === false) {
+      return false;
+    }
+
+    const isEnabledMember = (mesh as any).isEnabled;
+    if (typeof isEnabledMember === 'function') {
+      return !!isEnabledMember.call(mesh);
+    }
+    if (typeof isEnabledMember === 'boolean') {
+      return isEnabledMember;
+    }
+    return true;
   }
 
   /**
@@ -1954,86 +2153,15 @@ export class MeshFactory {
     sourceMesh: BABYLON.Mesh,
     targetMesh: BABYLON.Mesh,
   ): number {
-    if (metadata.isCrossFile) {
-      return this.getCrossFileEdgeVisibilityFactor(metadata);
-    }
-
-    const sharedParent = sourceMesh.parent && sourceMesh.parent === targetMesh.parent
-      ? sourceMesh.parent
-      : null;
-    if (!sharedParent || typeof (sharedParent as BABYLON.AbstractMesh).getBoundingInfo !== 'function') {
-      return 1.0;
-    }
-
-    if (typeof (sharedParent as BABYLON.AbstractMesh).computeWorldMatrix === 'function') {
-      (sharedParent as BABYLON.AbstractMesh).computeWorldMatrix(true);
-    }
-
-    const viewerWorldPosition = this.getViewerWorldPosition();
-    if (!viewerWorldPosition) {
-      return 1.0;
-    }
-
-    const boundingBox = (sharedParent as BABYLON.AbstractMesh).getBoundingInfo()?.boundingBox;
-    if (!boundingBox) {
-      return 1.0;
-    }
-
-    return this.isPointInsideBoundingBox(boundingBox, viewerWorldPosition) ? 1.0 : 0.45;
-  }
-
-  private getCrossFileEdgeVisibilityFactor(metadata: {
-    fromFile: string | null;
-    toFile: string | null;
-    targetsExternalLibrary: boolean;
-  }): number {
     void metadata;
+
+    // If either endpoint is hidden/disabled (for example module anchors),
+    // hide the connected edge so it cannot appear as a dangling connection.
+    if (!this.isMeshRenderable(sourceMesh) || !this.isMeshRenderable(targetMesh)) {
+      return 0.0;
+    }
+
     return 1.0;
-  }
-
-  private isPointInsideBoundingBox(
-    boundingBox: BABYLON.BoundingBox,
-    point: BABYLON.Vector3,
-  ): boolean {
-    if (typeof boundingBox.intersectsPoint === 'function') {
-      return boundingBox.intersectsPoint(point);
-    }
-
-    const minimumWorld = (boundingBox as any).minimumWorld ?? boundingBox.minimum;
-    const maximumWorld = (boundingBox as any).maximumWorld ?? boundingBox.maximum;
-    if (!minimumWorld || !maximumWorld) {
-      return true;
-    }
-
-    const padding = 0.5;
-    return point.x >= (minimumWorld.x - padding)
-      && point.x <= (maximumWorld.x + padding)
-      && point.y >= (minimumWorld.y - padding)
-      && point.y <= (maximumWorld.y + padding)
-      && point.z >= (minimumWorld.z - padding)
-      && point.z <= (maximumWorld.z + padding);
-  }
-
-  private getViewerWorldPosition(): BABYLON.Vector3 | null {
-    const activeCamera = this.scene.activeCamera;
-    if (!activeCamera) {
-      return null;
-    }
-
-    const activeGlobal = (activeCamera as any).globalPosition as BABYLON.Vector3 | undefined;
-    if (activeGlobal && Number.isFinite(activeGlobal.x) && Number.isFinite(activeGlobal.y) && Number.isFinite(activeGlobal.z)) {
-      return typeof activeGlobal.clone === 'function'
-        ? activeGlobal.clone()
-        : new BABYLON.Vector3(activeGlobal.x, activeGlobal.y, activeGlobal.z);
-    }
-
-    if (activeCamera.position) {
-      return typeof activeCamera.position.clone === 'function'
-        ? activeCamera.position.clone()
-        : new BABYLON.Vector3(activeCamera.position.x, activeCamera.position.y, activeCamera.position.z);
-    }
-
-    return null;
   }
 
   private extractFilePathFromNodeId(nodeId: string): string | null {

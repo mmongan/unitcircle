@@ -2,7 +2,7 @@
  * Shared type definitions for the VR visualization system
  */
 
-export type NodeType = 'function' | 'class' | 'interface' | 'type-alias' | 'enum' | 'namespace' | 'variable' | 'external';
+export type NodeType = 'function' | 'module-anchor' | 'class' | 'interface' | 'type-alias' | 'enum' | 'namespace' | 'variable' | 'external';
 
 export interface GraphNode {
   id: string;
@@ -11,6 +11,7 @@ export interface GraphNode {
   line?: number;
   isExported?: boolean;
   type?: NodeType;
+  containerId?: string;
   code?: string;
 }
 

@@ -282,7 +282,7 @@ describe('CodeTreeBuilder Integration', () => {
 
     it('contains module anchor nodes for import/export graph rendering', () => {
       const graph = readGraph();
-      const moduleNodes = graph.nodes.filter((n: any) => n.type === 'function' && typeof n.id === 'string' && n.id.startsWith('module:'));
+      const moduleNodes = graph.nodes.filter((n: any) => n.type === 'module-anchor' && typeof n.id === 'string' && n.id.startsWith('module:'));
       expect(moduleNodes.length).toBeGreaterThan(0);
     });
 

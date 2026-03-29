@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { VRSceneManager } from '../../../src/VRSceneManager';
+import { SceneConfig } from '../../../src/SceneConfig';
 
 // Mock Babylon.js
 vi.mock('@babylonjs/core', () => {
@@ -38,12 +39,14 @@ vi.mock('@babylonjs/core', () => {
     isPickable: false,
     setEnabled: vi.fn(),
     renderingGroupId: 0,
+    computeWorldMatrix: vi.fn(),
   };
 
   const mockTransformNode = {
     name: '',
     position: { x: 0, y: 0, z: 0, clone: vi.fn(() => ({ x: 0, y: 0, z: 0, add: vi.fn(), subtract: vi.fn() })), add: vi.fn(() => ({ x: 0, y: 0, z: 0 })), subtract: vi.fn(() => ({ x: 0, y: 0, z: 0 })) },
     dispose: vi.fn(),
+    computeWorldMatrix: vi.fn(),
   };
 
   const mockScene = {
@@ -210,7 +213,11 @@ describe('VRSceneManager', () => {
     it('should set up graph polling when initialized', async () => {
       const setIntervalSpy = vi.spyOn(global, 'setInterval');
       await manager.initialize();
-      expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 2000);
+      if (SceneConfig.ENABLE_GRAPH_POLLING) {
+        expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 2000);
+      } else {
+        expect(setIntervalSpy).not.toHaveBeenCalled();
+      }
     });
   });
 
@@ -429,6 +436,42 @@ describe('VRSceneManager', () => {
   describe('Edge Rendering', () => {
     beforeEach(() => {
       manager = new VRSceneManager(canvas);
+    });
+
+    it('should defer edge and conduit creation while layout is still settling', () => {
+      const managerAny = manager as any;
+      const renderEdgesSpy = vi.spyOn(managerAny, 'renderEdges').mockImplementation(() => {});
+      const updateEdgesSpy = vi.spyOn(managerAny.meshFactory, 'updateEdges').mockImplementation(() => {});
+
+      managerAny.pendingEdgeRender = true;
+      managerAny.physicsActive = true;
+
+      managerAny.finalizeEdgeRenderingAfterLayoutSettles();
+
+      expect(renderEdgesSpy).not.toHaveBeenCalled();
+      expect(updateEdgesSpy).not.toHaveBeenCalled();
+      expect(managerAny.pendingEdgeRender).toBe(true);
+    });
+
+    it('should create deferred edge and conduit meshes after layout settles', () => {
+      const managerAny = manager as any;
+      const renderEdgesSpy = vi.spyOn(managerAny, 'renderEdges').mockImplementation(() => {});
+      const updateEdgesSpy = vi.spyOn(managerAny.meshFactory, 'updateEdges').mockImplementation(() => {});
+      const sameFileStaticSpy = vi.spyOn(managerAny.meshFactory, 'setSameFileEdgesStatic').mockImplementation(() => {});
+      const crossFileStaticSpy = vi.spyOn(managerAny.meshFactory, 'setCrossFileEdgesStatic').mockImplementation(() => {});
+
+      managerAny.pendingEdgeRender = true;
+      managerAny.physicsActive = false;
+
+      managerAny.finalizeEdgeRenderingAfterLayoutSettles();
+
+      expect(renderEdgesSpy).toHaveBeenCalledTimes(1);
+      expect(updateEdgesSpy).toHaveBeenCalledWith(true);
+      expect(sameFileStaticSpy).toHaveBeenCalledWith(false);
+      expect(sameFileStaticSpy).toHaveBeenCalledWith(true);
+      expect(crossFileStaticSpy).toHaveBeenCalledWith(false);
+      expect(crossFileStaticSpy).toHaveBeenCalledWith(true);
+      expect(managerAny.pendingEdgeRender).toBe(false);
     });
 
     it('should create tube meshes for edges', () => {
@@ -908,13 +951,11 @@ describe('VRSceneManager', () => {
 
       (manager as any).autosizeFileBoxes();
 
-      // Children are centered around origin then positions rescaled:
-      //   extentX=0.475, scaleX: 20→67  → x = 0.475*(20/67) ≈ 0.1418
-      //   extentY=0.15,  scaleY: 20→54  → y = 0.15*(20/54)  ≈ 0.0556
-      //   extentZ=0.05,  scaleZ: 20→50  → z = 0.05*(20/50)  = 0.02
-      expect(Math.abs(exportedChild.position.x)).toBeCloseTo(0.475 * 20 / 67, 3);
-      expect(Math.abs(exportedChild.position.y)).toBeCloseTo(0.15 * 20 / 54, 3);
-      expect(Math.abs(exportedChild.position.z)).toBeCloseTo(0.05 * 20 / 50, 3);
+      // Children are centered around origin then rescaled by (oldScale / newScale)
+      // per axis to preserve world-space placement while the parent file box changes size.
+      expect(Math.abs(exportedChild.position.x)).toBeCloseTo(0.475 * 20 / fileBox.scaling.x, 3);
+      expect(Math.abs(exportedChild.position.y)).toBeCloseTo(0.15 * 20 / fileBox.scaling.y, 3);
+      expect(Math.abs(exportedChild.position.z)).toBeCloseTo(0.05 * 20 / fileBox.scaling.z, 3);
 
       // Per-axis resizing should produce a non-uniform box for anisotropic content.
       expect(fileBox.scaling.x).not.toBe(fileBox.scaling.y);
