@@ -819,6 +819,13 @@ export class MeshFactory {
       return;  // No edges to update
     }
 
+    // Build per-frame collision samples once per file box parent.
+    const collisionSampleCache = new Map<BABYLON.Node, Array<{
+      mesh: BABYLON.Mesh;
+      center: BABYLON.Vector3;
+      radius: number;
+    }>>();
+
     for (const [edgeId, cylinder] of this.edgeTubes) {
       const metadata = this.edgeMetadata.get(edgeId);
       if (!metadata) continue;
@@ -898,17 +905,19 @@ export class MeshFactory {
         continue;
       }
 
-      // Use vertical half extents so edges connect through top/bottom faces.
+      // Use mesh half extents so edges can connect to any face (x/y/z).
       const sourceBoundingBox = sourceMesh.getBoundingInfo().boundingBox;
       const targetBoundingBox = targetMesh.getBoundingInfo().boundingBox;
-      const sourceHalfY = Math.max(
-        0.1,
-        (sourceBoundingBox.maximum.y - sourceBoundingBox.minimum.y) * 0.5,
-      );
-      const targetHalfY = Math.max(
-        0.1,
-        (targetBoundingBox.maximum.y - targetBoundingBox.minimum.y) * 0.5,
-      );
+      const sourceHalfExtents = {
+        x: Math.max(0.1, (sourceBoundingBox.maximum.x - sourceBoundingBox.minimum.x) * 0.5),
+        y: Math.max(0.1, (sourceBoundingBox.maximum.y - sourceBoundingBox.minimum.y) * 0.5),
+        z: Math.max(0.1, (sourceBoundingBox.maximum.z - sourceBoundingBox.minimum.z) * 0.5),
+      };
+      const targetHalfExtents = {
+        x: Math.max(0.1, (targetBoundingBox.maximum.x - targetBoundingBox.minimum.x) * 0.5),
+        y: Math.max(0.1, (targetBoundingBox.maximum.y - targetBoundingBox.minimum.y) * 0.5),
+        z: Math.max(0.1, (targetBoundingBox.maximum.z - targetBoundingBox.minimum.z) * 0.5),
+      };
 
       // Normalize direction
       const normalizedDir = direction.normalize();
@@ -920,15 +929,30 @@ export class MeshFactory {
       const offsetSourcePos = sourceCenterPos.add(bidirectionalOffset);
       const offsetTargetPos = targetCenterPos.add(bidirectionalOffset);
 
-      // All non-self edges connect via top/bottom faces only.
-      // If target is above source, exit source top and enter target bottom.
-      // If target is below source, exit source bottom and enter target top.
-      const verticalSign = targetCenterPos.y >= sourceCenterPos.y ? 1 : -1;
-      const sourceVerticalOffset = new BABYLON.Vector3(0, verticalSign * sourceHalfY, 0);
-      const targetVerticalOffset = new BABYLON.Vector3(0, -verticalSign * targetHalfY, 0);
+      // Connect to the dominant axis face between source and target (no angle math).
+      const delta = offsetTargetPos.subtract(offsetSourcePos);
+      const absDx = Math.abs(delta.x);
+      const absDy = Math.abs(delta.y);
+      const absDz = Math.abs(delta.z);
 
-      const edgeStartPos = offsetSourcePos.add(sourceVerticalOffset);
-      const edgeEndPos = offsetTargetPos.add(targetVerticalOffset);
+      let sourceFaceOffset: BABYLON.Vector3;
+      let targetFaceOffset: BABYLON.Vector3;
+      if (absDx >= absDy && absDx >= absDz) {
+        const sign = delta.x >= 0 ? 1 : -1;
+        sourceFaceOffset = new BABYLON.Vector3(sign * sourceHalfExtents.x, 0, 0);
+        targetFaceOffset = new BABYLON.Vector3(-sign * targetHalfExtents.x, 0, 0);
+      } else if (absDy >= absDx && absDy >= absDz) {
+        const sign = delta.y >= 0 ? 1 : -1;
+        sourceFaceOffset = new BABYLON.Vector3(0, sign * sourceHalfExtents.y, 0);
+        targetFaceOffset = new BABYLON.Vector3(0, -sign * targetHalfExtents.y, 0);
+      } else {
+        const sign = delta.z >= 0 ? 1 : -1;
+        sourceFaceOffset = new BABYLON.Vector3(0, 0, sign * sourceHalfExtents.z);
+        targetFaceOffset = new BABYLON.Vector3(0, 0, -sign * targetHalfExtents.z);
+      }
+
+      const edgeStartPos = offsetSourcePos.add(sourceFaceOffset);
+      const edgeEndPos = offsetTargetPos.add(targetFaceOffset);
 
       // Get edge diameter from metadata/config
       const edgeKind = (cylinder as any).edgeKind ?? 'call';
@@ -945,8 +969,18 @@ export class MeshFactory {
       const sharedFileBox = (sourceMesh.parent === targetMesh.parent) ? sourceMesh.parent : null;
 
       // Calculate collision-free waypoints (only for edges in the same file box)
+      const collisionCandidates = sharedFileBox
+        ? this.getCollisionSamplesForFileBox(sharedFileBox, collisionSampleCache)
+        : [];
       const waypoints = sharedFileBox
-        ? this.calculateCollisionAvoidanceWaypoints(edgeStartPos, edgeEndPos, edgeRadius, sharedFileBox)
+        ? this.calculateCollisionAvoidanceWaypoints(
+            edgeStartPos,
+            edgeEndPos,
+            edgeRadius,
+            collisionCandidates,
+            sourceMesh,
+            targetMesh,
+          )
         : [edgeStartPos, edgeEndPos];
 
       // Convert waypoints to local space relative to parent for tube creation
@@ -1015,6 +1049,35 @@ export class MeshFactory {
         arrow.visibility = edgeVisibility;
       }
     }
+  }
+
+  private getCollisionSamplesForFileBox(
+    fileBoxParent: BABYLON.Node,
+    cache: Map<BABYLON.Node, Array<{ mesh: BABYLON.Mesh; center: BABYLON.Vector3; radius: number }>>,
+  ): Array<{ mesh: BABYLON.Mesh; center: BABYLON.Vector3; radius: number }> {
+    const cached = cache.get(fileBoxParent);
+    if (cached) {
+      return cached;
+    }
+
+    const samples: Array<{ mesh: BABYLON.Mesh; center: BABYLON.Vector3; radius: number }> = [];
+    const children = fileBoxParent.getChildren() as BABYLON.Mesh[];
+    for (const mesh of children) {
+      if (!mesh || !mesh.isVisible || !mesh.name || !mesh.name.startsWith('func_')) {
+        continue;
+      }
+
+      const bounds = mesh.getBoundingInfo()?.boundingSphere;
+      const radius = Math.max(0.25, bounds?.radiusWorld ?? 0.5);
+      samples.push({
+        mesh,
+        center: mesh.getAbsolutePosition().clone(),
+        radius,
+      });
+    }
+
+    cache.set(fileBoxParent, samples);
+    return samples;
   }
 
   private ensureMeshEnabled(mesh: BABYLON.Mesh): void {
@@ -1148,7 +1211,9 @@ export class MeshFactory {
     startPos: BABYLON.Vector3,
     endPos: BABYLON.Vector3,
     edgeRadius: number,
-    fileBoxParent: BABYLON.Node,
+    collisionCandidates: Array<{ mesh: BABYLON.Mesh; center: BABYLON.Vector3; radius: number }>,
+    sourceMesh?: BABYLON.Mesh,
+    targetMesh?: BABYLON.Mesh,
   ): BABYLON.Vector3[] {
     // Early exit: very short edges unlikely to collide
     const edgeLength = BABYLON.Vector3.Distance(startPos, endPos);
@@ -1156,17 +1221,7 @@ export class MeshFactory {
       return [startPos, endPos];
     }
 
-    // Collect only sibling boxes (children of the same file box)
-    const fileBoxChildren = fileBoxParent.getChildren() as BABYLON.Mesh[];
-    const siblingBoxes: BABYLON.Mesh[] = [];
-
-    for (const mesh of fileBoxChildren) {
-      if (mesh && mesh.isVisible && mesh.name && mesh.name.startsWith('func_')) {
-        siblingBoxes.push(mesh);
-      }
-    }
-
-    if (siblingBoxes.length === 0) {
+    if (collisionCandidates.length === 0) {
       return [startPos, endPos];
     }
 
@@ -1176,10 +1231,13 @@ export class MeshFactory {
     // Check for collisions with sibling boxes only
     const collisionBoxes: Array<{ mesh: BABYLON.Mesh; distance: number }> = [];
 
-    for (const mesh of siblingBoxes) {
-      const boundingSphere = mesh.getBoundingInfo().boundingSphere;
-      const boxCenter = mesh.getAbsolutePosition();
-      const boxRadius = boundingSphere.radiusWorld + edgeRadius + 0.3;
+    for (const candidate of collisionCandidates) {
+      const mesh = candidate.mesh;
+      if (mesh === sourceMesh || mesh === targetMesh) {
+        continue;
+      }
+      const boxCenter = candidate.center;
+      const boxRadius = candidate.radius + edgeRadius + 0.3;
 
       // Project box center onto edge line
       const toBox = boxCenter.subtract(startPos);
@@ -1206,13 +1264,15 @@ export class MeshFactory {
       return waypoints;
     }
 
-    // Sort and add waypoints to route around boxes
+    // Sort and add waypoints to route around boxes.
+    // Cap waypoint count to avoid excessive per-edge path complexity.
     collisionBoxes.sort((a, b) => a.distance - b.distance);
+    const MAX_COLLISION_WAYPOINTS = 2;
 
-    for (const { mesh } of collisionBoxes) {
-      const boxCenter = mesh.getAbsolutePosition();
-      const boundingSphere = mesh.getBoundingInfo().boundingSphere;
-      const boxRadius = boundingSphere.radiusWorld + edgeRadius + 0.5;
+    for (const { mesh } of collisionBoxes.slice(0, MAX_COLLISION_WAYPOINTS)) {
+      const sample = collisionCandidates.find((c) => c.mesh === mesh);
+      const boxCenter = sample?.center ?? mesh.getAbsolutePosition();
+      const boxRadius = (sample?.radius ?? (mesh.getBoundingInfo()?.boundingSphere?.radiusWorld ?? 0.5)) + edgeRadius + 0.5;
 
       // Build perpendicular offset direction
       let offsetDir = BABYLON.Axis.X;
