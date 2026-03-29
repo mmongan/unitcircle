@@ -274,7 +274,7 @@ describe('MeshFactory', () => {
   });
 
   describe('same-file edge visibility gating', () => {
-    it('hides same-file edges when the viewer is outside the shared file box', () => {
+    it('fades same-file edges when the viewer is outside the shared file box', () => {
       const factoryWithCamera = new MeshFactory({
         activeCamera: {
           position: { x: 40, y: 0, z: 0, clone: vi.fn(() => ({ x: 40, y: 0, z: 0 })) },
@@ -292,13 +292,14 @@ describe('MeshFactory', () => {
       const sourceMesh = { parent: sharedFileBox } as any;
       const targetMesh = { parent: sharedFileBox } as any;
 
-      const visible = (factoryWithCamera as any).shouldRenderEdge(
+      const visibility = (factoryWithCamera as any).getEdgeVisibilityFactor(
         { from: 'a', to: 'b', isCrossFile: false, isSelfLoop: false, bidirectionalOffsetSign: 0 },
         sourceMesh,
         targetMesh,
       );
 
-      expect(visible).toBe(false);
+      expect(visibility).toBeLessThan(1);
+      expect(visibility).toBeGreaterThan(0);
     });
 
     it('shows same-file edges when the viewer is inside the shared file box', () => {
@@ -319,13 +320,13 @@ describe('MeshFactory', () => {
       const sourceMesh = { parent: sharedFileBox } as any;
       const targetMesh = { parent: sharedFileBox } as any;
 
-      const visible = (factoryWithCamera as any).shouldRenderEdge(
+      const visibility = (factoryWithCamera as any).getEdgeVisibilityFactor(
         { from: 'a', to: 'b', isCrossFile: false, isSelfLoop: false, bidirectionalOffsetSign: 0 },
         sourceMesh,
         targetMesh,
       );
 
-      expect(visible).toBe(true);
+      expect(visibility).toBe(1);
     });
 
     it('refreshes the shared file box world matrix before checking containment', () => {
@@ -344,13 +345,13 @@ describe('MeshFactory', () => {
         })),
       } as any;
 
-      const visible = (factoryWithCamera as any).shouldRenderEdge(
+      const visibility = (factoryWithCamera as any).getEdgeVisibilityFactor(
         { from: 'a', to: 'b', isCrossFile: false, isSelfLoop: false, bidirectionalOffsetSign: 0 },
         { parent: sharedFileBox } as any,
         { parent: sharedFileBox } as any,
       );
 
-      expect(visible).toBe(true);
+      expect(visibility).toBe(1);
       expect(sharedFileBox.computeWorldMatrix).toHaveBeenCalledWith(true);
     });
 
@@ -371,13 +372,13 @@ describe('MeshFactory', () => {
         })),
       } as any;
 
-      const visible = (factoryWithCamera as any).shouldRenderEdge(
+      const visibility = (factoryWithCamera as any).getEdgeVisibilityFactor(
         { from: 'a', to: 'b', isCrossFile: false, isSelfLoop: false, bidirectionalOffsetSign: 0 },
         { parent: sharedFileBox } as any,
         { parent: sharedFileBox } as any,
       );
 
-      expect(visible).toBe(true);
+      expect(visibility).toBe(1);
     });
 
     it('keeps cross-file edges visible even when the viewer is outside a file box', () => {
@@ -398,13 +399,13 @@ describe('MeshFactory', () => {
       const sourceMesh = { parent: sharedFileBox } as any;
       const targetMesh = { parent: sharedFileBox } as any;
 
-      const visible = (factoryWithCamera as any).shouldRenderEdge(
+      const visibility = (factoryWithCamera as any).getEdgeVisibilityFactor(
         { from: 'a', to: 'b', isCrossFile: true, isSelfLoop: false, bidirectionalOffsetSign: 0 },
         sourceMesh,
         targetMesh,
       );
 
-      expect(visible).toBe(true);
+      expect(visibility).toBe(1);
     });
 
     it('re-enables a previously hidden non-self edge when it becomes visible again', () => {
@@ -418,40 +419,41 @@ describe('MeshFactory', () => {
       expect(cylinder.setEnabled).toHaveBeenCalledWith(true);
     });
 
-    it('hides unrelated cross-file edges when a focus file is active', () => {
+    it('fades unrelated cross-file edges when a focus file is active', () => {
       (factory as any).setDeclutterContext('src/main.ts', ['src']);
 
-      const visible = (factory as any).shouldRenderCrossFileEdge({
+      const visibility = (factory as any).getCrossFileEdgeVisibilityFactor({
         fromFile: 'scripts/build-graph.ts',
         toFile: 'viewer.html',
         targetsExternalLibrary: false,
       });
 
-      expect(visible).toBe(false);
+      expect(visibility).toBeLessThan(1);
+      expect(visibility).toBeGreaterThan(0);
     });
 
     it('keeps cross-file edges visible when they connect to the focus file', () => {
       (factory as any).setDeclutterContext('src/main.ts', ['src']);
 
-      const visible = (factory as any).shouldRenderCrossFileEdge({
+      const visibility = (factory as any).getCrossFileEdgeVisibilityFactor({
         fromFile: 'src/main.ts',
         toFile: 'src/VRSceneManager.ts',
         targetsExternalLibrary: false,
       });
 
-      expect(visible).toBe(true);
+      expect(visibility).toBe(1);
     });
 
     it('keeps cross-file edges visible when no focus file is active', () => {
       (factory as any).setDeclutterContext(null, []);
 
-      const visible = (factory as any).shouldRenderCrossFileEdge({
+      const visibility = (factory as any).getCrossFileEdgeVisibilityFactor({
         fromFile: 'scripts/build-graph.ts',
         toFile: 'viewer.html',
         targetsExternalLibrary: true,
       });
 
-      expect(visible).toBe(true);
+      expect(visibility).toBe(1);
     });
   });
 });

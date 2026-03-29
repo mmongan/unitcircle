@@ -830,11 +830,7 @@ export class MeshFactory {
 
       const arrow = this.edgeArrows.get(edgeId);
 
-      if (!this.shouldRenderEdge(metadata, sourceMesh, targetMesh)) {
-        cylinder.setEnabled(false);
-        arrow?.setEnabled(false);
-        continue;
-      }
+      const edgeVisibility = this.getEdgeVisibilityFactor(metadata, sourceMesh, targetMesh);
 
       if (metadata.isSelfLoop) {
         const sourceCenterPos = sourceMesh.getAbsolutePosition().clone();
@@ -857,6 +853,7 @@ export class MeshFactory {
         }
 
         this.ensureMeshEnabled(activeTube);
+        activeTube.visibility = edgeVisibility;
 
         if (arrow) {
           const loopRadius = Math.max(3.2, sourceRadius * 1.8);
@@ -878,6 +875,7 @@ export class MeshFactory {
           arrow.rotationQuaternion = arrowQ;
 
           this.ensureMeshEnabled(arrow);
+          arrow.visibility = edgeVisibility;
         }
 
         continue;
@@ -969,6 +967,7 @@ export class MeshFactory {
 
       // Ensure cylinder is visible
       this.ensureMeshEnabled(cylinder);
+      cylinder.visibility = edgeVisibility;
 
       // Position and orient arrowhead at the target surface
       if (arrow) {
@@ -990,6 +989,7 @@ export class MeshFactory {
         arrow.rotationQuaternion = arrowQ;
 
         this.ensureMeshEnabled(arrow);
+        arrow.visibility = edgeVisibility;
       }
     }
   }
@@ -1007,7 +1007,7 @@ export class MeshFactory {
     }
   }
 
-  private shouldRenderEdge(
+  private getEdgeVisibilityFactor(
     metadata: {
       from: string;
       to: string;
@@ -1020,16 +1020,16 @@ export class MeshFactory {
     },
     sourceMesh: BABYLON.Mesh,
     targetMesh: BABYLON.Mesh,
-  ): boolean {
+  ): number {
     if (metadata.isCrossFile) {
-      return this.shouldRenderCrossFileEdge(metadata);
+      return this.getCrossFileEdgeVisibilityFactor(metadata);
     }
 
     const sharedParent = sourceMesh.parent && sourceMesh.parent === targetMesh.parent
       ? sourceMesh.parent
       : null;
     if (!sharedParent || typeof (sharedParent as BABYLON.AbstractMesh).getBoundingInfo !== 'function') {
-      return true;
+      return 1.0;
     }
 
     if (typeof (sharedParent as BABYLON.AbstractMesh).computeWorldMatrix === 'function') {
@@ -1038,37 +1038,39 @@ export class MeshFactory {
 
     const viewerWorldPosition = this.getViewerWorldPosition();
     if (!viewerWorldPosition) {
-      return true;
+      return 1.0;
     }
 
     const boundingBox = (sharedParent as BABYLON.AbstractMesh).getBoundingInfo()?.boundingBox;
     if (!boundingBox) {
-      return true;
+      return 1.0;
     }
 
-    return this.isPointInsideBoundingBox(boundingBox, viewerWorldPosition);
+    return this.isPointInsideBoundingBox(boundingBox, viewerWorldPosition) ? 1.0 : 0.22;
   }
 
-  private shouldRenderCrossFileEdge(metadata: {
+  private getCrossFileEdgeVisibilityFactor(metadata: {
     fromFile: string | null;
     toFile: string | null;
     targetsExternalLibrary: boolean;
-  }): boolean {
+  }): number {
     if (!this.focusedFile) {
-      return true;
+      return 1.0;
     }
 
     if (metadata.fromFile === this.focusedFile || metadata.toFile === this.focusedFile) {
-      return true;
+      return 1.0;
     }
 
     if (metadata.targetsExternalLibrary) {
-      return metadata.fromFile === this.focusedFile;
+      return metadata.fromFile === this.focusedFile ? 1.0 : 0.18;
     }
 
     const fromDir = metadata.fromFile ? this.getDirectoryPathSafe(metadata.fromFile) : '';
     const toDir = metadata.toFile ? this.getDirectoryPathSafe(metadata.toFile) : '';
-    return this.focusedDirectories.has(fromDir) || this.focusedDirectories.has(toDir);
+    return this.focusedDirectories.has(fromDir) || this.focusedDirectories.has(toDir)
+      ? 0.56
+      : 0.24;
   }
 
   private isPointInsideBoundingBox(
