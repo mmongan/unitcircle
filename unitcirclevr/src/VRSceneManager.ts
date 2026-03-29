@@ -2690,15 +2690,15 @@ export class VRSceneManager {
       const material = new BABYLON.StandardMaterial(`fileboxmat_${file}`, this.scene);
       // Tint the glass with the file's unique colour at medium intensity
       material.diffuseColor = new BABYLON.Color3(
-        fileColor.r * 0.6,
-        fileColor.g * 0.6,
-        fileColor.b * 0.6
+        fileColor.r * 0.85,
+        fileColor.g * 0.85,
+        fileColor.b * 0.85
       );
       // Self-illumination so the tint is visible even without direct lighting
       material.emissiveColor = new BABYLON.Color3(
-        fileColor.r * 0.28,
-        fileColor.g * 0.28,
-        fileColor.b * 0.28
+        fileColor.r * 0.42,
+        fileColor.g * 0.42,
+        fileColor.b * 0.42
       );
       // Strong specular highlight for a glassy look
       material.specularColor = new BABYLON.Color3(1, 1, 1);
@@ -2718,9 +2718,9 @@ export class VRSceneManager {
       boxMesh.enableEdgesRendering();
       // Keep edge color strong so structure remains readable when faces are transparent
       boxMesh.edgesColor = new BABYLON.Color4(
-        Math.min(1, fileColor.r * 0.75 + 0.2),
-        Math.min(1, fileColor.g * 0.75 + 0.2),
-        Math.min(1, fileColor.b * 0.75 + 0.2),
+        Math.min(1, fileColor.r * 0.82 + 0.28),
+        Math.min(1, fileColor.g * 0.82 + 0.28),
+        Math.min(1, fileColor.b * 0.82 + 0.28),
         1.0
       );
       boxMesh.edgesWidth = SceneConfig.FILE_BOX_EDGE_WIDTH;
@@ -2738,9 +2738,9 @@ export class VRSceneManager {
       boxMesh.actionManager.registerAction(
         new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPointerOverTrigger, () => {
           material.emissiveColor = new BABYLON.Color3(
-            fileColor.r * 0.5,
-            fileColor.g * 0.5,
-            fileColor.b * 0.5
+            fileColor.r * 0.68,
+            fileColor.g * 0.68,
+            fileColor.b * 0.68
           );
         })
       );
