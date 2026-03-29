@@ -968,6 +968,15 @@ export class MeshFactory {
       // Determine shared file box parent - only internal edges need collision avoidance
       const sharedFileBox = (sourceMesh.parent === targetMesh.parent) ? sourceMesh.parent : null;
 
+      // Keep the tube ending at the arrow base so edges do not overlap cone tips.
+      const edgeDirection = edgeEndPos.subtract(edgeStartPos).normalize();
+      const arrowFullHeight = arrow
+        ? arrow.getBoundingInfo().boundingBox.maximum.y * 2
+        : 0;
+      const tubeEndPos = arrow && arrowFullHeight > 0.001
+        ? edgeEndPos.subtract(edgeDirection.scale(arrowFullHeight))
+        : edgeEndPos;
+
       // Calculate collision-free waypoints (only for edges in the same file box)
       const collisionCandidates = sharedFileBox
         ? this.getCollisionSamplesForFileBox(sharedFileBox, collisionSampleCache)
@@ -975,13 +984,13 @@ export class MeshFactory {
       const waypoints = sharedFileBox
         ? this.calculateCollisionAvoidanceWaypoints(
             edgeStartPos,
-            edgeEndPos,
+            tubeEndPos,
             edgeRadius,
             collisionCandidates,
             sourceMesh,
             targetMesh,
           )
-        : [edgeStartPos, edgeEndPos];
+        : [edgeStartPos, tubeEndPos];
 
       // Convert waypoints to local space relative to parent for tube creation
       const localWaypoints = waypoints.map((wp) => this.toParentLocalPoint(cylinder.parent ?? null, wp));
@@ -1020,14 +1029,6 @@ export class MeshFactory {
 
       // Position and orient arrowhead at the target surface
       if (arrow) {
-        // Edge direction unit vector (source → target)
-        const edgeDirection = edgeEndPos.subtract(edgeStartPos).normalize();
-        
-        // Compute arrow cone height so we can shorten the cylinder to avoid overlap.
-        const arrowFullHeight = arrow
-          ? arrow.getBoundingInfo().boundingBox.maximum.y * 2
-          : 0;
-
         const arrowHalfHeight = arrowFullHeight / 2;
         // Place cone center so its tip (+Y) sits exactly at edgeEndPos
         const arrowCenterWorld = edgeEndPos.subtract(edgeDirection.scale(arrowHalfHeight));

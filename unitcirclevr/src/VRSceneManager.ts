@@ -11,6 +11,9 @@ import { Quest3GripController, type GripState, type GripGesture } from './Quest3
 import { FileColorService } from './FileColorService';
 import { collectCodeViewerConnections, drawCodeViewerConnectionButtons } from './CodeViewerPanel';
 import { computeDesktopCameraDestination } from './CameraFlightPlanner';
+import { SceneDeclutterService } from './SceneDeclutterService';
+import { LabelManager } from './LabelManager';
+import type { SceneState } from './SceneState';
 import { getDirectoryPath, getParentDirectoryPath, normalizePath, toProjectRelativePath } from './PathUtils';
 
 // VS Code Dark+ inspired token colours for Canvas 2D syntax rendering
@@ -39,46 +42,6 @@ const EDITOR_TEXTURE_WIDTH = 1536;
 const EDITOR_TEXTURE_HEIGHT = 768;
 const EDITOR_WORLD_WIDTH_SCALE = 1.75;
 const EDITOR_WORLD_HEIGHT_SCALE = 1.08;
-
-interface DeclutterFileBoxWorkItem {
-  relativeFile: string;
-  fileDirectory: string;
-  box: BABYLON.Mesh;
-}
-
-interface DeclutterDirectoryBoxWorkItem {
-  relativeDirectory: string;
-  box: BABYLON.Mesh;
-}
-
-interface DeclutterNodeWorkItem {
-  node: GraphNode;
-  mesh: BABYLON.Mesh;
-  relativeFile: string | null;
-  fileDirectory: string;
-}
-
-interface DeclutterLabelWorkItem {
-  relativePath: string;
-  label: BABYLON.Mesh;
-}
-
-interface PendingDeclutterState {
-  viewerInsideFile: boolean;
-  focusedFile: string | null;
-  focusedFileDirectory: string;
-  focusedDirectories: Set<string>;
-  fileBoxes: DeclutterFileBoxWorkItem[];
-  directoryBoxes: DeclutterDirectoryBoxWorkItem[];
-  nodes: DeclutterNodeWorkItem[];
-  fileLabels: DeclutterLabelWorkItem[];
-  directoryLabels: DeclutterLabelWorkItem[];
-  fileBoxIndex: number;
-  directoryBoxIndex: number;
-  nodeIndex: number;
-  fileLabelIndex: number;
-  directoryLabelIndex: number;
-}
 
 export class VRSceneManager {
   private engine: BABYLON.Engine;
@@ -152,8 +115,8 @@ export class VRSceneManager {
   private graphUpdateInProgress = false;
   private lastGraphReloadAtMs = 0;
   private desktopStartupRecenterDone = false;
-  private lastDeclutterSignature: string | null = null;
-  private pendingDeclutterState: PendingDeclutterState | null = null;
+  private declutterService: SceneDeclutterService;
+  private labelManager: LabelManager;
   private readonly xrNavigationDebug = ((import.meta.env.VITE_XR_NAV_DEBUG ?? 'false').toLowerCase() === 'true');
   private readonly exportedFaceCircleLayout = ((import.meta.env.VITE_EXPORTED_FACE_CIRCLE ?? 'false').toLowerCase() === 'true');
   private readonly useLegacyExportedFaceLayout = ((import.meta.env.VITE_LEGACY_EXPORTED_FACE_LAYOUT ?? 'false').toLowerCase() === 'true');
@@ -173,6 +136,18 @@ export class VRSceneManager {
     // Initialize services
     this.meshFactory = new MeshFactory(this.scene);
     this.graphLoader = new GraphLoader(SceneConfig.GRAPH_POLL_INTERVAL_MS);
+    this.declutterService = new SceneDeclutterService();
+    this.labelManager = new LabelManager(
+      this.scene,
+      this.sceneRoot,
+      this.engine,
+      this as unknown as SceneState,
+      () => this.isInXR(),
+      () => {
+        const activeCamera = this.scene.activeCamera || this.camera;
+        return activeCamera?.fov || this.camera?.fov || 1.0;
+      },
+    );
 
     // Setup lighting
     this.setupLighting();
@@ -2902,197 +2877,6 @@ export class VRSceneManager {
     }
   }
 
-  /**
-   * Create a label plaque for a directory box.
-   */
-  private buildBreadcrumbSegments(
-    kind: 'file' | 'directory',
-    fullPath: string,
-  ): Array<{ text: string; kind: 'file' | 'directory'; path: string }> {
-    const normalized = (fullPath || '').replace(/\\/g, '/');
-    const parts = normalized.split('/').filter(Boolean);
-    const segments: Array<{ text: string; kind: 'file' | 'directory'; path: string }> = [];
-
-    let runningPath = '';
-    for (let index = 0; index < parts.length; index++) {
-      const part = parts[index];
-      runningPath = runningPath ? `${runningPath}/${part}` : part;
-      const isLast = index === parts.length - 1;
-      segments.push({
-        text: part,
-        kind: kind === 'file' && isLast ? 'file' : 'directory',
-        path: runningPath,
-      });
-    }
-
-    if (segments.length === 0) {
-      segments.push({ text: kind === 'directory' ? 'root' : fullPath, kind, path: fullPath });
-    }
-
-    return segments;
-  }
-
-  private createLabelChip(
-    name: string,
-    text: string,
-    fillStyle: string,
-    strokeStyle: string,
-    textStyle: string,
-  ): { mesh: BABYLON.Mesh; width: number; height: number } {
-    const fontSize = 440;
-    const horizontalPadding = 220;
-    const textureHeight = 720;
-
-    const measureCanvas = document.createElement('canvas');
-    const measureCtx = measureCanvas.getContext('2d') as CanvasRenderingContext2D;
-    measureCtx.font = `bold ${fontSize}px monospace`;
-    const textWidth = measureCtx.measureText(text).width;
-    const textureWidth = Math.max(980, Math.ceil(textWidth + (horizontalPadding * 2)));
-
-    const texture = new BABYLON.DynamicTexture(
-      `${name}_texture`,
-      { width: textureWidth, height: textureHeight },
-      this.scene,
-      false,
-    );
-    const ctx = texture.getContext() as CanvasRenderingContext2D;
-    ctx.clearRect(0, 0, textureWidth, textureHeight);
-    ctx.fillStyle = fillStyle;
-    ctx.fillRect(0, 0, textureWidth, textureHeight);
-    ctx.strokeStyle = strokeStyle;
-    ctx.lineWidth = 8;
-    ctx.strokeRect(8, 8, textureWidth - 16, textureHeight - 16);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = textStyle;
-    ctx.font = `bold ${fontSize}px monospace`;
-    ctx.fillText(text, textureWidth / 2, textureHeight / 2 + 2);
-    texture.update();
-
-    const worldHeight = 9.6;
-    const worldWidth = Math.max(17.0, worldHeight * (textureWidth / textureHeight));
-    const mesh = BABYLON.MeshBuilder.CreatePlane(
-      name,
-      { width: worldWidth, height: worldHeight },
-      this.scene,
-    );
-    const material = new BABYLON.StandardMaterial(`${name}_material`, this.scene);
-    material.diffuseTexture = texture;
-    material.emissiveColor = new BABYLON.Color3(1, 1, 1);
-    material.specularColor = new BABYLON.Color3(0, 0, 0);
-    material.backFaceCulling = false;
-    material.useAlphaFromDiffuseTexture = true;
-    material.disableLighting = true;
-    material.disableDepthWrite = true;
-    material.depthFunction = BABYLON.Constants.ALWAYS;
-    mesh.material = material;
-    mesh.renderingGroupId = 3;
-    mesh.alwaysSelectAsActiveMesh = true;
-    mesh.outlineColor = new BABYLON.Color3(0.95, 0.98, 1.0);
-    mesh.outlineWidth = 0.16;
-
-    const baseScaling = mesh.scaling.clone();
-    mesh.actionManager = new BABYLON.ActionManager(this.scene);
-    mesh.actionManager.registerAction(
-      new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPointerOverTrigger, () => {
-        mesh.renderOutline = true;
-        material.emissiveColor = new BABYLON.Color3(1.2, 1.2, 1.2);
-        mesh.scaling = baseScaling.scale(1.08);
-      })
-    );
-    mesh.actionManager.registerAction(
-      new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPointerOutTrigger, () => {
-        mesh.renderOutline = false;
-        material.emissiveColor = new BABYLON.Color3(1, 1, 1);
-        mesh.scaling = baseScaling.clone();
-      })
-    );
-
-    return { mesh, width: worldWidth, height: worldHeight };
-  }
-
-  private withAdjustedAlpha(style: string, alpha: number): string {
-    const rgbaMatch = style.match(/^rgba\((\d+),\s*(\d+),\s*(\d+),\s*([0-9.]+)\)$/i);
-    if (!rgbaMatch) {
-      return style;
-    }
-
-    const [, r, g, b] = rgbaMatch;
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  }
-
-  private createBreadcrumbLabelAnchor(
-    name: string,
-    segments: Array<{ text: string; kind: 'file' | 'directory'; path: string }>,
-    fillStyle: string,
-    strokeStyle: string,
-    textStyle: string,
-  ): BABYLON.Mesh {
-    const anchor = BABYLON.MeshBuilder.CreatePlane(
-      `${name}_anchor`,
-      { width: 1, height: 1 },
-      this.scene,
-    );
-    anchor.visibility = 0;
-    anchor.isPickable = false;
-    anchor.parent = this.sceneRoot;
-    anchor.scaling = new BABYLON.Vector3(1, 1, 1);
-    anchor.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
-    anchor.renderingGroupId = 3;
-    anchor.alwaysSelectAsActiveMesh = true;
-    anchor.setEnabled(this.labelsVisible);
-
-    const horizontalGap = 1.4;
-    const verticalGap = 1.15;
-    const maxRowWidth = 52;
-    const rowHeight = 4.8;
-    const rows: Array<Array<{ mesh: BABYLON.Mesh; width: number }>> = [];
-    let currentRow: Array<{ mesh: BABYLON.Mesh; width: number }> = [];
-    let currentRowWidth = 0;
-
-    for (let index = 0; index < segments.length; index++) {
-      const segment = segments[index];
-      const isCurrentSegment = index === segments.length - 1;
-      const chipFill = this.withAdjustedAlpha(fillStyle, isCurrentSegment ? 0.96 : 0.56);
-      const chipStroke = this.withAdjustedAlpha(strokeStyle, isCurrentSegment ? 1.0 : 0.72);
-      const chipText = isCurrentSegment ? textStyle : 'rgba(232, 238, 244, 0.82)';
-      const chip = this.createLabelChip(`${name}_chip_${index}`, segment.text, chipFill, chipStroke, chipText);
-      chip.mesh.parent = anchor;
-      chip.mesh.isPickable = this.labelsVisible;
-      (chip.mesh as any).labelData = { kind: segment.kind, path: segment.path };
-
-      const widthWithGap = currentRow.length === 0 ? chip.width : chip.width + horizontalGap;
-      if (currentRow.length > 0 && (currentRowWidth + widthWithGap) > maxRowWidth) {
-        rows.push(currentRow);
-        currentRow = [];
-        currentRowWidth = 0;
-      }
-
-      currentRow.push({ mesh: chip.mesh, width: chip.width });
-      currentRowWidth += currentRow.length === 1 ? chip.width : chip.width + horizontalGap;
-    }
-
-    if (currentRow.length > 0) {
-      rows.push(currentRow);
-    }
-
-    const totalHeight = (rows.length * rowHeight) + (Math.max(0, rows.length - 1) * verticalGap);
-    rows.forEach((row, rowIndex) => {
-      const rowWidth = row.reduce((sum, chip, chipIndex) => sum + chip.width + (chipIndex > 0 ? horizontalGap : 0), 0);
-      let cursorX = -rowWidth * 0.5;
-      const y = (totalHeight * 0.5) - (rowIndex * (rowHeight + verticalGap)) - (rowHeight * 0.5);
-
-      row.forEach((chip) => {
-        chip.mesh.position.x = cursorX + (chip.width * 0.5);
-        chip.mesh.position.y = y;
-        chip.mesh.position.z = 0;
-        cursorX += chip.width + horizontalGap;
-      });
-    });
-
-    return anchor;
-  }
-
   private findExactNavigationLabelTarget(kind: 'file' | 'directory', path: string): BABYLON.Mesh | null {
     const normalized = toProjectRelativePath(path) || path;
     if (!normalized) {
@@ -3204,68 +2988,14 @@ export class VRSceneManager {
   }
 
   private createDirectoryBoxLabel(directoryPath: string, directoryBox: BABYLON.Mesh): void {
-    const dirMat = directoryBox.material as BABYLON.StandardMaterial | null;
-    const dirTint = dirMat?.diffuseColor || new BABYLON.Color3(0.10, 0.14, 0.18);
-    const dirR = Math.max(0, Math.min(255, Math.floor(dirTint.r * 255)));
-    const dirG = Math.max(0, Math.min(255, Math.floor(dirTint.g * 255)));
-    const dirB = Math.max(0, Math.min(255, Math.floor(dirTint.b * 255)));
-
-    const displayPath = toProjectRelativePath(directoryPath) || 'root';
-    const label = this.createBreadcrumbLabelAnchor(
-      `dirlabel_${directoryPath}`,
-      this.buildBreadcrumbSegments('directory', displayPath),
-      `rgba(${dirR}, ${dirG}, ${dirB}, 0.88)`,
-      'rgba(128, 188, 255, 0.95)',
-      '#f4fbff',
-    );
-
-    this.updateDirectoryBoxLabelTransform(label, directoryBox);
-    this.directoryBoxLabels.set(directoryPath, label);
-    this.directoryLabelLookup.set(displayPath, label);
-  }
-
-  /**
-   * Keep directory label offset stable as directory box moves/scales.
-   * Label is parented to sceneRoot so position is in sceneRoot-local space.
-   */
-  private updateDirectoryBoxLabelTransform(label: BABYLON.Mesh, directoryBox: BABYLON.Mesh): void {
-    directoryBox.computeWorldMatrix(true);
-    const bounds = directoryBox.getBoundingInfo().boundingBox;
-    const worldPos = new BABYLON.Vector3(
-      bounds.centerWorld.x,
-      bounds.maximumWorld.y + 9.2,
-      bounds.centerWorld.z
-    );
-    // Convert world position to sceneRoot-local space.
-    this.sceneRoot.computeWorldMatrix(true);
-    label.position = BABYLON.Vector3.TransformCoordinates(
-      worldPos,
-      BABYLON.Matrix.Invert(this.sceneRoot.getWorldMatrix())
-    );
+    this.labelManager.createDirectoryBoxLabel(directoryPath, directoryBox);
   }
 
   /**
    * Create a label plaque for a file box.
    */
   private createFileBoxLabel(file: string, fileBox: BABYLON.Mesh): void {
-    const fileMat = fileBox.material as BABYLON.StandardMaterial | null;
-    const fileTint = fileMat?.diffuseColor || new BABYLON.Color3(0.2, 0.2, 0.2);
-    const fileR = Math.max(0, Math.min(255, Math.floor(fileTint.r * 255)));
-    const fileG = Math.max(0, Math.min(255, Math.floor(fileTint.g * 255)));
-    const fileB = Math.max(0, Math.min(255, Math.floor(fileTint.b * 255)));
-
-    const displayPath = toProjectRelativePath(file);
-    const label = this.createBreadcrumbLabelAnchor(
-      `filelabel_${file}`,
-      this.buildBreadcrumbSegments('file', displayPath),
-      `rgba(${fileR}, ${fileG}, ${fileB}, 0.84)`,
-      'rgba(255, 255, 255, 0.92)',
-      '#ffffff',
-    );
-
-    this.updateFileBoxLabelTransform(label, fileBox);
-    this.fileBoxLabels.set(file, label);
-    this.fileLabelLookup.set(displayPath, label);
+    this.labelManager.createFileBoxLabel(file, fileBox);
   }
 
   /**
@@ -3273,19 +3003,7 @@ export class VRSceneManager {
    * Label is parented to sceneRoot so position is in sceneRoot-local space.
    */
   private updateFileBoxLabelTransform(label: BABYLON.Mesh, fileBox: BABYLON.Mesh): void {
-    fileBox.computeWorldMatrix(true);
-    const bounds = fileBox.getBoundingInfo().boundingBox;
-    const worldPos = new BABYLON.Vector3(
-      bounds.centerWorld.x,
-      bounds.maximumWorld.y + 8.1,
-      bounds.centerWorld.z
-    );
-    // Convert world position to sceneRoot-local space.
-    this.sceneRoot.computeWorldMatrix(true);
-    label.position = BABYLON.Vector3.TransformCoordinates(
-      worldPos,
-      BABYLON.Matrix.Invert(this.sceneRoot.getWorldMatrix())
-    );
+    this.labelManager.updateFileBoxLabelTransform(label, fileBox);
   }
 
   /**
@@ -3293,87 +3011,14 @@ export class VRSceneManager {
    * Labels are parented to sceneRoot so positions are tracked independently.
    */
   private refreshLabelTransformsIfScaleChanged(_force: boolean = false): void {
-    for (const [file, label] of this.fileBoxLabels.entries()) {
-      const fileBox = this.fileBoxMeshes.get(file);
-      if (fileBox) {
-        this.updateFileBoxLabelTransform(label, fileBox);
-      }
-    }
-
-    for (const [dir, label] of this.directoryBoxLabels.entries()) {
-      const dirBox = this.directoryBoxMeshes.get(dir);
-      if (dirBox) {
-        this.updateDirectoryBoxLabelTransform(label, dirBox);
-      }
-    }
+    this.labelManager.refreshLabelTransformsIfScaleChanged(_force);
   }
 
   /**
    * Scale labels based on camera distance so they remain readable at range.
    */
   private updateLabelDistanceScaling(): void {
-    if (this.fileBoxLabels.size === 0 && this.directoryBoxLabels.size === 0) {
-      return;
-    }
-
-    // Keep baseline size uniform (1x), but scale up at distance when projected
-    // width falls below a readable minimum on-screen fraction.
-    const activeCamera = this.scene.activeCamera || this.camera;
-    if (!activeCamera) {
-      return;
-    }
-
-    const activeGlobal = (activeCamera as any).globalPosition as BABYLON.Vector3 | undefined;
-    const cameraWorldPos = (activeGlobal && Number.isFinite(activeGlobal.x))
-      ? activeGlobal
-      : activeCamera.position;
-
-    const renderWidth = Math.max(1, this.engine.getRenderWidth());
-    const renderHeight = Math.max(1, this.engine.getRenderHeight());
-    const aspect = renderWidth / renderHeight;
-    const verticalFov = Math.max(0.25, activeCamera.fov || this.camera.fov || 1.0);
-    const horizontalFov = 2 * Math.atan(Math.tan(verticalFov * 0.5) * aspect);
-
-    const fallbackBaseLabelWidth = 36.0;
-    const readableMinScale = this.isInXR() ? 1.25 : 1.05;
-    const hardMinScale = 0.35;
-    const nearDistanceThreshold = this.isInXR() ? 45 : 90;
-    const minViewportFraction = this.isInXR() ? 0.27 : 0.20;
-    const maxViewportFraction = this.isInXR() ? 0.16 : 0.13;
-    const maxScale = this.isInXR() ? 2.1 : 1.8;
-
-    const applyScale = (label: BABYLON.Mesh) => {
-      const hierarchyBounds = label.getHierarchyBoundingVectors(true);
-      const hierarchyWidth = Math.abs(hierarchyBounds.max.x - hierarchyBounds.min.x);
-      const currentScale = Math.max(0.0001, label.scaling.x);
-      const baseLabelWidth = Number.isFinite(hierarchyWidth) && hierarchyWidth > 0.001
-        ? hierarchyWidth / currentScale
-        : fallbackBaseLabelWidth;
-
-      const distance = BABYLON.Vector3.Distance(cameraWorldPos, label.getAbsolutePosition());
-      const minAngularWidth = horizontalFov * minViewportFraction;
-      const maxAngularWidth = horizontalFov * maxViewportFraction;
-      const minWorldWidthAtDistance = 2 * Math.max(0.01, distance) * Math.tan(minAngularWidth * 0.5);
-      const maxWorldWidthAtDistance = 2 * Math.max(0.01, distance) * Math.tan(maxAngularWidth * 0.5);
-      const floorScale = minWorldWidthAtDistance / baseLabelWidth;
-      const viewportCapScale = maxWorldWidthAtDistance / baseLabelWidth;
-      const effectiveMinScale = distance < nearDistanceThreshold ? hardMinScale : readableMinScale;
-
-      const desiredScale = Math.max(effectiveMinScale, floorScale);
-      // Keep labels readable by default, but never let them overgrow the viewport.
-      const scale = Math.max(hardMinScale, Math.min(maxScale, viewportCapScale, desiredScale));
-      if (Math.abs(label.scaling.x - scale) > 0.001) {
-        label.scaling.copyFromFloats(scale, scale, scale);
-      }
-    };
-
-    this.labelScaleState.clear();
-    for (const label of this.fileBoxLabels.values()) {
-      applyScale(label);
-    }
-    for (const label of this.directoryBoxLabels.values()) {
-      applyScale(label);
-    }
+    this.labelManager.updateLabelDistanceScaling();
   }
 
   /**
@@ -5458,300 +5103,22 @@ export class VRSceneManager {
     return activeCamera.position.clone();
   }
 
-  private getFocusedFilePath(): string | null {
-    const selectedNodeId = this.editorVisibleForNodeId || this.currentFunctionId;
-    if (selectedNodeId) {
-      const selectedNode = this.graphNodeMap.get(selectedNodeId);
-      if (selectedNode?.file) {
-        return toProjectRelativePath(selectedNode.file);
-      }
-    }
-
-    return null;
-  }
-
-  private buildFocusedDirectoryChain(filePath: string | null): Set<string> {
-    const chain = new Set<string>();
-    if (!filePath) {
-      return chain;
-    }
-
-    let current = getDirectoryPath(filePath);
-    chain.add(current);
-    while (current) {
-      current = getParentDirectoryPath(current);
-      chain.add(current);
-    }
-
-    return chain;
-  }
-
-  private isViewerInsideAnyFileBox(): boolean {
-    const viewerWorldPos = this.getViewerWorldPosition();
-    for (const fileBox of this.fileBoxMeshes.values()) {
-      fileBox.computeWorldMatrix(true);
-      const bounds = fileBox.getBoundingInfo().boundingBox;
-      if (bounds.intersectsPoint(viewerWorldPos)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private createPendingDeclutterState(
-    viewerInsideFile: boolean,
-    focusedFile: string | null,
-    focusedDirectories: Set<string>,
-  ): PendingDeclutterState {
-    const fileBoxes: DeclutterFileBoxWorkItem[] = [];
-    for (const [file, box] of this.fileBoxMeshes.entries()) {
-      const relativeFile = toProjectRelativePath(file);
-      fileBoxes.push({
-        relativeFile,
-        fileDirectory: getDirectoryPath(relativeFile),
-        box,
-      });
-    }
-
-    const directoryBoxes: DeclutterDirectoryBoxWorkItem[] = [];
-    for (const [directory, box] of this.directoryBoxMeshes.entries()) {
-      directoryBoxes.push({
-        relativeDirectory: toProjectRelativePath(directory),
-        box,
-      });
-    }
-
-    const nodes: DeclutterNodeWorkItem[] = [];
-    for (const [nodeId, mesh] of this.nodeMeshMap.entries()) {
-      const node = this.graphNodeMap.get(nodeId);
-      if (!node) {
-        continue;
-      }
-
-      const relativeFile = node.file ? toProjectRelativePath(node.file) : null;
-      nodes.push({
-        node,
-        mesh,
-        relativeFile,
-        fileDirectory: relativeFile ? getDirectoryPath(relativeFile) : '',
-      });
-    }
-
-    const fileLabels: DeclutterLabelWorkItem[] = [];
-    for (const [file, label] of this.fileBoxLabels.entries()) {
-      fileLabels.push({
-        relativePath: toProjectRelativePath(file),
-        label,
-      });
-    }
-
-    const directoryLabels: DeclutterLabelWorkItem[] = [];
-    for (const [directory, label] of this.directoryBoxLabels.entries()) {
-      directoryLabels.push({
-        relativePath: toProjectRelativePath(directory),
-        label,
-      });
-    }
-
-    return {
-      viewerInsideFile,
-      focusedFile,
-      focusedFileDirectory: focusedFile ? getDirectoryPath(focusedFile) : '',
-      focusedDirectories,
-      fileBoxes,
-      directoryBoxes,
-      nodes,
-      fileLabels,
-      directoryLabels,
-      fileBoxIndex: 0,
-      directoryBoxIndex: 0,
-      nodeIndex: 0,
-      fileLabelIndex: 0,
-      directoryLabelIndex: 0,
-    };
-  }
-
-  private processDeclutterBatch(): void {
-    const state = this.pendingDeclutterState;
-    if (!state) {
-      return;
-    }
-
-    let remainingMutations = SceneConfig.DECLUTTER_MUTATIONS_PER_FRAME;
-
-    while (remainingMutations > 0) {
-      if (state.fileBoxIndex < state.fileBoxes.length) {
-        const item = state.fileBoxes[state.fileBoxIndex++];
-        const material = item.box.material as BABYLON.StandardMaterial | null;
-
-        if (!state.viewerInsideFile) {
-          item.box.setEnabled(true);
-          item.box.visibility = 1.0;
-          if (material) {
-            material.alpha = 0.18;
-          }
-        } else {
-          const isFocused = state.focusedFile !== null && item.relativeFile === state.focusedFile;
-          const isContext = state.focusedFile !== null && state.focusedDirectories.has(item.fileDirectory);
-
-          item.box.visibility = isFocused
-            ? SceneConfig.DECLUTTER_FOCUS_VISIBILITY
-            : isContext
-              ? SceneConfig.DECLUTTER_CONTEXT_VISIBILITY
-              : SceneConfig.DECLUTTER_BACKGROUND_VISIBILITY;
-
-          if (material) {
-            material.alpha = isFocused
-              ? SceneConfig.DECLUTTER_ACTIVE_FILE_BOX_ALPHA
-              : isContext
-                ? SceneConfig.DECLUTTER_CONTEXT_FILE_BOX_ALPHA
-                : SceneConfig.DECLUTTER_BACKGROUND_FILE_BOX_ALPHA;
-          }
-        }
-
-        remainingMutations -= 1;
-        continue;
-      }
-
-      if (state.directoryBoxIndex < state.directoryBoxes.length) {
-        const item = state.directoryBoxes[state.directoryBoxIndex++];
-        const material = item.box.material as BABYLON.StandardMaterial | null;
-
-        if (!state.viewerInsideFile) {
-          item.box.setEnabled(true);
-          item.box.visibility = 1.0;
-          if (material) {
-            material.alpha = 0.08;
-          }
-        } else {
-          const showBox = state.focusedFile === null || state.focusedDirectories.has(item.relativeDirectory);
-          item.box.setEnabled(showBox);
-          item.box.visibility = showBox
-            ? (state.focusedFile !== null && item.relativeDirectory === state.focusedFileDirectory
-              ? SceneConfig.DECLUTTER_CONTEXT_VISIBILITY
-              : SceneConfig.DECLUTTER_BACKGROUND_VISIBILITY)
-            : SceneConfig.DECLUTTER_HIDDEN_VISIBILITY;
-
-          if (material) {
-            material.alpha = state.focusedFile !== null && item.relativeDirectory === state.focusedFileDirectory
-              ? SceneConfig.DECLUTTER_ACTIVE_DIRECTORY_BOX_ALPHA
-              : SceneConfig.DECLUTTER_CONTEXT_DIRECTORY_BOX_ALPHA;
-          }
-        }
-
-        remainingMutations -= 1;
-        continue;
-      }
-
-      if (state.nodeIndex < state.nodes.length) {
-        const item = state.nodes[state.nodeIndex++];
-        const material = item.mesh.material as BABYLON.StandardMaterial | null;
-
-        if (!state.viewerInsideFile) {
-          item.mesh.setEnabled(true);
-          item.mesh.isVisible = true;
-          item.mesh.visibility = 1.0;
-          if (material) {
-            material.alpha = 1.0;
-            material.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
-          }
-        } else {
-          const isFocusedNode = state.focusedFile !== null && item.relativeFile === state.focusedFile;
-          const isContextNode = state.focusedFile !== null && state.focusedDirectories.has(item.fileDirectory);
-          const isFunctionNode = item.node.type === 'function';
-          const isExternalOrVariable = item.node.type === 'external' || item.node.type === 'variable';
-          const shouldHide = state.focusedFile !== null && isExternalOrVariable && !isFocusedNode;
-
-          item.mesh.setEnabled(!shouldHide);
-          item.mesh.isVisible = !shouldHide;
-          item.mesh.visibility = shouldHide
-            ? SceneConfig.DECLUTTER_HIDDEN_VISIBILITY
-            : isFunctionNode
-              ? 1.0
-              : isFocusedNode
-                ? SceneConfig.DECLUTTER_FOCUS_VISIBILITY
-                : isContextNode
-                  ? SceneConfig.DECLUTTER_CONTEXT_VISIBILITY
-                  : SceneConfig.DECLUTTER_BACKGROUND_VISIBILITY;
-
-          if (material) {
-            material.alpha = shouldHide
-              ? 0.0
-              : isFunctionNode
-                ? 1.0
-                : isFocusedNode
-                  ? 1.0
-                  : isContextNode
-                    ? 0.88
-                    : 0.42;
-            material.transparencyMode = material.alpha >= 0.999
-              ? BABYLON.Material.MATERIAL_OPAQUE
-              : BABYLON.Material.MATERIAL_ALPHABLEND;
-          }
-        }
-
-        remainingMutations -= 1;
-        continue;
-      }
-
-      if (state.fileLabelIndex < state.fileLabels.length) {
-        const item = state.fileLabels[state.fileLabelIndex++];
-        const shouldShow = !state.viewerInsideFile
-          ? this.labelsVisible
-          : this.labelsVisible
-            && (state.focusedFile === null
-              || item.relativePath === state.focusedFile
-              || state.focusedDirectories.has(getDirectoryPath(item.relativePath)));
-        this.setBreadcrumbAnchorInteractivity(item.label, shouldShow);
-        item.label.visibility = shouldShow ? 1 : 0;
-
-        remainingMutations -= 1;
-        continue;
-      }
-
-      if (state.directoryLabelIndex < state.directoryLabels.length) {
-        const item = state.directoryLabels[state.directoryLabelIndex++];
-        const shouldShow = !state.viewerInsideFile
-          ? this.labelsVisible
-          : this.labelsVisible && (state.focusedFile === null || state.focusedDirectories.has(item.relativePath));
-        this.setBreadcrumbAnchorInteractivity(item.label, shouldShow);
-        item.label.visibility = shouldShow ? 1 : 0;
-
-        remainingMutations -= 1;
-        continue;
-      }
-
-      break;
-    }
-
-    const isDone = state.fileBoxIndex >= state.fileBoxes.length
-      && state.directoryBoxIndex >= state.directoryBoxes.length
-      && state.nodeIndex >= state.nodes.length
-      && state.fileLabelIndex >= state.fileLabels.length
-      && state.directoryLabelIndex >= state.directoryLabels.length;
-
-    if (isDone) {
-      this.pendingDeclutterState = null;
-    }
-  }
-
   private applySceneDeclutter(): void {
-    const viewerInsideFile = this.isViewerInsideAnyFileBox();
-    const focusedFile = viewerInsideFile ? this.getFocusedFilePath() : null;
-    const focusedDirectories = this.buildFocusedDirectoryChain(focusedFile);
-    const signature = `${viewerInsideFile ? 'inside' : 'outside'}|${focusedFile ?? 'none'}|${Array.from(focusedDirectories).sort().join(',')}|${this.labelsVisible ? 'labels' : 'nolabels'}`;
-    this.meshFactory.setDeclutterContext(focusedFile, focusedDirectories);
-
-    if (signature !== this.lastDeclutterSignature) {
-      this.lastDeclutterSignature = signature;
-      this.pendingDeclutterState = this.createPendingDeclutterState(
-        viewerInsideFile,
-        focusedFile,
-        focusedDirectories,
-      );
-    }
-
-    this.processDeclutterBatch();
+    this.declutterService.apply({
+      scene: this.scene,
+      camera: this.camera,
+      meshFactory: this.meshFactory,
+      currentFunctionId: this.currentFunctionId,
+      editorVisibleForNodeId: this.editorVisibleForNodeId,
+      graphNodeMap: this.graphNodeMap,
+      fileBoxMeshes: this.fileBoxMeshes,
+      directoryBoxMeshes: this.directoryBoxMeshes,
+      nodeMeshMap: this.nodeMeshMap,
+      fileBoxLabels: this.fileBoxLabels,
+      directoryBoxLabels: this.directoryBoxLabels,
+      labelsVisible: this.labelsVisible,
+      setBreadcrumbAnchorInteractivity: this.setBreadcrumbAnchorInteractivity.bind(this),
+    });
   }
 
   private findNearbyFunctionForEditor(): GraphNode | null {
@@ -6003,33 +5370,17 @@ export class VRSceneManager {
   }
 
   private toggleLabelsVisibility(): void {
-    this.setLabelsVisibility(!this.labelsVisible);
+    this.labelManager.toggleLabelsVisibility();
 
     console.log(`🏷️ Navigation labels ${this.labelsVisible ? 'shown' : 'hidden'} via secondary/menu button`);
   }
 
   private setBreadcrumbAnchorInteractivity(labelAnchor: BABYLON.Mesh, enabled: boolean): void {
-    labelAnchor.setEnabled(enabled);
-    labelAnchor.isPickable = false;
-
-    for (const child of labelAnchor.getChildMeshes(false)) {
-      child.isPickable = enabled;
-    }
+    this.labelManager.setBreadcrumbAnchorInteractivity(labelAnchor, enabled);
   }
 
   private setLabelsVisibility(visible: boolean): void {
-    this.labelsVisible = visible;
-
-    if (!this.labelsVisible) {
-      this.clearBreadcrumbHoverState();
-    }
-
-    for (const label of this.fileBoxLabels.values()) {
-      this.setBreadcrumbAnchorInteractivity(label, this.labelsVisible);
-    }
-    for (const label of this.directoryBoxLabels.values()) {
-      this.setBreadcrumbAnchorInteractivity(label, this.labelsVisible);
-    }
+    this.labelManager.setLabelsVisibility(visible);
   }
 
   public toggleNavigationLabels(): void {
