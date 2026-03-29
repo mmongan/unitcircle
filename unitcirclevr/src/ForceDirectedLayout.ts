@@ -52,9 +52,9 @@ export class ForceDirectedLayout {
     this.nodes = new Map();
 
     // Use smaller space for internal layouts (when nodeFileMap is provided), larger for file-level
-    // Internal layouts need to fit within file boxes; 40 units keeps nodes compact
-    // File-level layouts need to spread files far apart, so use 1250 unit space
-    this.SPACE_SIZE = nodeFileMap ? 40 : 1250;
+    // Internal layouts need to fit within file boxes; 24 units keeps nodes compact
+    // File-level layouts need to spread files far apart, so use 2000 unit space
+    this.SPACE_SIZE = nodeFileMap ? 24 : 2000;
 
     // Initialize nodes with random positions close to center
     // Nodes will spread apart due to sphere repulsion forces

@@ -55,12 +55,14 @@ export interface SceneState {
 
   // ── Function editor ─────────────────────────────────────────────────────────
   editorVisibleForNodeId: string | null;
+  editorDismissedNodeId: string | null;
   functionEditorScreen: BABYLON.Mesh | null;
   functionEditorTexture: BABYLON.DynamicTexture | null;
   functionEditorMaterial: BABYLON.StandardMaterial | null;
   editorCurrentNodeId: string | null;
   editorCallButtons: Array<{ x: number; y: number; width: number; height: number; targetNodeId: string }>;
   editorScrollButtons: Array<{ x: number; y: number; width: number; height: number; action: 'up' | 'down' }>;
+  editorCloseButton: { x: number; y: number; width: number; height: number } | null;
   editorCodeScrollByNodeId: Map<string, number>;
   editorCurrentCodeLineCount: number;
   editorCurrentCodeMaxLines: number;
@@ -129,12 +131,14 @@ export function createSceneState(): SceneState {
     hoveredBreadcrumbChip: null,
 
     editorVisibleForNodeId: null,
+    editorDismissedNodeId: null,
     functionEditorScreen: null,
     functionEditorTexture: null,
     functionEditorMaterial: null,
     editorCurrentNodeId: null,
     editorCallButtons: [],
     editorScrollButtons: [],
+    editorCloseButton: null,
     editorCodeScrollByNodeId: new Map(),
     editorCurrentCodeLineCount: 0,
     editorCurrentCodeMaxLines: 0,

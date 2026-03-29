@@ -28,6 +28,8 @@ vi.mock('@babylonjs/core', () => {
     isVisible: true,
     setEnabled: vi.fn(),
     renderOutline: false,
+    renderingGroupId: 0,
+    dispose: vi.fn(),
     getBoundingInfo: vi.fn(() => ({
       boundingBox: {
         maximum: { x: 2, y: 2, z: 2 },
@@ -54,6 +56,7 @@ vi.mock('@babylonjs/core', () => {
       backFaceCulling: true,
       useAlphaFromDiffuseTexture: false,
       disableLighting: false,
+      dispose: vi.fn(),
     })),
     Material: { MATERIAL_ALPHABLEND: 2, MATERIAL_OPAQUE: 0 },
     Color3: vi.fn((r: number, g: number, b: number) => ({
@@ -267,6 +270,57 @@ describe('MeshFactory', () => {
       const metadata = Array.from(((factory as any).edgeMetadata as Map<string, any>).values());
       expect(metadata[0].bidirectionalOffsetSign).toBe(0);
     });
+
+    it('scales cross-file conduit radius with edge count', () => {
+      const singleEdgeFactory = new MeshFactory(mockScene);
+      singleEdgeFactory.createEdges(
+        [{ from: 'funcA@src/a.ts', to: 'funcB@src/b.ts' }],
+        new Map()
+      );
+
+      const singleConduitCall = vi.mocked(BABYLON.MeshBuilder.CreateTube).mock.calls.find(
+        (call) => String(call[0]).startsWith('conduit_')
+      );
+      expect(singleConduitCall).toBeDefined();
+      const singleRadius = Number(singleConduitCall?.[1]?.radius ?? 0);
+
+      vi.clearAllMocks();
+
+      const multiEdgeFactory = new MeshFactory(mockScene);
+      multiEdgeFactory.createEdges(
+        [
+          { from: 'funcA1@src/a.ts', to: 'funcB1@src/b.ts' },
+          { from: 'funcA2@src/a.ts', to: 'funcB2@src/b.ts' },
+          { from: 'funcA3@src/a.ts', to: 'funcB3@src/b.ts' },
+          { from: 'funcA4@src/a.ts', to: 'funcB4@src/b.ts' },
+        ],
+        new Map()
+      );
+
+      const multiConduitCall = vi.mocked(BABYLON.MeshBuilder.CreateTube).mock.calls.find(
+        (call) => String(call[0]).startsWith('conduit_')
+      );
+      expect(multiConduitCall).toBeDefined();
+      const multiRadius = Number(multiConduitCall?.[1]?.radius ?? 0);
+
+      expect(multiRadius).toBeGreaterThan(singleRadius);
+    });
+
+    it('creates dodecagon junctions at conduit connection points', () => {
+      factory.createEdges(
+        [{ from: 'funcA@src/a.ts', to: 'funcB@src/b.ts' }],
+        new Map()
+      );
+
+      const junctionCalls = vi.mocked(BABYLON.MeshBuilder.CreateCylinder).mock.calls.filter(
+        (call) => String(call[0]).startsWith('conduitJunction_')
+      );
+
+      expect(junctionCalls).toHaveLength(2);
+      for (const call of junctionCalls) {
+        expect(call[1]).toEqual(expect.objectContaining({ tessellation: 12 }));
+      }
+    });
   });
 
   describe('same-file edge visibility gating', () => {
@@ -449,6 +503,173 @@ describe('MeshFactory', () => {
       });
 
       expect(visibility).toBe(1);
+    });
+  });
+
+  describe('createEdges – file link boxes', () => {
+    it('creates two billboard planes per cross-file edge pair', () => {
+      factory.createEdges(
+        [{ from: 'funcA@src/a.ts', to: 'funcB@src/b.ts' }],
+        new Map()
+      );
+
+      const planeCalls = vi.mocked(BABYLON.MeshBuilder.CreatePlane).mock.calls.filter(
+        (call) => String(call[0]).startsWith('fileLinkBox_')
+      );
+      expect(planeCalls).toHaveLength(2);
+    });
+
+    it('source link box name contains "_source" suffix', () => {
+      factory.createEdges(
+        [{ from: 'funcA@src/a.ts', to: 'funcB@src/b.ts' }],
+        new Map()
+      );
+
+      const planeCalls = vi.mocked(BABYLON.MeshBuilder.CreatePlane).mock.calls.filter(
+        (call) => String(call[0]).startsWith('fileLinkBox_')
+      );
+      const names = planeCalls.map((c) => String(c[0]));
+      expect(names.some((n) => n.endsWith('_source'))).toBe(true);
+      expect(names.some((n) => n.endsWith('_target'))).toBe(true);
+    });
+
+    it('billboard planes have BILLBOARDMODE_ALL set', () => {
+      factory.createEdges(
+        [{ from: 'funcA@src/a.ts', to: 'funcB@src/b.ts' }],
+        new Map()
+      );
+
+      const linkBoxes = (factory as any).crossFileConduitLinkBoxes as Map<string, { source: any; target: any }>;
+      expect(linkBoxes.size).toBeGreaterThan(0);
+      for (const { source, target } of linkBoxes.values()) {
+        expect(source.billboardMode).toBe(7); // BILLBOARDMODE_ALL
+        expect(target.billboardMode).toBe(7);
+      }
+    });
+
+    it('billboard planes have renderingGroupId = 2', () => {
+      factory.createEdges(
+        [{ from: 'funcA@src/a.ts', to: 'funcB@src/b.ts' }],
+        new Map()
+      );
+
+      const linkBoxes = (factory as any).crossFileConduitLinkBoxes as Map<string, { source: any; target: any }>;
+      for (const { source, target } of linkBoxes.values()) {
+        expect(source.renderingGroupId).toBe(2);
+        expect(target.renderingGroupId).toBe(2);
+      }
+    });
+
+    it('does not create link boxes for same-file edges', () => {
+      factory.createEdges(
+        [{ from: 'funcA@src/a.ts', to: 'funcB@src/a.ts' }],
+        new Map()
+      );
+
+      const planeCalls = vi.mocked(BABYLON.MeshBuilder.CreatePlane).mock.calls.filter(
+        (call) => String(call[0]).startsWith('fileLinkBox_')
+      );
+      expect(planeCalls).toHaveLength(0);
+    });
+
+    it('creates exactly one link box pair per unique file pair (multiple edges same pair)', () => {
+      factory.createEdges(
+        [
+          { from: 'funcA1@src/a.ts', to: 'funcB1@src/b.ts' },
+          { from: 'funcA2@src/a.ts', to: 'funcB2@src/b.ts' },
+        ],
+        new Map()
+      );
+
+      const linkBoxes = (factory as any).crossFileConduitLinkBoxes as Map<string, { source: any; target: any }>;
+      expect(linkBoxes.size).toBe(1);
+    });
+
+    it('stores node navigation metadata on hub meshes', () => {
+      factory.createEdges(
+        [{ from: 'funcA@src/a.ts', to: 'funcB@src/b.ts' }],
+        new Map()
+      );
+
+      const linkBoxes = (factory as any).crossFileConduitLinkBoxes as Map<string, { source: any; target: any }>;
+      const junctions = (factory as any).crossFileConduitJunctions as Map<string, { source: any; target: any }>;
+
+      const pairKey = Array.from(linkBoxes.keys())[0];
+      expect(pairKey).toBeDefined();
+
+      const linkPair = linkBoxes.get(pairKey)!;
+      const junctionPair = junctions.get(pairKey)!;
+
+      expect(linkPair.source.edgeData).toEqual({ from: 'funcA@src/a.ts', to: 'funcB@src/b.ts' });
+      expect(linkPair.target.edgeData).toEqual({ from: 'funcA@src/a.ts', to: 'funcB@src/b.ts' });
+      expect(junctionPair.source.edgeData).toEqual({ from: 'funcA@src/a.ts', to: 'funcB@src/b.ts' });
+      expect(junctionPair.target.edgeData).toEqual({ from: 'funcA@src/a.ts', to: 'funcB@src/b.ts' });
+
+      expect(linkPair.source.hubData.endpoint).toBe('source');
+      expect(linkPair.target.hubData.endpoint).toBe('target');
+      expect(linkPair.source.hubData.sourceNodeId).toBe('funcA@src/a.ts');
+      expect(linkPair.source.hubData.targetNodeId).toBe('funcB@src/b.ts');
+      expect(linkPair.source.hubData.navigationNodeId).toBe('funcB@src/b.ts');
+      expect(linkPair.target.hubData.navigationNodeId).toBe('funcA@src/a.ts');
+      expect(junctionPair.source.hubData.navigationNodeId).toBe('funcB@src/b.ts');
+      expect(junctionPair.target.hubData.navigationNodeId).toBe('funcA@src/a.ts');
+      expect(linkPair.source.isPickable).toBe(true);
+      expect(linkPair.target.isPickable).toBe(true);
+      expect(junctionPair.source.isPickable).toBe(true);
+      expect(junctionPair.target.isPickable).toBe(true);
+    });
+
+    it('clearEdges disposes link boxes and clears the map', () => {
+      factory.createEdges(
+        [{ from: 'funcA@src/a.ts', to: 'funcB@src/b.ts' }],
+        new Map()
+      );
+
+      const linkBoxes = (factory as any).crossFileConduitLinkBoxes as Map<string, any>;
+      expect(linkBoxes.size).toBe(1);
+
+      factory.clearEdges();
+
+      expect(linkBoxes.size).toBe(0);
+    });
+  });
+
+  describe('cross-file hub slotting', () => {
+    const makeFileBox = (x: number, y: number, z: number) => ({
+      getAbsolutePosition: vi.fn(() => new (BABYLON.Vector3 as any)(x, y, z)),
+      getBoundingInfo: vi.fn(() => ({
+        boundingBox: {
+          minimumWorld: { x: x - 20, y: y - 20, z: z - 20 },
+          maximumWorld: { x: x + 20, y: y + 20, z: z + 20 },
+          minimum: { x: -20, y: -20, z: -20 },
+          maximum: { x: 20, y: 20, z: 20 },
+        },
+      })),
+    }) as any;
+
+    it('assigns distinct hub positions for different peer slots on the same file', () => {
+      const sourceBox = makeFileBox(0, 0, 0);
+      const targetBox = makeFileBox(100, 0, 0);
+
+      const slot0 = (factory as any).computeCrossFileHubPoints(sourceBox, targetBox, 0, 2, 0, 1);
+      const slot1 = (factory as any).computeCrossFileHubPoints(sourceBox, targetBox, 1, 2, 0, 1);
+
+      expect(slot0.sourceHub.x).toBeCloseTo(slot1.sourceHub.x, 4);
+      const deltaY = Math.abs(slot0.sourceHub.y - slot1.sourceHub.y);
+      const deltaZ = Math.abs(slot0.sourceHub.z - slot1.sourceHub.z);
+      expect(Math.max(deltaY, deltaZ)).toBeGreaterThan(0.5);
+    });
+
+    it('keeps base hub position when there is only one peer slot', () => {
+      const sourceBox = makeFileBox(0, 0, 0);
+      const targetBox = makeFileBox(100, 0, 0);
+
+      const defaultHub = (factory as any).computeCrossFileHubPoints(sourceBox, targetBox);
+      const singleSlotHub = (factory as any).computeCrossFileHubPoints(sourceBox, targetBox, 0, 1, 0, 1);
+
+      expect(singleSlotHub.sourceHub.x).toBeCloseTo(defaultHub.sourceHub.x, 4);
+      expect(singleSlotHub.sourceHub.y).toBeCloseTo(defaultHub.sourceHub.y, 4);
+      expect(singleSlotHub.sourceHub.z).toBeCloseTo(defaultHub.sourceHub.z, 4);
     });
   });
 });

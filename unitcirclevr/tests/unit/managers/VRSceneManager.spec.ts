@@ -8,6 +8,7 @@ vi.mock('@babylonjs/core', () => {
     dispose: vi.fn(),
     update: vi.fn(),
     getContext: vi.fn(() => ({
+      clearRect: vi.fn(),
       fillStyle: '',
       strokeStyle: '',
       lineWidth: 0,
@@ -34,6 +35,9 @@ vi.mock('@babylonjs/core', () => {
     material: mockMaterial,
     actionManager: null,
     billboardMode: 0,
+    isPickable: false,
+    setEnabled: vi.fn(),
+    renderingGroupId: 0,
   };
 
   const mockTransformNode = {
@@ -51,6 +55,10 @@ vi.mock('@babylonjs/core', () => {
     createDefaultXRExperienceAsync: vi.fn(async () => ({})),
     onPointerObservable: {
       add: vi.fn(),
+    },
+    onBeforeRenderObservable: {
+      add: vi.fn(),
+      remove: vi.fn(),
     },
     pick: vi.fn(),
     pointerX: 0,
@@ -83,10 +91,17 @@ vi.mock('@babylonjs/core', () => {
       attachControl: vi.fn(),
       inertia: 0,
       angularSensibility: 0,
+      minZ: 0,
+      maxZ: 0,
       position: { x: 0, y: 0, z: 0 },
       target: { x: 0, y: 0, z: 0 },
+      inputs: {
+        attached: {},
+        remove: vi.fn(),
+      },
     })),
     Color3: vi.fn((r: number, g: number, b: number) => ({ r, g, b, clone: vi.fn(() => ({ r, g, b })) })),
+    Color4: vi.fn((r: number, g: number, b: number, a: number) => ({ r, g, b, a })),
     HemisphericLight: vi.fn(() => ({ intensity: 0 })),
     PointLight: vi.fn(() => ({ intensity: 0 })),
     StandardMaterial: vi.fn(() => mockMaterial),
@@ -118,6 +133,16 @@ vi.mock('@babylonjs/core', () => {
     },
   };
 });
+
+vi.mock('../../../src/XRSessionManager', () => ({
+  XRSessionManager: vi.fn().mockImplementation(() => ({
+    createXRLoadingPanel: vi.fn(),
+    setupWebXR: vi.fn().mockResolvedValue(undefined),
+    isInXR: vi.fn().mockReturnValue(false),
+    dispose: vi.fn(),
+    gripController: null,
+  })),
+}));
 
 describe('VRSceneManager', () => {
   let canvas: HTMLCanvasElement;
@@ -158,7 +183,6 @@ describe('VRSceneManager', () => {
           json: () => Promise.resolve({ nodes: [], edges: [], lastUpdated: '' }),
         } as Response)
       );
-
       manager = new VRSceneManager(canvas);
       // Give async initialization time to complete
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -884,10 +908,13 @@ describe('VRSceneManager', () => {
 
       (manager as any).autosizeFileBoxes();
 
-      // Exported function should remain snapped to one face center.
-      expect(Math.abs(exportedChild.position.x)).toBe(0.5);
-      expect(exportedChild.position.y).toBe(0);
-      expect(exportedChild.position.z).toBe(0);
+      // Children are centered around origin then positions rescaled:
+      //   extentX=0.475, scaleX: 20→67  → x = 0.475*(20/67) ≈ 0.1418
+      //   extentY=0.15,  scaleY: 20→54  → y = 0.15*(20/54)  ≈ 0.0556
+      //   extentZ=0.05,  scaleZ: 20→50  → z = 0.05*(20/50)  = 0.02
+      expect(Math.abs(exportedChild.position.x)).toBeCloseTo(0.475 * 20 / 67, 3);
+      expect(Math.abs(exportedChild.position.y)).toBeCloseTo(0.15 * 20 / 54, 3);
+      expect(Math.abs(exportedChild.position.z)).toBeCloseTo(0.05 * 20 / 50, 3);
 
       // Per-axis resizing should produce a non-uniform box for anisotropic content.
       expect(fileBox.scaling.x).not.toBe(fileBox.scaling.y);
@@ -912,10 +939,13 @@ describe('VRSceneManager', () => {
 
       expect(autosizeSpy).toHaveBeenCalledTimes(1);
       expect(ensureParentSpy).toHaveBeenCalledTimes(1);
-      expect(clampSpy).toHaveBeenCalledTimes(1);
+      // clampNodesInsideFileBoxes is called twice directly in fitAndSeparateFileBoxes
+      // plus once unconditionally at the end of resolveInternalNodeCollisions = 3 total
+      expect(clampSpy).toHaveBeenCalledTimes(3);
       expect(gridSpy).toHaveBeenCalledTimes(1);
       expect(overlapSpy).toHaveBeenCalledWith(6);
-      expect(gapSpy).toHaveBeenCalledWith(10.0, 6);
+      // fileBoxMinGap currently used by fitAndSeparateFileBoxes
+      expect(gapSpy).toHaveBeenCalledWith(28, 6);
     });
 
     it('should run resize and collision steps in the expected order', () => {
@@ -940,6 +970,83 @@ describe('VRSceneManager', () => {
       expect(clampOrder).toBeLessThan(gridOrder);
       expect(gridOrder).toBeLessThan(overlapOrder);
       expect(overlapOrder).toBeLessThan(gapOrder);
+    });
+  });
+
+  describe('Hub navigation resolution', () => {
+    beforeEach(() => {
+      manager = new VRSceneManager(canvas);
+    });
+
+    it('resolves hub metadata to the destination node mesh', () => {
+      const targetMesh: any = {
+        getAbsolutePosition: vi.fn(() => ({ x: 10, y: 0, z: 0 })),
+      };
+      const hubMesh: any = {
+        hubData: { navigationNodeId: 'funcB@src/b.ts' },
+        getAbsolutePosition: vi.fn(() => ({ x: 0, y: 0, z: 0 })),
+      };
+      const pickedPoint: any = { x: 6, y: 2, z: 0 };
+      const expectedFaceNormal = { x: 1, y: 0, z: 0, clone: vi.fn(() => ({ x: 1, y: 0, z: 0 })) } as any;
+
+      (manager as any).nodeMeshMap.set('funcB@src/b.ts', targetMesh);
+      vi.spyOn(manager as any, 'quantizeFaceNormalFromPickedPoint').mockReturnValue(expectedFaceNormal);
+
+      const resolved = (manager as any).resolveHubNavigationTarget(hubMesh, pickedPoint, { x: 0, y: 0, z: 1, clone: vi.fn() });
+
+      expect(resolved?.nodeId).toBe('funcB@src/b.ts');
+      expect(resolved?.targetMesh).toBe(targetMesh);
+      expect(resolved?.faceNormal).toBe(expectedFaceNormal);
+    });
+
+    it('returns null when hub metadata has no mapped node mesh', () => {
+      const hubMesh: any = {
+        hubData: { navigationNodeId: 'missing@src/missing.ts' },
+        getAbsolutePosition: vi.fn(() => ({ x: 0, y: 0, z: 0 })),
+      };
+
+      const resolved = (manager as any).resolveHubNavigationTarget(hubMesh, null, { x: 0, y: 0, z: 1, clone: vi.fn(() => ({ x: 0, y: 0, z: 1 })) });
+
+      expect(resolved).toBeNull();
+    });
+  });
+
+  describe('Editor screen attachment', () => {
+    beforeEach(() => {
+      manager = new VRSceneManager(canvas);
+    });
+
+    it('does not recompute attachment transforms when the signature is unchanged', () => {
+      const hostMesh: any = {
+        getAbsolutePosition: vi.fn(() => ({ x: 0, y: 0, z: 0 })),
+      };
+      const screen: any = {
+        parent: null,
+        position: null,
+        rotationQuaternion: null,
+        rotation: null,
+        scaling: null,
+      };
+
+      (manager as any).functionEditorScreen = screen;
+      vi.spyOn(manager as any, 'getPreferredEditorFaceNormal').mockReturnValue({
+        x: 1,
+        y: 0,
+        z: 0,
+        clone: vi.fn(() => ({ x: 1, y: 0, z: 0, clone: vi.fn() })),
+      });
+      vi.spyOn(manager as any, 'formatDebugVector').mockImplementation((value: any) => value);
+
+      (manager as any).attachEditorScreenToVisibleFace(hostMesh, 6, 'func@src/file.ts');
+      const firstPosition = screen.position;
+      const firstRotation = screen.rotation;
+      const firstScaling = screen.scaling;
+
+      (manager as any).attachEditorScreenToVisibleFace(hostMesh, 6, 'func@src/file.ts');
+
+      expect(screen.position).toBe(firstPosition);
+      expect(screen.rotation).toBe(firstRotation);
+      expect(screen.scaling).toBe(firstScaling);
     });
   });
 });

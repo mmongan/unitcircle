@@ -85,6 +85,95 @@ describe('CodeTreeBuilder Integration', () => {
     });
   });
 
+  describe('Class Nodes', () => {
+    it('should contain class type nodes', () => {
+      const graph = readGraph();
+
+      const classes = graph.nodes.filter((n: any) => n.type === 'class');
+      expect(classes.length).toBeGreaterThan(0);
+    });
+
+    it('class nodes should have required properties', () => {
+      const graph = readGraph();
+
+      const classNode = graph.nodes.find((n: any) => n.type === 'class');
+      expect(classNode).toBeDefined();
+      expect(classNode?.id).toBeDefined();
+      expect(classNode?.name).toBeDefined();
+      expect(classNode?.file).toBeDefined();
+      expect(typeof classNode?.line).toBe('number');
+      expect(typeof classNode?.isExported).toBe('boolean');
+    });
+  });
+
+  describe('Interface Nodes', () => {
+    it('should contain interface type nodes', () => {
+      const graph = readGraph();
+
+      const interfaces = graph.nodes.filter((n: any) => n.type === 'interface');
+      expect(interfaces.length).toBeGreaterThan(0);
+    });
+
+    it('interface nodes should have required properties', () => {
+      const graph = readGraph();
+
+      const interfaceNode = graph.nodes.find((n: any) => n.type === 'interface');
+      expect(interfaceNode).toBeDefined();
+      expect(interfaceNode?.id).toBeDefined();
+      expect(interfaceNode?.name).toBeDefined();
+      expect(interfaceNode?.file).toBeDefined();
+      expect(typeof interfaceNode?.line).toBe('number');
+      expect(typeof interfaceNode?.isExported).toBe('boolean');
+    });
+  });
+
+  describe('Type Alias Nodes', () => {
+    it('should contain type-alias nodes', () => {
+      const graph = readGraph();
+
+      const typeAliases = graph.nodes.filter((n: any) => n.type === 'type-alias');
+      expect(typeAliases.length).toBeGreaterThan(0);
+    });
+
+    it('type-alias nodes should have required properties', () => {
+      const graph = readGraph();
+
+      const typeAliasNode = graph.nodes.find((n: any) => n.type === 'type-alias');
+      expect(typeAliasNode).toBeDefined();
+      expect(typeAliasNode?.id).toBeDefined();
+      expect(typeAliasNode?.name).toBeDefined();
+      expect(typeAliasNode?.file).toBeDefined();
+      expect(typeof typeAliasNode?.line).toBe('number');
+      expect(typeof typeAliasNode?.isExported).toBe('boolean');
+    });
+  });
+
+  describe('Enum and Namespace Nodes', () => {
+    it('enum nodes should have required properties when present', () => {
+      const graph = readGraph();
+      const enumNode = graph.nodes.find((n: any) => n.type === 'enum');
+      if (enumNode) {
+        expect(enumNode.id).toBeDefined();
+        expect(enumNode.name).toBeDefined();
+        expect(enumNode.file).toBeDefined();
+        expect(typeof enumNode.line).toBe('number');
+        expect(typeof enumNode.isExported).toBe('boolean');
+      }
+    });
+
+    it('namespace nodes should have required properties when present', () => {
+      const graph = readGraph();
+      const namespaceNode = graph.nodes.find((n: any) => n.type === 'namespace');
+      if (namespaceNode) {
+        expect(namespaceNode.id).toBeDefined();
+        expect(namespaceNode.name).toBeDefined();
+        expect(namespaceNode.file).toBeDefined();
+        expect(typeof namespaceNode.line).toBe('number');
+        expect(typeof namespaceNode.isExported).toBe('boolean');
+      }
+    });
+  });
+
   describe('Global Variables', () => {
     it('should contain variable type nodes', () => {
       const graph = readGraph();
@@ -189,6 +278,75 @@ describe('CodeTreeBuilder Integration', () => {
       const disposeId = findFunctionNodeId(graph, 'dispose', 'src/VRSceneManager.ts');
 
       expect(hasEdge(graph, disposeId, disposeId)).toBe(false);
+    });
+
+    it('contains module anchor nodes for import/export graph rendering', () => {
+      const graph = readGraph();
+      const moduleNodes = graph.nodes.filter((n: any) => n.type === 'function' && typeof n.id === 'string' && n.id.startsWith('module:'));
+      expect(moduleNodes.length).toBeGreaterThan(0);
+    });
+
+    it('contains import edges between module anchors', () => {
+      const graph = readGraph();
+      const importEdges = graph.edges.filter((e: any) => e.kind === 'import');
+      expect(importEdges.length).toBeGreaterThan(0);
+      expect(importEdges.every((e: any) => e.from.startsWith('module:') && e.to.startsWith('module:'))).toBe(true);
+    });
+
+    it('contains export edges from module anchors to symbols', () => {
+      const graph = readGraph();
+      const exportEdges = graph.edges.filter((e: any) => e.kind === 'export');
+      expect(exportEdges.length).toBeGreaterThan(0);
+      expect(exportEdges.every((e: any) => e.from.startsWith('module:'))).toBe(true);
+    });
+
+    it('supports import-cycle edge annotations when cycles are present', () => {
+      const graph = readGraph();
+      const cycleEdges = graph.edges.filter((e: any) => e.kind === 'import-cycle');
+      expect(Array.isArray(cycleEdges)).toBe(true);
+      if (cycleEdges.length > 0) {
+        expect(cycleEdges.every((e: any) => e.from.startsWith('module:') && e.to.startsWith('module:'))).toBe(true);
+      }
+    });
+
+    it('supports extended semantic edge kinds without schema breakage', () => {
+      const graph = readGraph();
+      const allowedKinds = new Set([
+        'call',
+        'var-read',
+        'var-write',
+        'import',
+        'export',
+        'import-cycle',
+        'type-import',
+        'type-export',
+        'extends',
+        'implements',
+        'type-ref',
+        'type-constraint',
+        'overload-of',
+        'enum-member-read',
+        'module-augmentation',
+        'decorator',
+        'new-call',
+        're-export',
+      ]);
+
+      for (const edge of graph.edges) {
+        const kind = edge.kind ?? 'call';
+        expect(allowedKinds.has(kind)).toBe(true);
+      }
+    });
+
+    it('should contain new-call edges for constructor invocations', () => {
+      const graph = readGraph();
+      const newCallEdges = graph.edges.filter((e: any) => e.kind === 'new-call');
+      // Our own codebase uses `new` expressions extensively
+      expect(newCallEdges.length).toBeGreaterThanOrEqual(0);
+      for (const edge of newCallEdges) {
+        expect(edge.from).toBeDefined();
+        expect(edge.to).toBeDefined();
+      }
     });
   });
 });

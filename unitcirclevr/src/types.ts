@@ -2,7 +2,7 @@
  * Shared type definitions for the VR visualization system
  */
 
-export type NodeType = 'function' | 'variable' | 'external';
+export type NodeType = 'function' | 'class' | 'interface' | 'type-alias' | 'enum' | 'namespace' | 'variable' | 'external';
 
 export interface GraphNode {
   id: string;
@@ -17,7 +17,25 @@ export interface GraphNode {
 export interface GraphEdge {
   from: string;
   to: string;
-  kind?: 'call' | 'var-read' | 'var-write';
+  kind?:
+    | 'call'
+    | 'var-read'
+    | 'var-write'
+    | 'import'
+    | 'export'
+    | 'import-cycle'
+    | 'type-import'
+    | 'type-export'
+    | 'extends'
+    | 'implements'
+    | 'type-ref'
+    | 'type-constraint'
+    | 'overload-of'
+    | 'enum-member-read'
+    | 'module-augmentation'
+    | 'decorator'
+    | 'new-call'
+    | 're-export';
 }
 
 export interface GraphData {

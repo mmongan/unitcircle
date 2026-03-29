@@ -11,7 +11,15 @@ export interface GraphData {
   lastUpdated: string;
 }
 
-export type CodeNode = FunctionNode | GlobalVariable | ExternalModule;
+export type CodeNode =
+  | FunctionNode
+  | ClassNode
+  | InterfaceNode
+  | TypeAliasNode
+  | EnumNode
+  | NamespaceNode
+  | GlobalVariable
+  | ExternalModule;
 
 export interface FunctionNode {
   id: string;
@@ -20,6 +28,51 @@ export interface FunctionNode {
   line: number;
   isExported: boolean;
   type: 'function';
+}
+
+export interface ClassNode {
+  id: string;
+  name: string;
+  file: string;
+  line: number;
+  isExported: boolean;
+  type: 'class';
+}
+
+export interface InterfaceNode {
+  id: string;
+  name: string;
+  file: string;
+  line: number;
+  isExported: boolean;
+  type: 'interface';
+}
+
+export interface TypeAliasNode {
+  id: string;
+  name: string;
+  file: string;
+  line: number;
+  isExported: boolean;
+  type: 'type-alias';
+}
+
+export interface EnumNode {
+  id: string;
+  name: string;
+  file: string;
+  line: number;
+  isExported: boolean;
+  type: 'enum';
+}
+
+export interface NamespaceNode {
+  id: string;
+  name: string;
+  file: string;
+  line: number;
+  isExported: boolean;
+  type: 'namespace';
 }
 
 export interface GlobalVariable {
@@ -137,7 +190,7 @@ export class VRGraphViewer {
    * Filter and re-render with only specific node types
    * @param types Array of node types to show
    */
-  showNodeTypes(...types: Array<'function' | 'variable' | 'external'>): void {
+  showNodeTypes(...types: Array<'function' | 'class' | 'interface' | 'type-alias' | 'enum' | 'namespace' | 'variable' | 'external'>): void {
     if (!this.graphData) return;
 
     const filteredData: GraphData = {
@@ -194,6 +247,11 @@ export class VRGraphViewer {
       return {
         totalNodes: 0,
         functions: 0,
+        classes: 0,
+        interfaces: 0,
+        typeAliases: 0,
+        enums: 0,
+        namespaces: 0,
         variables: 0,
         externalModules: 0,
         totalEdges: 0,
@@ -204,6 +262,11 @@ export class VRGraphViewer {
     return {
       totalNodes: this.graphData.nodes.length,
       functions: this.graphData.nodes.filter(n => n.type === 'function').length,
+      classes: this.graphData.nodes.filter(n => n.type === 'class').length,
+      interfaces: this.graphData.nodes.filter(n => n.type === 'interface').length,
+      typeAliases: this.graphData.nodes.filter(n => n.type === 'type-alias').length,
+      enums: this.graphData.nodes.filter(n => n.type === 'enum').length,
+      namespaces: this.graphData.nodes.filter(n => n.type === 'namespace').length,
       variables: this.graphData.nodes.filter(n => n.type === 'variable').length,
       externalModules: this.graphData.nodes.filter(n => n.type === 'external').length,
       totalEdges: this.graphData.edges.length,

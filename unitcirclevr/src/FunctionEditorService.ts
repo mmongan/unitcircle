@@ -41,6 +41,7 @@ export class FunctionEditorService {
   private getViewerWorldPosition: () => BABYLON.Vector3;
   private coerceFaceNormalToSide: (face: BABYLON.Vector3, fallback: BABYLON.Vector3) => BABYLON.Vector3;
   private formatDebugVector: (v: BABYLON.Vector3) => { x: number; y: number; z: number };
+  private readonly editorDebug = ((import.meta.env.VITE_EDITOR_DEBUG ?? 'false').toLowerCase() === 'true');
 
   constructor(
     scene: BABYLON.Scene,
@@ -103,7 +104,7 @@ export class FunctionEditorService {
   }
 
   showFunctionEditor(node: GraphNode): void {
-    if (!node.code || !node.id) {
+    if (!node.id) {
       this.hideFunctionEditor();
       return;
     }
@@ -130,15 +131,17 @@ export class FunctionEditorService {
     this.state.editorVisibleForNodeId = node.id;
     this.state.editorCurrentNodeId = node.id;
 
-    console.log('🖥️ Editor shown', {
-      nodeId: node.id,
-      name: node.name,
-      file: node.file,
-      line: node.line,
-      selectedFunctionId: this.state.currentFunctionId,
-      selectedFaceNormal: this.state.currentFaceNormal ? this.formatDebugVector(this.state.currentFaceNormal) : null,
-      codeLength: node.code.length,
-    });
+    if (this.editorDebug) {
+      console.log('🖥️ Editor shown', {
+        nodeId: node.id,
+        name: node.name,
+        file: node.file,
+        line: node.line,
+        selectedFunctionId: this.state.currentFunctionId,
+        selectedFaceNormal: this.state.currentFaceNormal ? this.formatDebugVector(this.state.currentFaceNormal) : null,
+        codeLength: node.code?.length ?? 0,
+      });
+    }
   }
 
   hideFunctionEditor(): void {
@@ -147,6 +150,7 @@ export class FunctionEditorService {
     this.state.editorCurrentNodeId = null;
     this.state.editorCallButtons = [];
     this.state.editorScrollButtons = [];
+    this.state.editorCloseButton = null;
     this.state.editorCurrentCodeLineCount = 0;
     this.state.editorCurrentCodeMaxLines = 0;
     this.state.lastEditorAttachmentSignature = null;
@@ -154,27 +158,29 @@ export class FunctionEditorService {
       this.state.functionEditorScreen.parent = null;
       this.state.functionEditorScreen.setEnabled(false);
     }
-    if (previousNodeId) {
+    if (previousNodeId && this.editorDebug) {
       console.log('🖥️ Editor hidden', { nodeId: previousNodeId });
     }
   }
 
   handleEditorScreenClick(uv: BABYLON.Vector2): boolean {
-    if (!this.state.editorCurrentNodeId) {
-      return false;
-    }
-
     const texX = (1 - uv.x) * EDITOR_TEXTURE_WIDTH;
     const texY = (1 - uv.y) * EDITOR_TEXTURE_HEIGHT;
 
-    // Check close button first (top-right corner)
-    const closeButtonSize = 60;
-    const closeButtonX = EDITOR_TEXTURE_WIDTH - closeButtonSize - 12;
-    const closeButtonY = 12;
-    if (texX >= closeButtonX && texX <= closeButtonX + closeButtonSize
-        && texY >= closeButtonY && texY <= closeButtonY + closeButtonSize) {
-      this.hideFunctionEditor();
-      return true;
+    if (this.state.editorCloseButton) {
+      const insideClose = texX >= this.state.editorCloseButton.x
+        && texX <= (this.state.editorCloseButton.x + this.state.editorCloseButton.width)
+        && texY >= this.state.editorCloseButton.y
+        && texY <= (this.state.editorCloseButton.y + this.state.editorCloseButton.height);
+      if (insideClose) {
+        this.state.editorDismissedNodeId = this.state.editorCurrentNodeId;
+        this.hideFunctionEditor();
+        return true;
+      }
+    }
+
+    if (!this.state.editorCurrentNodeId) {
+      return false;
     }
 
     for (const btn of this.state.editorScrollButtons) {
@@ -212,9 +218,14 @@ export class FunctionEditorService {
   updateFunctionEditorProximity(): void {
     const nearbyNode = this.findNearbyFunctionForEditor();
     if (!nearbyNode) {
+      this.state.editorDismissedNodeId = null;
       if (this.state.editorVisibleForNodeId !== null) {
         this.hideFunctionEditor();
       }
+      return;
+    }
+
+    if (this.state.editorDismissedNodeId === nearbyNode.id) {
       return;
     }
 
@@ -273,6 +284,21 @@ export class FunctionEditorService {
       rotation = new BABYLON.Vector3(0, Math.PI, 0);
     }
 
+    const attachmentSignature = [
+      nodeId,
+      position.x.toFixed(3),
+      position.y.toFixed(3),
+      position.z.toFixed(3),
+      rotation.x.toFixed(3),
+      rotation.y.toFixed(3),
+      rotation.z.toFixed(3),
+      boxSize.toFixed(3),
+    ].join('|');
+
+    if (attachmentSignature === this.state.lastEditorAttachmentSignature) {
+      return;
+    }
+
     screen.parent = hostMesh;
     screen.position = position;
     screen.rotationQuaternion = null;
@@ -284,17 +310,8 @@ export class FunctionEditorService {
     );
     (screen as any).editorHostNodeId = nodeId;
 
-    const attachmentSignature = [
-      nodeId,
-      position.x.toFixed(3),
-      position.y.toFixed(3),
-      position.z.toFixed(3),
-      rotation.x.toFixed(3),
-      rotation.y.toFixed(3),
-      rotation.z.toFixed(3),
-    ].join('|');
-    if (attachmentSignature !== this.state.lastEditorAttachmentSignature) {
-      this.state.lastEditorAttachmentSignature = attachmentSignature;
+    this.state.lastEditorAttachmentSignature = attachmentSignature;
+    if (this.editorDebug) {
       console.log('🖥️ Editor screen attached', {
         nodeId,
         faceNormal: this.formatDebugVector(faceNormal),
@@ -325,24 +342,24 @@ export class FunctionEditorService {
     ctx.fillStyle = 'rgba(26, 38, 57, 0.95)';
     ctx.fillRect(16, 16, width - 32, 88);
 
-    // Draw close button (X) in top-right corner
-    const closeButtonSize = 60;
-    const closeButtonX = width - closeButtonSize - 12;
-    const closeButtonY = 12;
-    ctx.fillStyle = 'rgba(220, 50, 50, 0.85)';
-    ctx.fillRect(closeButtonX, closeButtonY, closeButtonSize, closeButtonSize);
-    ctx.strokeStyle = 'rgba(255, 100, 100, 0.95)';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(closeButtonX, closeButtonY, closeButtonSize, closeButtonSize);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-    ctx.lineWidth = 4;
+    const closeSize = 52;
+    const closeX = width - 24 - closeSize;
+    const closeY = 34;
+    this.state.editorCloseButton = { x: closeX, y: closeY, width: closeSize, height: closeSize };
+
+    ctx.fillStyle = 'rgba(210, 44, 44, 0.96)';
+    ctx.fillRect(closeX, closeY, closeSize, closeSize);
+    ctx.strokeStyle = 'rgba(255, 224, 224, 0.95)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(closeX, closeY, closeSize, closeSize);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 5;
+    const iconInset = 14;
     ctx.beginPath();
-    ctx.moveTo(closeButtonX + 14, closeButtonY + 14);
-    ctx.lineTo(closeButtonX + closeButtonSize - 14, closeButtonY + closeButtonSize - 14);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(closeButtonX + closeButtonSize - 14, closeButtonY + 14);
-    ctx.lineTo(closeButtonX + 14, closeButtonY + closeButtonSize - 14);
+    ctx.moveTo(closeX + iconInset, closeY + iconInset);
+    ctx.lineTo(closeX + closeSize - iconInset, closeY + closeSize - iconInset);
+    ctx.moveTo(closeX + closeSize - iconInset, closeY + iconInset);
+    ctx.lineTo(closeX + iconInset, closeY + closeSize - iconInset);
     ctx.stroke();
 
     ctx.fillStyle = '#f6f9ff';
@@ -380,8 +397,9 @@ export class FunctionEditorService {
     const maxLines = Math.floor((height - codeAreaY - reserveFooterHeight) / lineHeight);
     const requestedStartLine = this.state.editorCodeScrollByNodeId.get(node.id || '') ?? 0;
 
+    const renderCode = this.getRenderableEditorCode(node);
     const codeRender = this.drawHighlightedCode(
-      ctx, node.code || '', codeAreaX, codeAreaY, codeAreaWidth, lineHeight, maxLines, requestedStartLine,
+      ctx, renderCode, codeAreaX, codeAreaY, codeAreaWidth, lineHeight, maxLines, requestedStartLine,
     );
     this.state.editorCodeScrollByNodeId.set(node.id || '', codeRender.appliedStartLine);
     this.state.editorCurrentCodeLineCount = codeRender.totalLines;
@@ -418,8 +436,7 @@ export class FunctionEditorService {
     if (this.state.currentFunctionId) {
       const selectedNode = this.state.graphNodeMap.get(this.state.currentFunctionId);
       const selectedMesh = this.state.nodeMeshMap.get(this.state.currentFunctionId);
-      if (selectedNode && selectedMesh && selectedNode.type === 'function' && selectedNode.code
-        && selectedMesh.isEnabled() && selectedMesh.isVisible) {
+      if (selectedNode && selectedMesh && (selectedNode.type === 'function' || selectedNode.type === 'class' || selectedNode.type === 'interface' || selectedNode.type === 'type-alias' || selectedNode.type === 'enum' || selectedNode.type === 'namespace')) {
         return selectedNode;
       }
     }
@@ -429,7 +446,7 @@ export class FunctionEditorService {
 
     for (const [nodeId, mesh] of this.state.nodeMeshMap.entries()) {
       const node = this.state.graphNodeMap.get(nodeId);
-      if (!node || node.type !== 'function' || !node.code || !mesh.isEnabled() || !mesh.isVisible) continue;
+      if (!node || (node.type !== 'function' && node.type !== 'class' && node.type !== 'interface' && node.type !== 'type-alias' && node.type !== 'enum' && node.type !== 'namespace') || !mesh.isEnabled() || !mesh.isVisible) continue;
 
       const radius = mesh.getBoundingInfo()?.boundingSphere?.radiusWorld ?? 0;
       const activationDistance = Math.max(12, radius + 6);
@@ -566,7 +583,7 @@ export class FunctionEditorService {
     if (!this.state.editorCurrentNodeId) return false;
 
     const node = this.state.graphNodeMap.get(this.state.editorCurrentNodeId);
-    if (!node || node.type !== 'function' || !node.code) return false;
+    if (!node || (node.type !== 'function' && node.type !== 'class' && node.type !== 'interface' && node.type !== 'type-alias' && node.type !== 'enum' && node.type !== 'namespace')) return false;
 
     const current = this.state.editorCodeScrollByNodeId.get(node.id) ?? 0;
     const maxStart = Math.max(0, this.state.editorCurrentCodeLineCount - this.state.editorCurrentCodeMaxLines);
@@ -580,6 +597,23 @@ export class FunctionEditorService {
     this.state.editorCodeScrollByNodeId.set(node.id, next);
     this.drawFunctionEditorTexture(node);
     return true;
+  }
+
+  private getRenderableEditorCode(node: GraphNode): string {
+    if (node.code && node.code.trim().length > 0) {
+      return node.code;
+    }
+
+    const fileLabel = node.file ? toProjectRelativePath(node.file) : '(unknown file)';
+    const lineLabel = node.line ? ` at line ${node.line}` : '';
+    return [
+      '// Source code unavailable for this symbol node.',
+      `// Symbol: ${node.name}${lineLabel}`,
+      `// File: ${fileLabel}`,
+      '//',
+      '// This usually means the parser could not extract a concrete code block',
+      '// for this symbol (for example generated/ambient declarations).',
+    ].join('\n');
   }
 
   private drawHighlightedLine(

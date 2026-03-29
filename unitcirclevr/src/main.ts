@@ -1,6 +1,9 @@
 import './style.css'
 import { VRSceneManager } from './VRSceneManager'
 import '@babylonjs/loaders/glTF'
+import { createLogger } from './logger'
+
+const log = createLogger('main')
 
 const LOADING_OVERLAY_ID = 'startupLoadingOverlay';
 const LOADING_OVERLAY_MIN_VISIBLE_MS = 1200;
@@ -23,7 +26,7 @@ async function logBuildVersion(): Promise<void> {
 
 function logFormattedMessage(date: Date): void {
   const formattedTime = date.toLocaleString();
-  console.log(`%c📦 Build: ${formattedTime}`, 'color: #00ff00; font-weight: bold; font-size: 12px;');
+  log.info(`Build: ${formattedTime}`);
 }
 
 function initializeScene(): void {
@@ -52,7 +55,7 @@ async function initializeApplication(canvas: HTMLCanvasElement): Promise<void> {
     await createVRScene(canvas);
     setupWindowCleanup();
   } catch (error) {
-    console.error('Failed to initialize VR scene:', error);
+    log.error('Failed to initialize VR scene', error);
     showUnsupportedMessage(canvas);
   }
 }
@@ -134,7 +137,7 @@ function setupLayoutRebuildShortcut(vrScene: VRSceneManager): void {
     // Press 'R' to rebuild exported function layout
     if (event.key.toLowerCase() === 'r' && event.ctrlKey) {
       event.preventDefault();
-      console.log('🔄 Rebuilding exported function layout (Ctrl+R)...');
+      log.info('Rebuilding exported function layout (Ctrl+R)...');
       vrScene.rebuildExportedFunctionLayout();
     }
   });

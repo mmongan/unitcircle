@@ -103,7 +103,6 @@ export class VRSceneManager {
   private functionEditorScreen: BABYLON.Mesh | null = null;
   private functionEditorTexture: BABYLON.DynamicTexture | null = null;
   private functionEditorMaterial: BABYLON.StandardMaterial | null = null;
-  private editorDismissedNodeId: string | null = null;
   private editorCurrentNodeId: string | null = null;
   private editorCallButtons: Array<{ x: number; y: number; width: number; height: number; targetNodeId: string }> = [];
   private editorScrollButtons: Array<{ x: number; y: number; width: number; height: number; action: 'up' | 'down' }> = [];
@@ -112,6 +111,9 @@ export class VRSceneManager {
   private editorCurrentCodeLineCount = 0;
   private editorCurrentCodeMaxLines = 0;
   private lastEditorAttachmentSignature: string | null = null;
+  private lastEditorAttachedNodeId: string | null = null;
+  private lastEditorAttachedFaceNormal: BABYLON.Vector3 | null = null;
+  private lastEdgeVisibilitySignature: string | null = null;
   private labelScaleState: Map<number, number> = new Map();
   private graphUpdateInProgress = false;
   private lastGraphReloadAtMs = 0;
@@ -254,11 +256,20 @@ export class VRSceneManager {
           const isBoxSurface = mesh.name.startsWith('filebox_') || mesh.name.startsWith('dirbox_');
           let faceNormal = (prioritizedHit as any).normal || new BABYLON.Vector3(0, 0, 1);
           const pickedPoint = (prioritizedHit as any).pickedPoint as BABYLON.Vector3 | null;
+          const hubNavigation = this.resolveHubNavigationTarget(mesh as BABYLON.Mesh, pickedPoint, faceNormal);
           if (clickedNode) {
             faceNormal = this.quantizeFaceNormalFromPickedPoint(mesh as BABYLON.Mesh, pickedPoint, faceNormal);
             pendingNodeId = clickedNode.id;
             pendingEdge = null;
             pendingBox = null;
+          } else if (hubNavigation) {
+            pendingNodeId = hubNavigation.nodeId;
+            pendingEdge = null;
+            pendingBox = null;
+            pendingMesh = hubNavigation.targetMesh;
+            pendingFaceNormal = hubNavigation.faceNormal.clone();
+            pendingPickedPoint = null;
+            return;
           } else {
             pendingNodeId = null;
             pendingEdge = clickedEdge || null;
@@ -652,6 +663,8 @@ export class VRSceneManager {
     if (this.scene.registerBeforeRender) {
       this.scene.registerBeforeRender(() => {
         if (this.physicsActive && this.fileLayout && this.fileInternalLayouts.size > 0) {
+          this.meshFactory.markEdgesDirty();
+
           // Re-anchor labels only while layout motion is active.
           this.refreshLabelTransformsIfScaleChanged(false);
 
@@ -755,6 +768,40 @@ export class VRSceneManager {
     }
 
     return this.coerceFaceNormalToSide(quantized, fallbackNormal);
+  }
+
+  private resolveHubNavigationTarget(
+    mesh: BABYLON.Mesh,
+    pickedPoint: BABYLON.Vector3 | null,
+    fallbackNormal: BABYLON.Vector3,
+  ): { targetMesh: BABYLON.Mesh; nodeId: string; faceNormal: BABYLON.Vector3 } | null {
+    const hubData = (mesh as any).hubData as { navigationNodeId?: string } | undefined;
+    const nodeId = hubData?.navigationNodeId;
+    if (!nodeId) {
+      return null;
+    }
+
+    const targetMesh = this.nodeMeshMap.get(nodeId);
+    if (!targetMesh) {
+      return null;
+    }
+
+    const targetPos = targetMesh.getAbsolutePosition();
+    const referencePoint = pickedPoint || mesh.getAbsolutePosition();
+    const dx = referencePoint.x - targetPos.x;
+    const dy = referencePoint.y - targetPos.y;
+    const dz = referencePoint.z - targetPos.z;
+    const lenSq = (dx * dx) + (dy * dy) + (dz * dz);
+    const hubFacingNormal = lenSq > 0.000001
+      ? new BABYLON.Vector3(dx, dy, dz)
+      : fallbackNormal.clone();
+    const faceNormal = this.quantizeFaceNormalFromPickedPoint(targetMesh, referencePoint, hubFacingNormal);
+
+    return {
+      targetMesh,
+      nodeId,
+      faceNormal,
+    };
   }
 
   private coerceFaceNormalToSide(
@@ -4577,6 +4624,8 @@ export class VRSceneManager {
     this.editorCurrentCodeLineCount = 0;
     this.editorCurrentCodeMaxLines = 0;
     this.lastEditorAttachmentSignature = null;
+    this.lastEditorAttachedNodeId = null;
+    this.lastEditorAttachedFaceNormal = null;
     if (this.functionEditorScreen) {
       this.functionEditorScreen.parent = null;
       this.functionEditorScreen.setEnabled(false);
@@ -4700,7 +4749,6 @@ export class VRSceneManager {
         && texY >= this.editorCloseButton.y
         && texY <= (this.editorCloseButton.y + this.editorCloseButton.height);
       if (insideClose) {
-        this.editorDismissedNodeId = this.editorCurrentNodeId;
         this.hideFunctionEditor();
         return true;
       }
@@ -4943,6 +4991,14 @@ export class VRSceneManager {
       return this.currentFaceNormal.clone();
     }
 
+    if (
+      this.editorVisibleForNodeId === nodeId
+      && this.lastEditorAttachedNodeId === nodeId
+      && this.lastEditorAttachedFaceNormal
+    ) {
+      return this.lastEditorAttachedFaceNormal.clone();
+    }
+
     const viewerWorldPos = this.getViewerWorldPosition();
     let fallback = viewerWorldPos.subtract(hostMesh.getAbsolutePosition());
     if (!Number.isFinite(fallback.length()) || fallback.lengthSquared() < 0.000001) {
@@ -4990,6 +5046,20 @@ export class VRSceneManager {
       rotation = new BABYLON.Vector3(0, Math.PI, 0);
     }
 
+    const attachmentSignature = [
+      nodeId,
+      position.x.toFixed(3),
+      position.y.toFixed(3),
+      position.z.toFixed(3),
+      rotation.x.toFixed(3),
+      rotation.y.toFixed(3),
+      rotation.z.toFixed(3),
+    ].join('|');
+
+    if (attachmentSignature === this.lastEditorAttachmentSignature && screen.parent === hostMesh) {
+      return;
+    }
+
     screen.parent = hostMesh;
     screen.position = position;
     // Clear quaternion so Euler rotations apply deterministically.
@@ -5001,16 +5071,9 @@ export class VRSceneManager {
       1,
     );
     (screen as any).editorHostNodeId = nodeId;
+    this.lastEditorAttachedNodeId = nodeId;
+    this.lastEditorAttachedFaceNormal = faceNormal.clone();
 
-    const attachmentSignature = [
-      nodeId,
-      position.x.toFixed(3),
-      position.y.toFixed(3),
-      position.z.toFixed(3),
-      rotation.x.toFixed(3),
-      rotation.y.toFixed(3),
-      rotation.z.toFixed(3),
-    ].join('|');
     if (attachmentSignature !== this.lastEditorAttachmentSignature) {
       this.lastEditorAttachmentSignature = attachmentSignature;
       console.log('🖥️ Editor screen attached', {
@@ -5048,77 +5111,6 @@ export class VRSceneManager {
       labelsVisible: this.labelsVisible,
       setBreadcrumbAnchorInteractivity: this.setBreadcrumbAnchorInteractivity.bind(this),
     });
-  }
-
-  private findNearbyFunctionForEditor(): GraphNode | null {
-    const viewerWorldPos = this.getViewerWorldPosition();
-
-    if (this.currentFunctionId) {
-      const selectedNode = this.graphNodeMap.get(this.currentFunctionId);
-      const selectedMesh = this.nodeMeshMap.get(this.currentFunctionId);
-      if (selectedNode && selectedMesh && selectedNode.type === 'function' && selectedNode.code && selectedMesh.isEnabled() && selectedMesh.isVisible) {
-        // Keep the editor pinned to the selected function while selection is active.
-        // This prevents flicker/hide when camera or scene-root transitions briefly
-        // move outside distance thresholds during face changes.
-        return selectedNode;
-      }
-    }
-
-    let closestNode: GraphNode | null = null;
-    let closestDistance = Number.POSITIVE_INFINITY;
-
-    for (const [nodeId, mesh] of this.nodeMeshMap.entries()) {
-      const node = this.graphNodeMap.get(nodeId);
-      if (!node || node.type !== 'function' || !node.code || !mesh.isEnabled() || !mesh.isVisible) {
-        continue;
-      }
-
-      const radius = mesh.getBoundingInfo()?.boundingSphere?.radiusWorld ?? 0;
-      const activationDistance = Math.max(12, radius + 6);
-      const distance = BABYLON.Vector3.Distance(viewerWorldPos, mesh.getAbsolutePosition());
-      if (distance > activationDistance || distance >= closestDistance) {
-        continue;
-      }
-
-      closestDistance = distance;
-      closestNode = node;
-    }
-
-    return closestNode;
-  }
-
-  private updateFunctionEditorProximity(): void {
-    const nearbyNode = this.findNearbyFunctionForEditor();
-    if (!nearbyNode) {
-      this.editorDismissedNodeId = null;
-      if (this.editorVisibleForNodeId !== null) {
-        this.hideFunctionEditor();
-      }
-      return;
-    }
-
-    if (this.editorDismissedNodeId === nearbyNode.id) {
-      return;
-    }
-
-    if (this.editorVisibleForNodeId === nearbyNode.id) {
-      const hostMesh = this.nodeMeshMap.get(nearbyNode.id);
-      if (hostMesh && this.functionEditorScreen) {
-        const meshAny = hostMesh as any;
-        const boxSize = typeof meshAny.boxSize === 'number'
-          ? meshAny.boxSize
-          : Math.max(1.0, (hostMesh.getBoundingInfo()?.boundingSphere?.radiusWorld ?? 1) * 1.15);
-        this.attachEditorScreenToVisibleFace(hostMesh, boxSize, nearbyNode.id);
-      }
-      return;
-    }
-
-    // Ensure a clean redraw whenever the editor switches to a different function.
-    if (this.editorVisibleForNodeId && this.editorVisibleForNodeId !== nearbyNode.id) {
-      this.hideFunctionEditor();
-    }
-
-    this.showFunctionEditor(nearbyNode);
   }
 
   private async setupWebXR(): Promise<void> {
@@ -5409,7 +5401,6 @@ export class VRSceneManager {
 
     if (isSameFace) {
       if (clickedNode.type === 'function' && clickedNode.code && this.editorVisibleForNodeId !== clickedNode.id) {
-        this.editorDismissedNodeId = null;
         this.showFunctionEditor(clickedNode);
       }
 
@@ -5423,7 +5414,6 @@ export class VRSceneManager {
       // Different face of same function - slide to new face
       this.currentFaceNormal = faceNormal.clone();
       if (clickedNode.type === 'function' && clickedNode.code && this.editorVisibleForNodeId !== clickedNode.id) {
-        this.editorDismissedNodeId = null;
         this.showFunctionEditor(clickedNode);
       }
       this.slideFaceView(targetMesh.getAbsolutePosition(), faceNormal, targetMesh);
@@ -5435,7 +5425,6 @@ export class VRSceneManager {
       // Refresh editor content immediately for the newly selected function box.
       // This prevents stale code text/buttons from the previous selection.
       if (clickedNode.type === 'function' && clickedNode.code) {
-        this.editorDismissedNodeId = null;
         if (this.editorVisibleForNodeId && this.editorVisibleForNodeId !== clickedNode.id) {
           this.hideFunctionEditor();
         }
@@ -5489,6 +5478,11 @@ export class VRSceneManager {
     const pickedMesh = hit.pickedMesh as BABYLON.Mesh;
     const pickedPoint = hit.pickedPoint || pickedMesh.getAbsolutePosition();
     const pickedEdge = (pickedMesh as any).edgeData as { from: string; to: string } | undefined;
+    const hubNavigation = this.resolveHubNavigationTarget(
+      pickedMesh,
+      pickedPoint,
+      hit.getNormal(true) || new BABYLON.Vector3(0, 0, 1),
+    );
     const pickedLabel = (pickedMesh as any).labelData as { kind: 'file' | 'directory'; path: string } | undefined;
 
     this.logXRNavigationDebug('teleport:pick', {
@@ -5502,6 +5496,17 @@ export class VRSceneManager {
       rayDirection: this.formatDebugVector(gripState.direction),
       hitDistance: Number(((hit as any).distance ?? 0).toFixed(3)),
     });
+
+    if (hubNavigation) {
+      this.logXRNavigationDebug('teleport:hub-destination', {
+        meshName: pickedMesh.name,
+        nodeId: hubNavigation.nodeId,
+        destinationWorldPos: this.formatDebugVector(hubNavigation.targetMesh.getAbsolutePosition()),
+        faceNormal: this.formatDebugVector(hubNavigation.faceNormal),
+      });
+      this.navigateToFunctionMesh(hubNavigation.targetMesh, hubNavigation.faceNormal);
+      return;
+    }
 
     if (pickedEdge) {
       const fromMesh = this.nodeMeshMap.get(pickedEdge.from);
@@ -5618,9 +5623,15 @@ export class VRSceneManager {
   public run(): void {
     this.engine.runRenderLoop(() => {
       this.applySceneDeclutter();
-      // Update edge cylinders each frame
+
+      const edgeVisibilitySignature = `${this.currentFunctionId ?? ''}|${this.editorVisibleForNodeId ?? ''}`;
+      if (edgeVisibilitySignature !== this.lastEdgeVisibilitySignature) {
+        this.lastEdgeVisibilitySignature = edgeVisibilitySignature;
+        this.meshFactory.markEdgesDirty();
+      }
+
+      // Geometry updates are now dirty-driven and become a fast no-op when static.
       this.meshFactory.updateEdges();
-      this.updateFunctionEditorProximity();
       this.scene.render();
     });
   }

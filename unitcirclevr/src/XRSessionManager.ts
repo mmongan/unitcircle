@@ -1,6 +1,9 @@
 import * as BABYLON from '@babylonjs/core';
 import { Quest3GripController, type GripGesture } from './Quest3GripController';
 import type { SceneState } from './SceneState';
+import { createLogger } from './logger';
+
+const log = createLogger('XRSessionManager');
 
 export class XRSessionManager {
   public xrExperience: BABYLON.WebXRDefaultExperience | null = null;
@@ -88,18 +91,18 @@ export class XRSessionManager {
       } | undefined;
 
       if (!xrNavigator || typeof xrNavigator.isSessionSupported !== 'function') {
-        console.log('WebXR API not available in this browser context; running desktop mode.');
+        log.info('WebXR API not available in this browser context; running desktop mode.');
         return;
       }
 
       const supportsImmersiveVR = await xrNavigator.isSessionSupported('immersive-vr');
       if (!supportsImmersiveVR) {
-        console.log('WebXR immersive-vr is not supported here; running desktop mode.');
+        log.info('WebXR immersive-vr is not supported here; running desktop mode.');
         return;
       }
 
       this.xrExperience = await this.scene.createDefaultXRExperienceAsync();
-      console.log('WebXR experience created successfully');
+      log.info('WebXR experience created successfully');
 
       this.gripController = new Quest3GripController(this.scene);
       const xrInput = this.xrExperience.input;
@@ -109,10 +112,10 @@ export class XRSessionManager {
       });
 
       xrInput.onControllerAddedObservable.add((controller) => {
-        console.log(`VR Controller connected: ${controller.inputSource.handedness}`);
+        log.info(`VR Controller connected: ${controller.inputSource.handedness}`);
       });
       xrInput.onControllerRemovedObservable.add((controller) => {
-        console.log(`VR Controller disconnected: ${controller.inputSource.handedness}`);
+        log.info(`VR Controller disconnected: ${controller.inputSource.handedness}`);
       });
 
       this.xrExperience.baseExperience.onStateChangedObservable.add((state) => {
@@ -144,7 +147,7 @@ export class XRSessionManager {
       this.setXRLoadingPanelVisible(false);
     } catch (error) {
       this.setXRLoadingPanelVisible(false);
-      console.warn('WebXR not available or failed to initialize:', error);
+      log.warn('WebXR not available or failed to initialize', error);
     }
   }
 

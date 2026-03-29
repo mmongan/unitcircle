@@ -63,8 +63,24 @@ export interface SceneDeclutterInput {
 export class SceneDeclutterService {
   private lastDeclutterSignature: string | null = null;
   private pendingDeclutterState: PendingDeclutterState | null = null;
+  private lastIdleViewerPosition: BABYLON.Vector3 | null = null;
+  private lastIdleViewerForward: BABYLON.Vector3 | null = null;
+  private lastIdleSelectedNodeId: string | null = null;
+  private lastIdleLabelsVisible: boolean | null = null;
+  private lastIdleCheckAtMs = 0;
 
   public apply(input: SceneDeclutterInput): void {
+    // If there is queued declutter work, keep draining that batch before
+    // recomputing the full visibility signature again.
+    if (this.pendingDeclutterState) {
+      this.processDeclutterBatch(input);
+      return;
+    }
+
+    if (this.canSkipIdleDeclutter(input)) {
+      return;
+    }
+
     const viewerInsideFile = this.isViewerInsideAnyFileBox(input);
     const focusedFile = viewerInsideFile ? this.getFocusedFilePath(input) : null;
     const focusedDirectories = this.buildFocusedDirectoryChain(focusedFile);
@@ -80,9 +96,36 @@ export class SceneDeclutterService {
         focusedFile,
         focusedDirectories,
       );
+      this.processDeclutterBatch(input);
+    }
+  }
+
+  private canSkipIdleDeclutter(input: SceneDeclutterInput): boolean {
+    const activeCamera = input.scene.activeCamera || input.camera;
+    const viewerPosition = this.getViewerWorldPosition(input);
+    const viewerForward = activeCamera.getForwardRay().direction;
+    const selectedNodeId = input.editorVisibleForNodeId || input.currentFunctionId || null;
+    const now = performance.now();
+
+    if (
+      this.lastIdleViewerPosition
+      && this.lastIdleViewerForward
+      && this.lastIdleLabelsVisible !== null
+      && this.lastIdleSelectedNodeId === selectedNodeId
+      && this.lastIdleLabelsVisible === input.labelsVisible
+      && BABYLON.Vector3.Distance(this.lastIdleViewerPosition, viewerPosition) < 0.08
+      && BABYLON.Vector3.Dot(this.lastIdleViewerForward, viewerForward) > 0.9996
+      && (now - this.lastIdleCheckAtMs) < 120
+    ) {
+      return true;
     }
 
-    this.processDeclutterBatch(input);
+    this.lastIdleViewerPosition = viewerPosition.clone();
+    this.lastIdleViewerForward = viewerForward.clone();
+    this.lastIdleSelectedNodeId = selectedNodeId;
+    this.lastIdleLabelsVisible = input.labelsVisible;
+    this.lastIdleCheckAtMs = now;
+    return false;
   }
 
   private getViewerWorldPosition(input: SceneDeclutterInput): BABYLON.Vector3 {
@@ -295,7 +338,12 @@ export class SceneDeclutterService {
         } else {
           const isFocusedNode = state.focusedFile !== null && item.relativeFile === state.focusedFile;
           const isContextNode = state.focusedFile !== null && state.focusedDirectories.has(item.fileDirectory);
-          const isFunctionNode = item.node.type === 'function';
+          const isFunctionNode = item.node.type === 'function'
+            || item.node.type === 'class'
+            || item.node.type === 'interface'
+            || item.node.type === 'type-alias'
+            || item.node.type === 'enum'
+            || item.node.type === 'namespace';
           const isExternalOrVariable = item.node.type === 'external' || item.node.type === 'variable';
           const shouldHide = state.focusedFile !== null && isExternalOrVariable && !isFocusedNode;
 

@@ -89,7 +89,7 @@ export class LayoutPipelineService {
       nodeExportedMap.set(node.id, !!node.isExported);
 
       let size = 1.0;
-      if (node.type === 'function') {
+      if (node.type === 'function' || node.type === 'class' || node.type === 'interface' || node.type === 'type-alias' || node.type === 'enum' || node.type === 'namespace') {
         size = node.isExported ? 1.8 : 1.3;
       }
       nodeSizeMap.set(node.id, size);

@@ -39,6 +39,46 @@ describe('VRGraphViewer', () => {
         type: 'function' as const
       },
       {
+        id: 'class:SceneHarness@src/VRSceneManager.ts',
+        name: 'SceneHarness',
+        file: 'src/VRSceneManager.ts',
+        line: 120,
+        isExported: true,
+        type: 'class' as const
+      },
+      {
+        id: 'interface:SceneLike@src/VRSceneManager.ts',
+        name: 'SceneLike',
+        file: 'src/VRSceneManager.ts',
+        line: 135,
+        isExported: true,
+        type: 'interface' as const
+      },
+      {
+        id: 'type:SceneMode@src/VRSceneManager.ts',
+        name: 'SceneMode',
+        file: 'src/VRSceneManager.ts',
+        line: 145,
+        isExported: true,
+        type: 'type-alias' as const
+      },
+      {
+        id: 'enum:SceneState@src/VRSceneManager.ts',
+        name: 'SceneState',
+        file: 'src/VRSceneManager.ts',
+        line: 155,
+        isExported: true,
+        type: 'enum' as const
+      },
+      {
+        id: 'namespace:SceneUtils@src/VRSceneManager.ts',
+        name: 'SceneUtils',
+        file: 'src/VRSceneManager.ts',
+        line: 165,
+        isExported: true,
+        type: 'namespace' as const
+      },
+      {
         id: 'var1',
         name: 'scene',
         file: 'src/VRSceneManager.ts',
@@ -62,6 +102,11 @@ describe('VRGraphViewer', () => {
     ],
     edges: [
       { from: 'func1', to: 'func2' },
+      { from: 'func1', to: 'class:SceneHarness@src/VRSceneManager.ts' },
+      { from: 'func1', to: 'interface:SceneLike@src/VRSceneManager.ts' },
+      { from: 'func1', to: 'type:SceneMode@src/VRSceneManager.ts' },
+      { from: 'func1', to: 'enum:SceneState@src/VRSceneManager.ts' },
+      { from: 'func1', to: 'namespace:SceneUtils@src/VRSceneManager.ts' },
       { from: 'func1', to: 'var1' },
       { from: 'func2', to: 'ext:babylon' },
       { from: 'func2', to: 'var1' }
@@ -121,8 +166,8 @@ describe('VRGraphViewer', () => {
       );
 
       await viewer.loadGraph();
-      expect(viewer.getNodeCount()).toBe(5);
-      expect(viewer.getEdgeCount()).toBe(4);
+      expect(viewer.getNodeCount()).toBe(10);
+      expect(viewer.getEdgeCount()).toBe(9);
     });
 
     it('should use default path when no argument provided', async () => {
@@ -173,11 +218,16 @@ describe('VRGraphViewer', () => {
 
     it('should calculate correct statistics', () => {
       const stats = viewer.getStats();
-      expect(stats.totalNodes).toBe(5);
+      expect(stats.totalNodes).toBe(10);
       expect(stats.functions).toBe(2);
+      expect(stats.classes).toBe(1);
+      expect(stats.interfaces).toBe(1);
+      expect(stats.typeAliases).toBe(1);
+      expect(stats.enums).toBe(1);
+      expect(stats.namespaces).toBe(1);
       expect(stats.variables).toBe(2);
       expect(stats.externalModules).toBe(1);
-      expect(stats.totalEdges).toBe(4);
+      expect(stats.totalEdges).toBe(9);
     });
 
     it('should include last updated timestamp', () => {
@@ -218,7 +268,7 @@ describe('VRGraphViewer', () => {
 
     it('should find calls from a node', () => {
       const calls = viewer.findCallsFrom('func1');
-      expect(calls).toHaveLength(2);
+      expect(calls).toHaveLength(7);
       expect(calls[0].from).toBe('func1');
     });
 
@@ -261,6 +311,46 @@ describe('VRGraphViewer', () => {
       expect(graphData?.nodes.every(n => n.type === 'variable')).toBe(true);
     });
 
+    it('should show only classes', () => {
+      viewer.showNodeTypes('class');
+      const graphData = viewer.getGraphData();
+
+      expect(graphData?.nodes).toHaveLength(1);
+      expect(graphData?.nodes[0].type).toBe('class');
+    });
+
+    it('should show only interfaces', () => {
+      viewer.showNodeTypes('interface');
+      const graphData = viewer.getGraphData();
+
+      expect(graphData?.nodes).toHaveLength(1);
+      expect(graphData?.nodes[0].type).toBe('interface');
+    });
+
+    it('should show only type aliases', () => {
+      viewer.showNodeTypes('type-alias');
+      const graphData = viewer.getGraphData();
+
+      expect(graphData?.nodes).toHaveLength(1);
+      expect(graphData?.nodes[0].type).toBe('type-alias');
+    });
+
+    it('should show only enums', () => {
+      viewer.showNodeTypes('enum');
+      const graphData = viewer.getGraphData();
+
+      expect(graphData?.nodes).toHaveLength(1);
+      expect(graphData?.nodes[0].type).toBe('enum');
+    });
+
+    it('should show only namespaces', () => {
+      viewer.showNodeTypes('namespace');
+      const graphData = viewer.getGraphData();
+
+      expect(graphData?.nodes).toHaveLength(1);
+      expect(graphData?.nodes[0].type).toBe('namespace');
+    });
+
     it('should show only external modules', () => {
       viewer.showNodeTypes('external');
       const graphData = viewer.getGraphData();
@@ -270,10 +360,10 @@ describe('VRGraphViewer', () => {
     });
 
     it('should show multiple types', () => {
-      viewer.showNodeTypes('function', 'variable');
+      viewer.showNodeTypes('function', 'class', 'interface', 'type-alias', 'enum', 'namespace', 'variable');
       const graphData = viewer.getGraphData();
       
-      expect(graphData?.nodes).toHaveLength(4);
+      expect(graphData?.nodes).toHaveLength(9);
     });
 
     it('should filter edges when hiding node types', () => {
@@ -302,7 +392,7 @@ describe('VRGraphViewer', () => {
       viewer.showExportedOnly();
       const graphData = viewer.getGraphData();
       
-      expect(graphData?.nodes).toHaveLength(2);
+      expect(graphData?.nodes).toHaveLength(7);
       expect(graphData?.nodes.every(n => 'isExported' in n && n.isExported)).toBe(true);
     });
 
@@ -312,6 +402,11 @@ describe('VRGraphViewer', () => {
       const ids = graphData?.nodes.map(n => n.id);
       
       expect(ids).toContain('func1');
+      expect(ids).toContain('class:SceneHarness@src/VRSceneManager.ts');
+      expect(ids).toContain('interface:SceneLike@src/VRSceneManager.ts');
+      expect(ids).toContain('type:SceneMode@src/VRSceneManager.ts');
+      expect(ids).toContain('enum:SceneState@src/VRSceneManager.ts');
+      expect(ids).toContain('namespace:SceneUtils@src/VRSceneManager.ts');
       expect(ids).toContain('var2');
     });
 
@@ -319,7 +414,7 @@ describe('VRGraphViewer', () => {
       viewer.showExportedOnly();
       const graphData = viewer.getGraphData();
       
-      expect(graphData?.edges.length).toBeLessThanOrEqual(4);
+      expect(graphData?.edges.length).toBeLessThanOrEqual(5);
     });
   });
 
@@ -339,7 +434,7 @@ describe('VRGraphViewer', () => {
       viewer.showAll();
       
       const stats = viewer.getStats();
-      expect(stats.totalNodes).toBe(5);
+      expect(stats.totalNodes).toBe(10);
     });
 
     it('should restore all edges after filtering', () => {
@@ -347,7 +442,7 @@ describe('VRGraphViewer', () => {
       viewer.showAll();
       
       const stats = viewer.getStats();
-      expect(stats.totalEdges).toBe(4);
+      expect(stats.totalEdges).toBe(9);
     });
   });
 

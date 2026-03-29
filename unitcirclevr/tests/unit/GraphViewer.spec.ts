@@ -14,6 +14,46 @@ describe('GraphViewer', () => {
         type: 'function' as const
       },
       {
+        id: 'class:TestViewer@src/test.ts',
+        name: 'TestViewer',
+        file: 'src/test.ts',
+        line: 20,
+        isExported: true,
+        type: 'class' as const
+      },
+      {
+        id: 'interface:Renderable@src/test.ts',
+        name: 'Renderable',
+        file: 'src/test.ts',
+        line: 30,
+        isExported: true,
+        type: 'interface' as const
+      },
+      {
+        id: 'type:RenderMode@src/test.ts',
+        name: 'RenderMode',
+        file: 'src/test.ts',
+        line: 40,
+        isExported: true,
+        type: 'type-alias' as const
+      },
+      {
+        id: 'enum:RenderTier@src/test.ts',
+        name: 'RenderTier',
+        file: 'src/test.ts',
+        line: 50,
+        isExported: true,
+        type: 'enum' as const
+      },
+      {
+        id: 'namespace:Rendering@src/test.ts',
+        name: 'Rendering',
+        file: 'src/test.ts',
+        line: 60,
+        isExported: true,
+        type: 'namespace' as const
+      },
+      {
         id: 'var1',
         name: 'myVariable',
         file: 'src/test.ts',
@@ -29,6 +69,11 @@ describe('GraphViewer', () => {
     ],
     edges: [
       { from: 'func1', to: 'var1' },
+      { from: 'func1', to: 'class:TestViewer@src/test.ts' },
+      { from: 'func1', to: 'interface:Renderable@src/test.ts' },
+      { from: 'func1', to: 'type:RenderMode@src/test.ts' },
+      { from: 'func1', to: 'enum:RenderTier@src/test.ts' },
+      { from: 'func1', to: 'namespace:Rendering@src/test.ts' },
       { from: 'func1', to: 'ext:lodash' }
     ],
     lastUpdated: '2024-01-01T00:00:00Z'
@@ -63,11 +108,16 @@ describe('GraphViewer', () => {
       await viewer.loadGraph('/test.json');
       const stats = viewer.getStats();
 
-      expect(stats.totalNodes).toBe(3);
+      expect(stats.totalNodes).toBe(8);
       expect(stats.functions).toBe(1);
+      expect(stats.classes).toBe(1);
+      expect(stats.interfaces).toBe(1);
+      expect(stats.typeAliases).toBe(1);
+      expect(stats.enums).toBe(1);
+      expect(stats.namespaces).toBe(1);
       expect(stats.variables).toBe(1);
       expect(stats.externalModules).toBe(1);
-      expect(stats.totalEdges).toBe(2);
+      expect(stats.totalEdges).toBe(7);
     });
 
     it('should handle fetch errors', async () => {
@@ -107,11 +157,16 @@ describe('GraphViewer', () => {
 
     it('should calculate correct statistics', () => {
       const stats = viewer.getStats();
-      expect(stats.totalNodes).toBe(3);
+      expect(stats.totalNodes).toBe(8);
       expect(stats.functions).toBe(1);
+      expect(stats.classes).toBe(1);
+      expect(stats.interfaces).toBe(1);
+      expect(stats.typeAliases).toBe(1);
+      expect(stats.enums).toBe(1);
+      expect(stats.namespaces).toBe(1);
       expect(stats.variables).toBe(1);
       expect(stats.externalModules).toBe(1);
-      expect(stats.totalEdges).toBe(2);
+      expect(stats.totalEdges).toBe(7);
     });
 
     it('should include last updated timestamp', () => {
@@ -144,7 +199,7 @@ describe('GraphViewer', () => {
 
     it('should find calls from a node', () => {
       const calls = viewer.findCallsFrom('func1');
-      expect(calls).toHaveLength(2);
+      expect(calls).toHaveLength(7);
       expect(calls[0].from).toBe('func1');
     });
 
@@ -230,6 +285,11 @@ describe('GraphViewer', () => {
       const container = document.querySelector('#test-root');
       expect(container?.innerHTML).toContain('Code Graph Viewer');
       expect(container?.innerHTML).toContain('Functions: 1');
+      expect(container?.innerHTML).toContain('Classes: 1');
+      expect(container?.innerHTML).toContain('Interfaces: 1');
+      expect(container?.innerHTML).toContain('Types: 1');
+      expect(container?.innerHTML).toContain('Enums: 1');
+      expect(container?.innerHTML).toContain('Namespaces: 1');
       expect(container?.innerHTML).toContain('Variables: 1');
     });
 
@@ -241,14 +301,19 @@ describe('GraphViewer', () => {
 
     it('should render tab buttons', () => {
       const container = document.querySelector('#test-root');
-      expect(container?.innerHTML).toContain('Nodes (3)');
-      expect(container?.innerHTML).toContain('Edges (2)');
+      expect(container?.innerHTML).toContain('Nodes (8)');
+      expect(container?.innerHTML).toContain('Edges (7)');
     });
 
     it('should render nodes table', () => {
       const container = document.querySelector('#test-root');
       expect(container?.innerHTML).toContain('nodes-table');
       expect(container?.innerHTML).toContain('myFunction');
+      expect(container?.innerHTML).toContain('TestViewer');
+      expect(container?.innerHTML).toContain('Renderable');
+      expect(container?.innerHTML).toContain('RenderMode');
+      expect(container?.innerHTML).toContain('RenderTier');
+      expect(container?.innerHTML).toContain('Rendering');
       expect(container?.innerHTML).toContain('myVariable');
     });
 
@@ -256,8 +321,48 @@ describe('GraphViewer', () => {
       const container = document.querySelector('#test-root');
       expect(container?.innerHTML).toContain('type-badge');
       expect(container?.innerHTML).toContain('function');
+      expect(container?.innerHTML).toContain('class');
+      expect(container?.innerHTML).toContain('interface');
+      expect(container?.innerHTML).toContain('type-alias');
+      expect(container?.innerHTML).toContain('enum');
+      expect(container?.innerHTML).toContain('namespace');
       expect(container?.innerHTML).toContain('variable');
       expect(container?.innerHTML).toContain('external');
+    });
+
+    it('should filter class nodes', () => {
+      viewer.filterByType('class');
+      const container = document.querySelector('#test-root');
+      expect(container?.innerHTML).toContain('TestViewer');
+      expect(container?.innerHTML).toContain('Classes');
+    });
+
+    it('should filter interface nodes', () => {
+      viewer.filterByType('interface');
+      const container = document.querySelector('#test-root');
+      expect(container?.innerHTML).toContain('Renderable');
+      expect(container?.innerHTML).toContain('Interfaces');
+    });
+
+    it('should filter type alias nodes', () => {
+      viewer.filterByType('type-alias');
+      const container = document.querySelector('#test-root');
+      expect(container?.innerHTML).toContain('RenderMode');
+      expect(container?.innerHTML).toContain('Type Aliases');
+    });
+
+    it('should filter enum nodes', () => {
+      viewer.filterByType('enum');
+      const container = document.querySelector('#test-root');
+      expect(container?.innerHTML).toContain('RenderTier');
+      expect(container?.innerHTML).toContain('Enums');
+    });
+
+    it('should filter namespace nodes', () => {
+      viewer.filterByType('namespace');
+      const container = document.querySelector('#test-root');
+      expect(container?.innerHTML).toContain('Rendering');
+      expect(container?.innerHTML).toContain('Namespaces');
     });
   });
 

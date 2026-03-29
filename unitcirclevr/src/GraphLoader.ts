@@ -2,6 +2,9 @@
  * Service for loading and managing graph data from different sources
  */
 import type { GraphData } from './types';
+import { createLogger } from './logger';
+
+const log = createLogger('GraphLoader');
 
 export class GraphLoader {
   private cache: GraphData | null = null;
@@ -36,7 +39,7 @@ export class GraphLoader {
       
       return false;  // No update needed
     } catch (error) {
-      console.warn('Error checking version:', error);
+      log.warn('Error checking version', error);
       return false;
     }
   }
@@ -67,24 +70,24 @@ export class GraphLoader {
           this.lastSeenVersion = graphVersion;
         }
         if (graphVersion !== this.lastLoggedGraphVersion) {
-          console.log(`✓ Loaded graph with ${data.nodes?.length || 0} functions and ${data.edges?.length || 0} calls`);
+          log.debug(`Loaded graph with ${data.nodes?.length || 0} functions and ${data.edges?.length || 0} calls`);
           this.lastLoggedGraphVersion = graphVersion;
         }
         return data;
       }
       
-      console.warn(`Failed to load graph: ${response.status} ${response.statusText}`);
+      log.warn(`Failed to load graph: ${response.status} ${response.statusText}`);
       // If fetch fails, try returning cached version
       if (this.cache) {
-        console.warn('Using cached graph data');
+        log.warn('Using cached graph data');
         return this.cache;
       }
       return null;
     } catch (error) {
-      console.error('Error loading graph:', error);
+      log.error('Error loading graph', error);
       // Return cached version if available
       if (this.cache) {
-        console.warn('Using cached graph data due to error');
+        log.warn('Using cached graph data due to error');
         return this.cache;
       }
       return null;

@@ -9,7 +9,15 @@ export interface GraphData {
   lastUpdated: string;
 }
 
-export type CodeNode = FunctionNode | GlobalVariable | ExternalModule;
+export type CodeNode =
+  | FunctionNode
+  | ClassNode
+  | InterfaceNode
+  | TypeAliasNode
+  | EnumNode
+  | NamespaceNode
+  | GlobalVariable
+  | ExternalModule;
 
 export interface FunctionNode {
   id: string;
@@ -18,6 +26,51 @@ export interface FunctionNode {
   line: number;
   isExported: boolean;
   type: 'function';
+}
+
+export interface ClassNode {
+  id: string;
+  name: string;
+  file: string;
+  line: number;
+  isExported: boolean;
+  type: 'class';
+}
+
+export interface InterfaceNode {
+  id: string;
+  name: string;
+  file: string;
+  line: number;
+  isExported: boolean;
+  type: 'interface';
+}
+
+export interface TypeAliasNode {
+  id: string;
+  name: string;
+  file: string;
+  line: number;
+  isExported: boolean;
+  type: 'type-alias';
+}
+
+export interface EnumNode {
+  id: string;
+  name: string;
+  file: string;
+  line: number;
+  isExported: boolean;
+  type: 'enum';
+}
+
+export interface NamespaceNode {
+  id: string;
+  name: string;
+  file: string;
+  line: number;
+  isExported: boolean;
+  type: 'namespace';
 }
 
 export interface GlobalVariable {
@@ -133,6 +186,11 @@ export class GraphViewer {
       return {
         totalNodes: 0,
         functions: 0,
+        classes: 0,
+        interfaces: 0,
+        typeAliases: 0,
+        enums: 0,
+        namespaces: 0,
         variables: 0,
         externalModules: 0,
         totalEdges: 0,
@@ -143,6 +201,11 @@ export class GraphViewer {
     return {
       totalNodes: this.graphData.nodes.length,
       functions: this.graphData.nodes.filter(n => n.type === 'function').length,
+      classes: this.graphData.nodes.filter(n => n.type === 'class').length,
+      interfaces: this.graphData.nodes.filter(n => n.type === 'interface').length,
+      typeAliases: this.graphData.nodes.filter(n => n.type === 'type-alias').length,
+      enums: this.graphData.nodes.filter(n => n.type === 'enum').length,
+      namespaces: this.graphData.nodes.filter(n => n.type === 'namespace').length,
       variables: this.graphData.nodes.filter(n => n.type === 'variable').length,
       externalModules: this.graphData.nodes.filter(n => n.type === 'external').length,
       totalEdges: this.graphData.edges.length,
@@ -193,6 +256,11 @@ export class GraphViewer {
           <h2>Code Graph Viewer</h2>
           <div class="viewer-stats">
             <span class="stat">📦 Functions: ${stats.functions}</span>
+            <span class="stat">🏛️ Classes: ${stats.classes}</span>
+            <span class="stat">🧩 Interfaces: ${stats.interfaces}</span>
+            <span class="stat">🏷️ Types: ${stats.typeAliases}</span>
+            <span class="stat">🔢 Enums: ${stats.enums}</span>
+            <span class="stat">📚 Namespaces: ${stats.namespaces}</span>
             <span class="stat">📝 Variables: ${stats.variables}</span>
             <span class="stat">🔗 External: ${stats.externalModules}</span>
             <span class="stat">➡️ Calls: ${stats.totalEdges}</span>
@@ -211,6 +279,11 @@ export class GraphViewer {
           <select class="filter-select" id="filter-select">
             <option value="all" ${this.filterType === 'all' ? 'selected' : ''}>All Types</option>
             <option value="function" ${this.filterType === 'function' ? 'selected' : ''}>Functions</option>
+            <option value="class" ${this.filterType === 'class' ? 'selected' : ''}>Classes</option>
+            <option value="interface" ${this.filterType === 'interface' ? 'selected' : ''}>Interfaces</option>
+            <option value="type-alias" ${this.filterType === 'type-alias' ? 'selected' : ''}>Type Aliases</option>
+            <option value="enum" ${this.filterType === 'enum' ? 'selected' : ''}>Enums</option>
+            <option value="namespace" ${this.filterType === 'namespace' ? 'selected' : ''}>Namespaces</option>
             <option value="variable" ${this.filterType === 'variable' ? 'selected' : ''}>Variables</option>
             <option value="external" ${this.filterType === 'external' ? 'selected' : ''}>External</option>
           </select>
@@ -356,6 +429,11 @@ export class GraphViewer {
   private getTypeColor(type: string): string {
     const colors: { [key: string]: string } = {
       function: '#4A9EFF',
+      class: '#35b26f',
+      interface: '#6f8cff',
+      'type-alias': '#9f7aea',
+      enum: '#f97316',
+      namespace: '#14b8a6',
       variable: '#FFD700',
       external: '#00D4FF'
     };

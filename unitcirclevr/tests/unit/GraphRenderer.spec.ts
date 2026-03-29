@@ -10,7 +10,12 @@ vi.mock('@babylonjs/core', () => {
     v.subtract = vi.fn((other: any) => makeVector(v.x - other.x, v.y - other.y, v.z - other.z));
     v.scale = vi.fn((s: number) => makeVector(v.x * s, v.y * s, v.z * s));
     v.clone = vi.fn(() => makeVector(v.x, v.y, v.z));
-    v.copyFrom = vi.fn(function(other: any) { this.x = other.x; this.y = other.y; this.z = other.z; return this; });
+    v.copyFrom = vi.fn((other: any) => {
+      v.x = other.x;
+      v.y = other.y;
+      v.z = other.z;
+      return v;
+    });
     return v;
   };
 

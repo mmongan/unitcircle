@@ -9,6 +9,12 @@ export class LabelManager {
   private state: SceneState;
   private isInXR: () => boolean;
   private getCameraFov: () => number;
+  private lastScaleCameraPosition: BABYLON.Vector3 | null = null;
+  private lastScaleCameraForward: BABYLON.Vector3 | null = null;
+  private lastScaleRenderWidth = 0;
+  private lastScaleRenderHeight = 0;
+  private lastScaleFov = 0;
+  private lastScaleUpdateAtMs = 0;
 
   constructor(
     scene: BABYLON.Scene,
@@ -112,6 +118,7 @@ export class LabelManager {
   }
 
   updateLabelDistanceScaling(): void {
+    if (!this.state.labelsVisible) return;
     if (this.state.fileBoxLabels.size === 0 && this.state.directoryBoxLabels.size === 0) return;
 
     const activeCamera = this.scene.activeCamera;
@@ -127,6 +134,26 @@ export class LabelManager {
     const aspect = renderWidth / renderHeight;
     const verticalFov = Math.max(0.25, this.getCameraFov());
     const horizontalFov = 2 * Math.atan(Math.tan(verticalFov * 0.5) * aspect);
+    const cameraForward = activeCamera.getForwardRay().direction;
+    const now = performance.now();
+
+    if (this.lastScaleCameraPosition && this.lastScaleCameraForward) {
+      const positionDelta = BABYLON.Vector3.Distance(this.lastScaleCameraPosition, cameraWorldPos);
+      const rotationDot = BABYLON.Vector3.Dot(this.lastScaleCameraForward, cameraForward);
+      const renderSizeUnchanged = this.lastScaleRenderWidth === renderWidth
+        && this.lastScaleRenderHeight === renderHeight;
+      const fovUnchanged = Math.abs(this.lastScaleFov - verticalFov) < 0.0001;
+      const elapsed = now - this.lastScaleUpdateAtMs;
+      if (
+        positionDelta < 0.05
+        && rotationDot > 0.9995
+        && renderSizeUnchanged
+        && fovUnchanged
+        && elapsed < 150
+      ) {
+        return;
+      }
+    }
 
     const fallbackBaseLabelWidth = 36.0;
     const readableMinScale = this.isInXR() ? 1.25 : 1.05;
@@ -163,6 +190,13 @@ export class LabelManager {
     this.state.labelScaleState.clear();
     for (const label of this.state.fileBoxLabels.values()) applyScale(label);
     for (const label of this.state.directoryBoxLabels.values()) applyScale(label);
+
+    this.lastScaleCameraPosition = cameraWorldPos.clone();
+    this.lastScaleCameraForward = cameraForward.clone();
+    this.lastScaleRenderWidth = renderWidth;
+    this.lastScaleRenderHeight = renderHeight;
+    this.lastScaleFov = verticalFov;
+    this.lastScaleUpdateAtMs = now;
   }
 
   setBreadcrumbAnchorInteractivity(labelAnchor: BABYLON.Mesh, enabled: boolean): void {

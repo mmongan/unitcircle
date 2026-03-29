@@ -98,11 +98,11 @@ describe('NavigationController', () => {
   describe('Face Normal Handling', () => {
     it('should quantize face normals correctly', () => {
       const mesh: any = {
-        getAbsolutePosition: vi.fn(() => BABYLON.Vector3(0, 0, 0)),
+        getAbsolutePosition: vi.fn(() => new BABYLON.Vector3(0, 0, 0)),
       };
 
-      const pickedPoint = BABYLON.Vector3(5, 0, 0);
-      const fallback = BABYLON.Vector3(0, 0, 1);
+      const pickedPoint = new BABYLON.Vector3(5, 0, 0);
+      const fallback = new BABYLON.Vector3(0, 0, 1);
 
       const result = navController.quantizeFaceNormalFromPickedPoint(
         mesh as any,
@@ -114,16 +114,16 @@ describe('NavigationController', () => {
     });
 
     it('should coerce face normal to side', () => {
-      const faceNormal = BABYLON.Vector3(0, 1, 0); // Top face
-      const fallback = BABYLON.Vector3(1, 0, 0); // Side face
+      const faceNormal = new BABYLON.Vector3(0, 1, 0); // Top face
+      const fallback = new BABYLON.Vector3(1, 0, 0); // Side face
 
       const result = navController.coerceFaceNormalToSide(faceNormal, fallback);
       expect(Math.abs(result.y)).toBeLessThan(0.5); // Should not be top/bottom
     });
 
     it('should compare face normals with tolerance', () => {
-      const a = BABYLON.Vector3(1, 0, 0);
-      const b = BABYLON.Vector3(0.95, 0.05, 0);
+      const a = new BABYLON.Vector3(1, 0, 0);
+      const b = new BABYLON.Vector3(0.95, 0.05, 0);
 
       const result = navController.isFaceNormalEqual(a, b);
       expect(result).toBe(true);

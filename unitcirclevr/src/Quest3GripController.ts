@@ -2,6 +2,9 @@
  * Quest 3 Grip Controller - Handles hand grips, pressure, and gestures
  */
 import * as BABYLON from '@babylonjs/core';
+import { createLogger } from './logger';
+
+const log = createLogger('Quest3GripController');
 
 export interface GripState {
   handedness: 'left' | 'right';
@@ -58,7 +61,7 @@ export class Quest3GripController {
 
       controller.onMotionControllerInitObservable.add((motionController) => {
         const handedness = controller.inputSource.handedness as 'left' | 'right';
-        console.log(`Quest 3 ${handedness} controller initialized`);
+        log.info(`Quest 3 ${handedness} controller initialized`);
 
         // Setup squeeze/grip button
         const squeezeComponent = motionController.getComponent('xr-standard-squeeze');
@@ -237,7 +240,7 @@ export class Quest3GripController {
    * Emit grip gesture callback
    */
   private emitGripGesture(gesture: GripGesture): void {
-    console.log(`Grip Gesture - ${gesture.hand}: ${gesture.type} (intensity: ${gesture.intensity})`);
+    log.debug(`Grip Gesture - ${gesture.hand}: ${gesture.type} (intensity: ${gesture.intensity})`);
     if (this.onGripGestureCallback) {
       this.onGripGestureCallback(gesture);
     }
@@ -270,7 +273,7 @@ export class Quest3GripController {
   public grabObject(hand: 'left' | 'right', mesh: BABYLON.Mesh): void {
     const heldObjects = hand === 'left' ? this.heldObjectsLeft : this.heldObjectsRight;
     heldObjects.add(mesh);
-    console.log(`Object grabbed by ${hand} hand`);
+    log.debug(`Object grabbed by ${hand} hand`);
   }
 
   /**
@@ -283,7 +286,7 @@ export class Quest3GripController {
     } else {
       heldObjects.clear();
     }
-    console.log(`Object released by ${hand} hand`);
+    log.debug(`Object released by ${hand} hand`);
   }
 
   /**

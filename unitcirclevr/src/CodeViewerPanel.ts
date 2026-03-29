@@ -38,7 +38,7 @@ export function collectCodeViewerConnections(
   for (const edge of graphData.edges) {
     if (edge.from === nodeId) {
       const target = graphNodeMap.get(edge.to);
-      if (target?.type === 'function' && !outgoingSeen.has(target.id)) {
+      if ((target?.type === 'function' || target?.type === 'class' || target?.type === 'interface' || target?.type === 'type-alias' || target?.type === 'enum' || target?.type === 'namespace') && !outgoingSeen.has(target.id)) {
         outgoingSeen.add(target.id);
         outgoingCalls.push(target);
       }
@@ -50,7 +50,7 @@ export function collectCodeViewerConnections(
 
     if (edge.to === nodeId) {
       const source = graphNodeMap.get(edge.from);
-      if (source?.type === 'function' && !incomingSeen.has(source.id)) {
+      if ((source?.type === 'function' || source?.type === 'class' || source?.type === 'interface' || source?.type === 'type-alias' || source?.type === 'enum' || source?.type === 'namespace') && !incomingSeen.has(source.id)) {
         incomingSeen.add(source.id);
         incomingCalls.push(source);
       }
