@@ -1,6 +1,6 @@
 import * as BABYLON from '@babylonjs/core';
 import { ForceDirectedLayout } from './ForceDirectedLayout';
-import type { GraphNode } from './types';
+import type { GraphData, GraphEdge, GraphNode } from './types';
 import { toProjectRelativePath } from './PathUtils';
 
 /**
@@ -71,6 +71,92 @@ export class LayoutPipelineService {
 
   public deactivatePhysics(): void {
     this.physicsActive = false;
+  }
+
+  /**
+   * Build and settle per-file internal layouts.
+   */
+  public createAndSettleInternalLayouts(
+    graph: GraphData,
+    fileNodeIds: Map<string, Set<string>>,
+    fileMap: Map<string, string>,
+  ): Map<string, ForceDirectedLayout> {
+    const allEdges = this.buildEdgeList(graph.edges);
+    const nodeExportedMap = new Map<string, boolean>();
+    const nodeSizeMap = new Map<string, number>();
+
+    for (const node of graph.nodes) {
+      nodeExportedMap.set(node.id, !!node.isExported);
+
+      let size = 1.0;
+      if (node.type === 'function') {
+        size = node.isExported ? 1.8 : 1.3;
+      }
+      nodeSizeMap.set(node.id, size);
+    }
+
+    const nextLayouts = new Map<string, ForceDirectedLayout>();
+    for (const [file, nodeIds] of fileNodeIds.entries()) {
+      const nodeArray = Array.from(nodeIds);
+      const sameFileEdges = allEdges.filter(e =>
+        nodeIds.has(e.source) && nodeIds.has(e.target)
+      );
+
+      const internalLayout = new ForceDirectedLayout(
+        nodeArray,
+        sameFileEdges,
+        fileMap,
+        nodeExportedMap,
+        undefined,
+        nodeSizeMap,
+      );
+      nextLayouts.set(file, internalLayout);
+    }
+
+    for (const internalLayout of nextLayouts.values()) {
+      internalLayout.simulate(500);
+    }
+
+    this.fileInternalLayouts = nextLayouts;
+    return nextLayouts;
+  }
+
+  /**
+   * Build and settle top-level file layout.
+   */
+  public createAndSettleFileLevelLayout(
+    graph: GraphData,
+    fileNodeIds: Map<string, Set<string>>,
+    fileMap: Map<string, string>,
+  ): { files: string[]; crossFileEdges: Array<{ source: string; target: string }>; layout: ForceDirectedLayout } {
+    const files = Array.from(fileNodeIds.keys());
+    const crossFileEdges = this.buildCrossFileEdges(graph.edges, fileMap);
+
+    const layout = new ForceDirectedLayout(files, crossFileEdges);
+    layout.simulate(600);
+
+    this.fileLayout = layout;
+    return { files, crossFileEdges, layout };
+  }
+
+  /**
+   * Apply current file layout node positions to file box meshes.
+   */
+  public applyFileLayoutPositions(layout: ForceDirectedLayout | null): void {
+    if (!layout) {
+      return;
+    }
+
+    const filePositions = layout.getNodes();
+    for (const [file, fileBox] of this.fileBoxMeshes.entries()) {
+      const fileNode = filePositions.get(file);
+      if (!fileNode) {
+        continue;
+      }
+      fileBox.position.x = fileNode.position.x;
+      fileBox.position.y = fileNode.position.y;
+      fileBox.position.z = fileNode.position.z;
+    }
   }
 
   /**
@@ -478,5 +564,37 @@ export class LayoutPipelineService {
    */
   public resolveFunctionLabelObstructions(_maxPasses: number = 12): void {
     // Placeholder for label obstruction resolution
+  }
+
+  private buildEdgeList(edges: GraphEdge[]): Array<{ source: string; target: string }> {
+    return edges.map(edge => ({
+      source: edge.from,
+      target: edge.to,
+    }));
+  }
+
+  private buildCrossFileEdges(
+    edges: GraphEdge[],
+    fileMap: Map<string, string>,
+  ): Array<{ source: string; target: string }> {
+    const crossFileEdges: Array<{ source: string; target: string }> = [];
+    const seen = new Set<string>();
+
+    for (const edge of edges) {
+      const sourceFile = fileMap.get(edge.from);
+      const targetFile = fileMap.get(edge.to);
+      if (!sourceFile || !targetFile || sourceFile === targetFile) {
+        continue;
+      }
+
+      const key = `${sourceFile}->${targetFile}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      crossFileEdges.push({ source: sourceFile, target: targetFile });
+    }
+
+    return crossFileEdges;
   }
 }

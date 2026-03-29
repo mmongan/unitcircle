@@ -7,6 +7,7 @@ import type { GraphData, GraphEdge, GraphNode } from './types';
 import { MeshFactory } from './MeshFactory';
 import { GraphLoader } from './GraphLoader';
 import { SceneConfig } from './SceneConfig';
+import { LayoutPipelineService } from './LayoutPipelineService';
 import { Quest3GripController, type GripState, type GripGesture } from './Quest3GripController';
 import { FileColorService } from './FileColorService';
 import { collectCodeViewerConnections, drawCodeViewerConnectionButtons } from './CodeViewerPanel';
@@ -117,6 +118,7 @@ export class VRSceneManager {
   private desktopStartupRecenterDone = false;
   private declutterService: SceneDeclutterService;
   private labelManager: LabelManager;
+  private layoutPipelineService: LayoutPipelineService;
   private readonly xrNavigationDebug = ((import.meta.env.VITE_XR_NAV_DEBUG ?? 'false').toLowerCase() === 'true');
   private readonly exportedFaceCircleLayout = ((import.meta.env.VITE_EXPORTED_FACE_CIRCLE ?? 'false').toLowerCase() === 'true');
   private readonly useLegacyExportedFaceLayout = ((import.meta.env.VITE_LEGACY_EXPORTED_FACE_LAYOUT ?? 'false').toLowerCase() === 'true');
@@ -137,6 +139,7 @@ export class VRSceneManager {
     this.meshFactory = new MeshFactory(this.scene);
     this.graphLoader = new GraphLoader(SceneConfig.GRAPH_POLL_INTERVAL_MS);
     this.declutterService = new SceneDeclutterService();
+    this.layoutPipelineService = new LayoutPipelineService(this.scene);
     this.labelManager = new LabelManager(
       this.scene,
       this.sceneRoot,
@@ -1315,74 +1318,33 @@ export class VRSceneManager {
   }
 
   private createAndSettleInternalLayouts(graph: GraphData, fileMap: Map<string, string>): void {
-    const allEdges = this.buildEdgeList(graph.edges);
-    const nodeExportedMap = new Map<string, boolean>();
-    const nodeSizeMap = new Map<string, number>();
-
-    for (const node of graph.nodes) {
-      nodeExportedMap.set(node.id, !!node.isExported);
-
-      // Functions are rendered with different box sizes, so mirror that in
-      // layout radii to preserve spacing in the force simulation.
-      let size = 1.0;
-      if (node.type === 'function') {
-        size = node.isExported ? 1.8 : 1.3;
-      }
-      nodeSizeMap.set(node.id, size);
-    }
-
-    for (const [file, nodeIds] of this.fileNodeIds.entries()) {
-      const nodeArray = Array.from(nodeIds);
-      const sameFileEdges = allEdges.filter(e =>
-        nodeIds.has(e.source) && nodeIds.has(e.target)
-      );
-
-      const internalLayout = new ForceDirectedLayout(
-        nodeArray,
-        sameFileEdges,
-        fileMap,
-        nodeExportedMap,
-        undefined,
-        nodeSizeMap
-      );
-      this.fileInternalLayouts.set(file, internalLayout);
-    }
-
-    for (const internalLayout of this.fileInternalLayouts.values()) {
-      internalLayout.simulate(500);
-    }
+    this.fileInternalLayouts = this.layoutPipelineService.createAndSettleInternalLayouts(
+      graph,
+      this.fileNodeIds,
+      fileMap,
+    );
 
     this.recenterInternalLayouts();
   }
 
   private createAndSettleFileLevelLayout(graph: GraphData, fileMap: Map<string, string>): string[] {
-    const files = Array.from(this.fileNodeIds.keys());
-    const crossFileEdges = this.buildCrossFileEdges(graph.edges, fileMap);
+    const result = this.layoutPipelineService.createAndSettleFileLevelLayout(
+      graph,
+      this.fileNodeIds,
+      fileMap,
+    );
 
-    console.log(`📍 File-level layout: ${files.length} files, ${crossFileEdges.length} cross-file edges`);
-    console.log(`   Files: ${files.join(', ')}`);
-    console.log(`   Cross-file edges: ${crossFileEdges.map(e => `${e.source}->${e.target}`).join(', ')}`);
+    console.log(`📍 File-level layout: ${result.files.length} files, ${result.crossFileEdges.length} cross-file edges`);
+    console.log(`   Files: ${result.files.join(', ')}`);
+    console.log(`   Cross-file edges: ${result.crossFileEdges.map(e => `${e.source}->${e.target}`).join(', ')}`);
 
-    this.fileLayout = new ForceDirectedLayout(files, crossFileEdges);
-    this.fileLayout.simulate(600);
-    return files;
+    this.fileLayout = result.layout;
+    return result.files;
   }
 
   private applyFileLayoutPositions(): void {
-    if (!this.fileLayout) {
-      return;
-    }
-
-    const initialFilePositions = this.fileLayout.getNodes();
-    for (const [file, fileBox] of this.fileBoxMeshes.entries()) {
-      const fileNode = initialFilePositions.get(file);
-      if (!fileNode) {
-        continue;
-      }
-      fileBox.position.x = fileNode.position.x;
-      fileBox.position.y = fileNode.position.y;
-      fileBox.position.z = fileNode.position.z;
-    }
+    this.layoutPipelineService.setFileBoxMeshes(this.fileBoxMeshes);
+    this.layoutPipelineService.applyFileLayoutPositions(this.fileLayout);
   }
 
   private fitAndSeparateFileBoxes(): void {
@@ -1700,39 +1662,6 @@ export class VRSceneManager {
     this.fileLayout = null;
     this.lastFileBoxScales.clear();
     this.lastDirectoryBoxScales.clear();
-  }
-
-  private buildEdgeList(edges: Array<{ from: string; to: string }>): Array<{ source: string; target: string }> {
-    return edges.map(e => ({ source: e.from, target: e.to }));
-  }
-
-  /**
-   * Build edges between file nodes for file-level layout
-   * Creates edges between files when there are references crossing file boundaries
-   */
-  private buildCrossFileEdges(
-    edges: Array<{ from: string; to: string }>,
-    fileMap: Map<string, string>
-  ): Array<{ source: string; target: string }> {
-    const fileEdges = new Set<string>();
-    
-    for (const edge of edges) {
-      const sourceFile = fileMap.get(edge.from);
-      const targetFile = fileMap.get(edge.to);
-      
-      // Only create file edge if it's between different files
-      if (sourceFile && targetFile && sourceFile !== targetFile) {
-        // Create a unique key to avoid duplicate file edges
-        const edgeKey = `${sourceFile}->${targetFile}`;
-        fileEdges.add(edgeKey);
-      }
-    }
-    
-    // Convert edge keys to edge objects
-    return Array.from(fileEdges).map(key => {
-      const [source, target] = key.split('->');
-      return { source, target };
-    });
   }
 
   private renderNodes(
