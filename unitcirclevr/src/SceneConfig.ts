@@ -49,10 +49,10 @@ export class SceneConfig {
   static readonly GROUND_HEIGHT = 150;
 
   // Label
-  static readonly LABEL_OFFSET = new BABYLON.Vector3(0, 1.2, 0);
-  static readonly LABEL_WIDTH = 2;
-  static readonly LABEL_HEIGHT = 0.5;
-  static readonly LABEL_TEXTURE_SIZE = 512;
+  static readonly LABEL_OFFSET = new BABYLON.Vector3(0, 1.5, 0);
+  static readonly LABEL_WIDTH = 4;  // Increased from 2 for better readability
+  static readonly LABEL_HEIGHT = 1.2;  // Increased from 0.5 for better readability
+  static readonly LABEL_TEXTURE_SIZE = 1024;  // Increased from 512 for sharper text
 
   // Texture
   static readonly SIGNATURE_TEXTURE_SIZE = 256;

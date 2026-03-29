@@ -541,7 +541,7 @@ export class MeshFactory {
   }
 
   /**
-   * Create a billboard label above a mesh
+   * Create a billboard label above a mesh with improved readability
    */
   private createLabel(text: string, parentMesh: BABYLON.Mesh): void {
     const dynamicTexture = new BABYLON.DynamicTexture(
@@ -551,18 +551,33 @@ export class MeshFactory {
     );
     const ctx = dynamicTexture.getContext() as any;
 
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    // Clear background
+    ctx.clearRect(0, 0, SceneConfig.LABEL_TEXTURE_SIZE, SceneConfig.LABEL_TEXTURE_SIZE);
+    
+    // Dark rounded background with border
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
     ctx.fillRect(0, 0, SceneConfig.LABEL_TEXTURE_SIZE, SceneConfig.LABEL_TEXTURE_SIZE);
+    
+    // Subtle border
+    ctx.strokeStyle = 'rgba(100, 150, 255, 0.6)';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(8, 8, SceneConfig.LABEL_TEXTURE_SIZE - 16, SceneConfig.LABEL_TEXTURE_SIZE - 16);
 
-    ctx.fillStyle = '#ffffff';  // White text for contrast
-    ctx.font = 'bold 64px Arial';
+    // Bright cyan text for high visibility
+    ctx.fillStyle = '#00ffff';
+    ctx.font = `bold 80px monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     
-    // Draw dark outline for readability
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 3;
-    ctx.fillText(text, SceneConfig.LABEL_TEXTURE_SIZE / 2, SceneConfig.LABEL_TEXTURE_SIZE / 2);
+    // Text shadow for additional readability
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+    
+    // Wrap text if it's too long
+    const displayText = this.truncateText(text, 24);
+    ctx.fillText(displayText, SceneConfig.LABEL_TEXTURE_SIZE / 2, SceneConfig.LABEL_TEXTURE_SIZE / 2);
 
     dynamicTexture.update();
 
@@ -582,6 +597,21 @@ export class MeshFactory {
     labelMaterial.emissiveTexture = dynamicTexture;
     labelMaterial.backFaceCulling = false;
     labelPlane.material = labelMaterial;
+  }
+
+  private truncateText(text: string, maxChars: number): string {
+    if (text.length <= maxChars) {
+      return text;
+    }
+    // Extract meaningful part (e.g., class name from "class:MyClass@file" or just the last segment)
+    const parts = text.split(/[:\/@.]/);
+    const filtered = parts.filter(p => p.length > 0 && !p.includes('file') && p !== 'class');
+    const meaningful = filtered[filtered.length - 1] || text;
+    
+    if (meaningful.length <= maxChars) {
+      return meaningful;
+    }
+    return meaningful.slice(0, maxChars - 2) + '...';
   }
 
   /**
