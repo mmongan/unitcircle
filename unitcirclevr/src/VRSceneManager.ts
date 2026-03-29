@@ -1297,6 +1297,10 @@ export class VRSceneManager {
     this.applyFileLayoutPositions();
 
     this.renderNodes(graph.nodes, indegreeMap);
+    
+    // Position class boxes at the center of their members NOW THAT NODES EXIST
+    this.positionClassBoxesAtMemberCenters();
+    
     this.layoutAndPopulateExternalLibraries(graph);
     this.fitAndSeparateFileBoxes();
     this.renderDirectoryBoxes();
@@ -3115,12 +3119,42 @@ export class VRSceneManager {
       boxMesh.edgesColor = new BABYLON.Color4(0.4, 0.5, 0.6, 1.0);
       boxMesh.edgesWidth = 2;
       boxMesh.parent = this.sceneRoot;
+      // Position at origin initially - will be updated by positionClassBoxesAtMemberCenters()
       boxMesh.position = BABYLON.Vector3.Zero();
 
       this.classBoxMeshes.set(classId, boxMesh);
 
       // Add class name label
       this.createClassBoxLabel(classId, boxMesh);
+    }
+  }
+
+  private positionClassBoxesAtMemberCenters(): void {
+    for (const [classId, memberIds] of this.classNodeIds.entries()) {
+      const classBox = this.classBoxMeshes.get(classId);
+      if (!classBox || memberIds.size === 0) {
+        continue;
+      }
+
+      // Calculate center of member positions
+      let sumX = 0, sumY = 0, sumZ = 0;
+      let count = 0;
+      
+      for (const memberId of memberIds) {
+        const memberMesh = this.nodeMeshMap.get(memberId);
+        if (memberMesh && memberMesh.isEnabled()) {
+          const worldPos = memberMesh.getAbsolutePosition();
+          sumX += worldPos.x;
+          sumY += worldPos.y;
+          sumZ += worldPos.z;
+          count++;
+        }
+      }
+
+      if (count > 0) {
+        // Position class box at the centroid of its members
+        classBox.position = new BABYLON.Vector3(sumX / count, sumY / count, sumZ / count);
+      }
     }
   }
 

@@ -30,7 +30,6 @@ export class SceneConfig {
   static readonly FUNCTION_BOX_SIZE = 0.1;
   static readonly INTERNAL_FUNCTION_BOX_SIZE = 2.2;
   static readonly EXPORTED_FUNCTION_BOX_SIZE = 6.0;
-  static readonly VARIABLE_SPHERE_DIAMETER = 1.5;
   static readonly EXTERNAL_PYRAMID_BASE = 1.2;
   static readonly EXTERNAL_PYRAMID_HEIGHT = 2.0;
 

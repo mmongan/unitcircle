@@ -6,7 +6,7 @@ import type { GraphEdge, GraphNode } from './types';
 import { SceneConfig } from './SceneConfig';
 import { toProjectRelativePath } from './PathUtils';
 import { createDefaultFunctionBoxFactory } from './FunctionBoxFactory';
-import type { FunctionBoxCreator, FunctionBoxFactoryConfig } from './FunctionBoxContracts';
+import type { FunctionBoxCreator, FunctionBoxFactoryConfig, FunctionBoxInput } from './FunctionBoxContracts';
 
 export interface MeshFactoryDependencies {
   functionBoxFactory?: FunctionBoxCreator;
@@ -503,24 +503,17 @@ export class MeshFactory {
     position: BABYLON.Vector3,
     onNodeInteraction: (mesh: BABYLON.Mesh, material: BABYLON.StandardMaterial, node: GraphNode) => void
   ): void {
-    const sphere = BABYLON.MeshBuilder.CreateSphere(
-      `var_${node.id}`,
-      { diameter: SceneConfig.VARIABLE_SPHERE_DIAMETER },
-      this.scene
-    );
-    sphere.position = position;
-    sphere.isPickable = true;
-
-    const material = new BABYLON.StandardMaterial(`varMat_${node.id}`, this.scene);
-    material.emissiveColor = new BABYLON.Color3(0.15, 0.15, 0.15);  // Subtle gray
-    material.wireframe = false;
-    sphere.material = material;
+    const variableAsFunctionBox: FunctionBoxInput = {
+      id: node.id,
+      name: node.name,
+      isExported: false,
+    };
+    const { mesh: box, material } = this.functionBoxFactory.create(variableAsFunctionBox, position, null);
 
     // Store reference to this mesh for raycasting during edge creation
-    this.nodeMeshes.set(node.id, sphere);
+    this.nodeMeshes.set(node.id, box);
 
-    this.createLabel(node.name, sphere as BABYLON.Mesh);
-    onNodeInteraction(sphere as BABYLON.Mesh, material, node);
+    onNodeInteraction(box as BABYLON.Mesh, material, node);
   }
 
   /**
