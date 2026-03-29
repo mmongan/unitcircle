@@ -272,4 +272,87 @@ describe('MeshFactory', () => {
       expect(metadata[0].bidirectionalOffsetSign).toBe(0);
     });
   });
+
+  describe('same-file edge visibility gating', () => {
+    it('hides same-file edges when the viewer is outside the shared file box', () => {
+      const factoryWithCamera = new MeshFactory({
+        activeCamera: {
+          position: { x: 40, y: 0, z: 0, clone: vi.fn(() => ({ x: 40, y: 0, z: 0 })) },
+        },
+      } as any);
+
+      const sharedFileBox = {
+        getBoundingInfo: vi.fn(() => ({
+          boundingBox: {
+            intersectsPoint: vi.fn(() => false),
+          },
+        })),
+      } as any;
+
+      const sourceMesh = { parent: sharedFileBox } as any;
+      const targetMesh = { parent: sharedFileBox } as any;
+
+      const visible = (factoryWithCamera as any).shouldRenderEdge(
+        { from: 'a', to: 'b', isCrossFile: false, isSelfLoop: false, bidirectionalOffsetSign: 0 },
+        sourceMesh,
+        targetMesh,
+      );
+
+      expect(visible).toBe(false);
+    });
+
+    it('shows same-file edges when the viewer is inside the shared file box', () => {
+      const factoryWithCamera = new MeshFactory({
+        activeCamera: {
+          position: { x: 0, y: 0, z: 0, clone: vi.fn(() => ({ x: 0, y: 0, z: 0 })) },
+        },
+      } as any);
+
+      const sharedFileBox = {
+        getBoundingInfo: vi.fn(() => ({
+          boundingBox: {
+            intersectsPoint: vi.fn(() => true),
+          },
+        })),
+      } as any;
+
+      const sourceMesh = { parent: sharedFileBox } as any;
+      const targetMesh = { parent: sharedFileBox } as any;
+
+      const visible = (factoryWithCamera as any).shouldRenderEdge(
+        { from: 'a', to: 'b', isCrossFile: false, isSelfLoop: false, bidirectionalOffsetSign: 0 },
+        sourceMesh,
+        targetMesh,
+      );
+
+      expect(visible).toBe(true);
+    });
+
+    it('keeps cross-file edges visible even when the viewer is outside a file box', () => {
+      const factoryWithCamera = new MeshFactory({
+        activeCamera: {
+          position: { x: 40, y: 0, z: 0, clone: vi.fn(() => ({ x: 40, y: 0, z: 0 })) },
+        },
+      } as any);
+
+      const sharedFileBox = {
+        getBoundingInfo: vi.fn(() => ({
+          boundingBox: {
+            intersectsPoint: vi.fn(() => false),
+          },
+        })),
+      } as any;
+
+      const sourceMesh = { parent: sharedFileBox } as any;
+      const targetMesh = { parent: sharedFileBox } as any;
+
+      const visible = (factoryWithCamera as any).shouldRenderEdge(
+        { from: 'a', to: 'b', isCrossFile: true, isSelfLoop: false, bidirectionalOffsetSign: 0 },
+        sourceMesh,
+        targetMesh,
+      );
+
+      expect(visible).toBe(true);
+    });
+  });
 });

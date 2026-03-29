@@ -810,6 +810,12 @@ export class MeshFactory {
 
       const arrow = this.edgeArrows.get(edgeId);
 
+      if (!this.shouldRenderEdge(metadata, sourceMesh, targetMesh)) {
+        cylinder.setEnabled(false);
+        arrow?.setEnabled(false);
+        continue;
+      }
+
       if (metadata.isSelfLoop) {
         const sourceCenterPos = sourceMesh.getAbsolutePosition().clone();
         const sourceRadius = sourceMesh.getBoundingInfo()?.boundingSphere?.radiusWorld ?? 2.0;
@@ -974,6 +980,57 @@ export class MeshFactory {
         }
       }
     }
+  }
+
+  private shouldRenderEdge(
+    metadata: { from: string; to: string; isCrossFile: boolean; isSelfLoop: boolean; bidirectionalOffsetSign: number },
+    sourceMesh: BABYLON.Mesh,
+    targetMesh: BABYLON.Mesh,
+  ): boolean {
+    if (metadata.isCrossFile) {
+      return true;
+    }
+
+    const sharedParent = sourceMesh.parent && sourceMesh.parent === targetMesh.parent
+      ? sourceMesh.parent
+      : null;
+    if (!sharedParent || typeof (sharedParent as BABYLON.AbstractMesh).getBoundingInfo !== 'function') {
+      return true;
+    }
+
+    const viewerWorldPosition = this.getViewerWorldPosition();
+    if (!viewerWorldPosition) {
+      return true;
+    }
+
+    const boundingBox = (sharedParent as BABYLON.AbstractMesh).getBoundingInfo()?.boundingBox;
+    if (!boundingBox || typeof boundingBox.intersectsPoint !== 'function') {
+      return true;
+    }
+
+    return boundingBox.intersectsPoint(viewerWorldPosition);
+  }
+
+  private getViewerWorldPosition(): BABYLON.Vector3 | null {
+    const activeCamera = this.scene.activeCamera;
+    if (!activeCamera) {
+      return null;
+    }
+
+    const activeGlobal = (activeCamera as any).globalPosition as BABYLON.Vector3 | undefined;
+    if (activeGlobal && Number.isFinite(activeGlobal.x) && Number.isFinite(activeGlobal.y) && Number.isFinite(activeGlobal.z)) {
+      return typeof activeGlobal.clone === 'function'
+        ? activeGlobal.clone()
+        : new BABYLON.Vector3(activeGlobal.x, activeGlobal.y, activeGlobal.z);
+    }
+
+    if (activeCamera.position) {
+      return typeof activeCamera.position.clone === 'function'
+        ? activeCamera.position.clone()
+        : new BABYLON.Vector3(activeCamera.position.x, activeCamera.position.y, activeCamera.position.z);
+    }
+
+    return null;
   }
 
 }
