@@ -5420,15 +5420,6 @@ export class VRSceneManager {
       }
     }
 
-    const viewerWorldPos = this.getViewerWorldPosition();
-    for (const [file, fileBox] of this.fileBoxMeshes.entries()) {
-      fileBox.computeWorldMatrix(true);
-      const bounds = fileBox.getBoundingInfo().boundingBox;
-      if (bounds.intersectsPoint(viewerWorldPos)) {
-        return toProjectRelativePath(file);
-      }
-    }
-
     return null;
   }
 

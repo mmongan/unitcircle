@@ -3256,13 +3256,13 @@
       "line": 5414,
       "isExported": false,
       "type": "function",
-      "code": "private getFocusedFilePath(): string | null {\n    const selectedNodeId = this.editorVisibleForNodeId || this.currentFunctionId;\n    if (selectedNodeId) {\n      const selectedNode = this.graphNodeMap.get(selectedNodeId);\n      if (selectedNode?.file) {\n        return toProjectRelativePath(selectedNode.file);\n      }\n    }\n\n    const viewerWorldPos = this.getViewerWorldPosition();\n    for (const [file, fileBox] of this.fileBoxMeshes.entries()) {\n      fileBox.computeWorldMatrix(true);\n      const bounds = fileBox.getBoundingInfo().boundingBox;\n      if (bounds.intersectsPoint(viewerWorldPos)) {\n        return toProjectRelativePath(file);\n      }\n    }\n\n    return null;\n  }"
+      "code": "private getFocusedFilePath(): string | null {\n    const selectedNodeId = this.editorVisibleForNodeId || this.currentFunctionId;\n    if (selectedNodeId) {\n      const selectedNode = this.graphNodeMap.get(selectedNodeId);\n      if (selectedNode?.file) {\n        return toProjectRelativePath(selectedNode.file);\n      }\n    }\n\n    return null;\n  }"
     },
     {
       "id": "buildFocusedDirectoryChain@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "buildFocusedDirectoryChain",
       "file": "src/VRSceneManager.ts",
-      "line": 5435,
+      "line": 5426,
       "isExported": false,
       "type": "function",
       "code": "private buildFocusedDirectoryChain(filePath: string | null): Set<string> {\n    const chain = new Set<string>();\n    if (!filePath) {\n      return chain;\n    }\n\n    let current = getDirectoryPath(filePath);\n    chain.add(current);\n    while (current) {\n      current = getParentDirectoryPath(current);\n      chain.add(current);\n    }\n\n    return chain;\n  }"
@@ -3271,7 +3271,7 @@
       "id": "applySceneDeclutter@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "applySceneDeclutter",
       "file": "src/VRSceneManager.ts",
-      "line": 5451,
+      "line": 5442,
       "isExported": false,
       "type": "function",
       "code": "private applySceneDeclutter(): void {\n    const focusedFile = this.getFocusedFilePath();\n    const focusedDirectories = this.buildFocusedDirectoryChain(focusedFile);\n    const signature = `${focusedFile ?? 'none'}|${Array.from(focusedDirectories).sort().join(',')}|${this.labelsVisible ? 'labels' : 'nolabels'}`;\n\n    if (signature === this.lastDeclutterSignature && !this.isAnimating) {\n      this.meshFactory.setDeclutterContext(focusedFile, focusedDirectories);\n      return;\n    }\n\n    this.lastDeclutterSignature = signature;\n    this.meshFactory.setDeclutterContext(focusedFile, focusedDirectories);\n\n    for (const [file, box] of this.fileBoxMeshes.entries()) {\n      const relativeFile = toProjectRelativePath(file);\n      const fileDir = getDirectoryPath(relativeFile);\n      const material = box.material as BABYLON.StandardMaterial | null;\n      const isFocused = focusedFile !== null && relativeFile === focusedFile;\n      const isContext = focusedFile !== null && focusedDirectories.has(fileDir);\n\n      box.visibility = isFocused\n        ? SceneConfig.DECLUTTER_FOCUS_VISIBILITY\n        : isContext\n          ? SceneConfig.DECLUTTER_CONTEXT_VISIBILITY\n          : SceneConfig.DECLUTTER_BACKGROUND_VISIBILITY;\n\n      if (material) {\n        material.alpha = isFocused\n          ? SceneConfig.DECLUTTER_ACTIVE_FILE_BOX_ALPHA\n          : isContext\n            ? SceneConfig.DECLUTTER_CONTEXT_FILE_BOX_ALPHA\n            : SceneConfig.DECLUTTER_BACKGROUND_FILE_BOX_ALPHA;\n      }\n    }\n\n    for (const [dir, box] of this.directoryBoxMeshes.entries()) {\n      const relativeDir = toProjectRelativePath(dir);\n      const showBox = focusedFile === null || focusedDirectories.has(relativeDir);\n      box.setEnabled(showBox);\n      box.visibility = showBox\n        ? (focusedFile !== null && relativeDir === getDirectoryPath(focusedFile)\n          ? SceneConfig.DECLUTTER_CONTEXT_VISIBILITY\n          : SceneConfig.DECLUTTER_BACKGROUND_VISIBILITY)\n        : SceneConfig.DECLUTTER_HIDDEN_VISIBILITY;\n\n      const material = box.material as BABYLON.StandardMaterial | null;\n      if (material) {\n        material.alpha = focusedFile !== null && relativeDir === getDirectoryPath(focusedFile)\n          ? SceneConfig.DECLUTTER_ACTIVE_DIRECTORY_BOX_ALPHA\n          : SceneConfig.DECLUTTER_CONTEXT_DIRECTORY_BOX_ALPHA;\n      }\n    }\n\n    for (const [nodeId, mesh] of this.nodeMeshMap.entries()) {\n      const node = this.graphNodeMap.get(nodeId);\n      if (!node) {\n        continue;\n      }\n\n      const relativeFile = node.file ? toProjectRelativePath(node.file) : null;\n      const fileDir = relativeFile ? getDirectoryPath(relativeFile) : '';\n      const isFocusedNode = focusedFile !== null && relativeFile === focusedFile;\n      const isContextNode = focusedFile !== null && focusedDirectories.has(fileDir);\n      const isExternalOrVariable = node.type === 'external' || node.type === 'variable';\n      const shouldHide = focusedFile !== null && isExternalOrVariable && !isFocusedNode;\n\n      mesh.setEnabled(!shouldHide);\n      mesh.isVisible = !shouldHide;\n      mesh.visibility = shouldHide\n        ? SceneConfig.DECLUTTER_HIDDEN_VISIBILITY\n        : isFocusedNode\n          ? SceneConfig.DECLUTTER_FOCUS_VISIBILITY\n          : isContextNode\n            ? SceneConfig.DECLUTTER_CONTEXT_VISIBILITY\n            : SceneConfig.DECLUTTER_BACKGROUND_VISIBILITY;\n\n      const material = mesh.material as BABYLON.StandardMaterial | null;\n      if (material) {\n        material.alpha = shouldHide\n          ? 0.0\n          : isFocusedNode\n            ? 1.0\n            : isContextNode\n              ? 0.78\n              : 0.18;\n        material.transparencyMode = material.alpha >= 0.999\n          ? BABYLON.Material.MATERIAL_OPAQUE\n          : BABYLON.Material.MATERIAL_ALPHABLEND;\n      }\n    }\n\n    for (const [file, label] of this.fileBoxLabels.entries()) {\n      const relativeFile = toProjectRelativePath(file);\n      const shouldShow = this.labelsVisible && (focusedFile === null || relativeFile === focusedFile || focusedDirectories.has(getDirectoryPath(relativeFile)));\n      this.setBreadcrumbAnchorInteractivity(label, shouldShow);\n      label.visibility = shouldShow ? 1 : 0;\n    }\n\n    for (const [dir, label] of this.directoryBoxLabels.entries()) {\n      const relativeDir = toProjectRelativePath(dir);\n      const shouldShow = this.labelsVisible && (focusedFile === null || focusedDirectories.has(relativeDir));\n      this.setBreadcrumbAnchorInteractivity(label, shouldShow);\n      label.visibility = shouldShow ? 1 : 0;\n    }\n  }"
@@ -3280,7 +3280,7 @@
       "id": "findNearbyFunctionForEditor@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "findNearbyFunctionForEditor",
       "file": "src/VRSceneManager.ts",
-      "line": 5557,
+      "line": 5548,
       "isExported": false,
       "type": "function",
       "code": "private findNearbyFunctionForEditor(): GraphNode | null {\n    const viewerWorldPos = this.getViewerWorldPosition();\n\n    if (this.currentFunctionId) {\n      const selectedNode = this.graphNodeMap.get(this.currentFunctionId);\n      const selectedMesh = this.nodeMeshMap.get(this.currentFunctionId);\n      if (selectedNode && selectedMesh && selectedNode.type === 'function' && selectedNode.code && selectedMesh.isEnabled() && selectedMesh.isVisible) {\n        // Keep the editor pinned to the selected function while selection is active.\n        // This prevents flicker/hide when camera or scene-root transitions briefly\n        // move outside distance thresholds during face changes.\n        return selectedNode;\n      }\n    }\n\n    let closestNode: GraphNode | null = null;\n    let closestDistance = Number.POSITIVE_INFINITY;\n\n    for (const [nodeId, mesh] of this.nodeMeshMap.entries()) {\n      const node = this.graphNodeMap.get(nodeId);\n      if (!node || node.type !== 'function' || !node.code || !mesh.isEnabled() || !mesh.isVisible) {\n        continue;\n      }\n\n      const radius = mesh.getBoundingInfo()?.boundingSphere?.radiusWorld ?? 0;\n      const activationDistance = Math.max(12, radius + 6);\n      const distance = BABYLON.Vector3.Distance(viewerWorldPos, mesh.getAbsolutePosition());\n      if (distance > activationDistance || distance >= closestDistance) {\n        continue;\n      }\n\n      closestDistance = distance;\n      closestNode = node;\n    }\n\n    return closestNode;\n  }"
@@ -3289,7 +3289,7 @@
       "id": "updateFunctionEditorProximity@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "updateFunctionEditorProximity",
       "file": "src/VRSceneManager.ts",
-      "line": 5594,
+      "line": 5585,
       "isExported": false,
       "type": "function",
       "code": "private updateFunctionEditorProximity(): void {\n    const nearbyNode = this.findNearbyFunctionForEditor();\n    if (!nearbyNode) {\n      if (this.editorVisibleForNodeId !== null) {\n        this.hideFunctionEditor();\n      }\n      return;\n    }\n\n    if (this.editorVisibleForNodeId === nearbyNode.id) {\n      const hostMesh = this.nodeMeshMap.get(nearbyNode.id);\n      if (hostMesh && this.functionEditorScreen) {\n        const meshAny = hostMesh as any;\n        const boxSize = typeof meshAny.boxSize === 'number'\n          ? meshAny.boxSize\n          : Math.max(1.0, (hostMesh.getBoundingInfo()?.boundingSphere?.radiusWorld ?? 1) * 1.15);\n        this.attachEditorScreenToVisibleFace(hostMesh, boxSize, nearbyNode.id);\n      }\n      return;\n    }\n\n    // Ensure a clean redraw whenever the editor switches to a different function.\n    if (this.editorVisibleForNodeId && this.editorVisibleForNodeId !== nearbyNode.id) {\n      this.hideFunctionEditor();\n    }\n\n    this.showFunctionEditor(nearbyNode);\n  }"
@@ -3298,7 +3298,7 @@
       "id": "setupWebXR@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "setupWebXR",
       "file": "src/VRSceneManager.ts",
-      "line": 5623,
+      "line": 5614,
       "isExported": false,
       "type": "function",
       "code": "private async setupWebXR(): Promise<void> {\n    this.setXRLoadingPanelVisible(false);\n    try {\n      const xrNavigator = (navigator as any).xr as {\n        isSessionSupported?: (mode: string) => Promise<boolean>;\n      } | undefined;\n\n      if (!xrNavigator || typeof xrNavigator.isSessionSupported !== 'function') {\n        console.log('WebXR API not available in this browser context; running desktop mode.');\n        return;\n      }\n\n      const supportsImmersiveVR = await xrNavigator.isSessionSupported('immersive-vr');\n      if (!supportsImmersiveVR) {\n        console.log('WebXR immersive-vr is not supported here; running desktop mode.');\n        return;\n      }\n\n      this.xrExperience = await this.scene.createDefaultXRExperienceAsync();\n      console.log('WebXR experience created successfully');\n\n      // Initialize Quest 3 Grip Controller (sole input handler for VR)\n      this.gripController = new Quest3GripController(this.scene);\n      \n      // Setup VR controller input\n      const xrInput = this.xrExperience.input;\n      \n      // Initialize grip controller from XR input\n      this.gripController.initializeFromXRInput(xrInput);\n      \n      // Register grip gesture callback\n      this.gripController.onGripGesture((gesture) => {\n        this.handleGripGesture(gesture);\n      });\n\n      // Log when controllers connect/disconnect\n      xrInput.onControllerAddedObservable.add((controller) => {\n        console.log(`VR Controller connected: ${controller.inputSource.handedness}`);\n      });\n\n      xrInput.onControllerRemovedObservable.add((controller) => {\n        console.log(`VR Controller disconnected: ${controller.inputSource.handedness}`);\n      });\n\n      this.xrExperience.baseExperience.onStateChangedObservable.add((state) => {\n        if (this.xrLoadingHideTimer !== null) {\n          window.clearTimeout(this.xrLoadingHideTimer);\n          this.xrLoadingHideTimer = null;\n        }\n\n        if (state === BABYLON.WebXRState.ENTERING_XR) {\n          // ENTERING_XR is still mirrored on desktop canvas, so keep panel hidden here.\n          this.setXRLoadingPanelVisible(false);\n          return;\n        }\n\n        if (state === BABYLON.WebXRState.IN_XR) {\n          this.recenterGraphInFrontOfXRCamera();\n\n          // Show briefly once the session is actually in-headset.\n          this.setXRLoadingPanelVisible(true);\n          this.xrLoadingHideTimer = window.setTimeout(() => {\n            this.setXRLoadingPanelVisible(false);\n            this.xrLoadingHideTimer = null;\n          }, 1200);\n          return;\n        }\n\n        if (state === BABYLON.WebXRState.NOT_IN_XR) {\n          this.setXRLoadingPanelVisible(false);\n        }\n      });\n\n      this.setXRLoadingPanelVisible(false);\n    } catch (error) {\n      this.setXRLoadingPanelVisible(false);\n      console.warn('WebXR not available or failed to initialize:', error);\n    }\n  }"
@@ -3307,7 +3307,7 @@
       "id": "recenterGraphInFrontOfXRCamera@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "recenterGraphInFrontOfXRCamera",
       "file": "src/VRSceneManager.ts",
-      "line": 5703,
+      "line": 5694,
       "isExported": false,
       "type": "function",
       "code": "private recenterGraphInFrontOfXRCamera(): void {\n    const activeCamera = this.scene.activeCamera || this.camera;\n    if (!activeCamera) {\n      return;\n    }\n\n    const activeGlobal = (activeCamera as any).globalPosition as BABYLON.Vector3 | undefined;\n    const cameraWorldPos = (activeGlobal && Number.isFinite(activeGlobal.x))\n      ? activeGlobal.clone()\n      : activeCamera.position.clone();\n\n    let forward = activeCamera.getForwardRay(1).direction;\n    if (!Number.isFinite(forward.length()) || forward.lengthSquared() < 0.000001) {\n      forward = new BABYLON.Vector3(0, 0, 1);\n    }\n    // Keep recentering on horizontal plane to avoid placing graph too high/low.\n    forward.y = 0;\n    if (forward.lengthSquared() < 0.000001) {\n      forward = new BABYLON.Vector3(0, 0, 1);\n    }\n    forward.normalize();\n\n    const desiredDistance = 22;\n    const desiredCenterWorld = cameraWorldPos.add(forward.scale(desiredDistance));\n\n    // Estimate current graph center from visible function nodes.\n    let sum = BABYLON.Vector3.Zero();\n    let count = 0;\n    for (const [nodeId, mesh] of this.nodeMeshMap.entries()) {\n      const node = this.graphNodeMap.get(nodeId);\n      if (!node || node.type === 'variable' || node.type === 'external') {\n        continue;\n      }\n      if (!mesh.isEnabled() || !mesh.isVisible) {\n        continue;\n      }\n      sum = sum.add(mesh.getAbsolutePosition());\n      count++;\n    }\n    if (count === 0) {\n      return;\n    }\n\n    const currentCenterWorld = sum.scale(1 / count);\n    const delta = desiredCenterWorld.subtract(currentCenterWorld);\n    this.sceneRoot.position.addInPlace(delta);\n\n    this.logXRNavigationDebug('xr-recenter:on-entry', {\n      cameraWorldPos: this.formatDebugVector(cameraWorldPos),\n      desiredCenterWorld: this.formatDebugVector(desiredCenterWorld),\n      currentCenterWorld: this.formatDebugVector(currentCenterWorld),\n      sceneRootDelta: this.formatDebugVector(delta),\n      sceneRootAfter: this.formatDebugVector(this.sceneRoot.position),\n      nodeCount: count,\n    });\n  }"
@@ -3316,7 +3316,7 @@
       "id": "handleGripGesture@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "handleGripGesture",
       "file": "src/VRSceneManager.ts",
-      "line": 5763,
+      "line": 5754,
       "isExported": false,
       "type": "function",
       "code": "private handleGripGesture(gesture: GripGesture): void {\n    console.log(`🎮 Grip Gesture: ${gesture.hand} - ${gesture.type} (intensity: ${gesture.intensity})`);\n    \n    if (!this.gripController) return;\n    \n    const gripState = this.gripController.getGripState(gesture.hand);\n    \n    switch (gesture.type) {\n      case 'grab':\n        // On grip press, try to grab a nearby object\n        this.attemptGrabObject(gesture.hand, gripState);\n        break;\n\n      case 'press':\n        // Trigger press teleports to the targeted function mesh.\n        this.attemptTeleportToFunction(gesture.hand, gripState);\n        break;\n        \n      case 'release':\n        // On grip release, release any held objects\n        this.releaseHeldObjects(gesture.hand);\n        break;\n        \n      case 'manipulate':\n        // On grip pressure change, update held object positions\n        this.updateHeldObjectPositions(gesture.hand, gripState);\n        break;\n\n      case 'menu':\n        this.toggleLabelsVisibility();\n        break;\n        \n      default:\n        break;\n    }\n  }"
@@ -3325,7 +3325,7 @@
       "id": "toggleLabelsVisibility@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "toggleLabelsVisibility",
       "file": "src/VRSceneManager.ts",
-      "line": 5800,
+      "line": 5791,
       "isExported": false,
       "type": "function",
       "code": "private toggleLabelsVisibility(): void {\n    this.setLabelsVisibility(!this.labelsVisible);\n\n    console.log(`🏷️ Navigation labels ${this.labelsVisible ? 'shown' : 'hidden'} via secondary/menu button`);\n  }"
@@ -3334,7 +3334,7 @@
       "id": "setBreadcrumbAnchorInteractivity@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "setBreadcrumbAnchorInteractivity",
       "file": "src/VRSceneManager.ts",
-      "line": 5806,
+      "line": 5797,
       "isExported": false,
       "type": "function",
       "code": "private setBreadcrumbAnchorInteractivity(labelAnchor: BABYLON.Mesh, enabled: boolean): void {\n    labelAnchor.setEnabled(enabled);\n    labelAnchor.isPickable = false;\n\n    for (const child of labelAnchor.getChildMeshes(false)) {\n      child.isPickable = enabled;\n    }\n  }"
@@ -3343,7 +3343,7 @@
       "id": "setLabelsVisibility@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "setLabelsVisibility",
       "file": "src/VRSceneManager.ts",
-      "line": 5815,
+      "line": 5806,
       "isExported": false,
       "type": "function",
       "code": "private setLabelsVisibility(visible: boolean): void {\n    this.labelsVisible = visible;\n\n    if (!this.labelsVisible) {\n      this.clearBreadcrumbHoverState();\n    }\n\n    for (const label of this.fileBoxLabels.values()) {\n      this.setBreadcrumbAnchorInteractivity(label, this.labelsVisible);\n    }\n    for (const label of this.directoryBoxLabels.values()) {\n      this.setBreadcrumbAnchorInteractivity(label, this.labelsVisible);\n    }\n  }"
@@ -3352,7 +3352,7 @@
       "id": "toggleNavigationLabels@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "toggleNavigationLabels",
       "file": "src/VRSceneManager.ts",
-      "line": 5830,
+      "line": 5821,
       "isExported": true,
       "type": "function",
       "code": "public toggleNavigationLabels(): void {\n    this.toggleLabelsVisibility();\n  }"
@@ -3361,7 +3361,7 @@
       "id": "setNavigationLabelsVisible@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "setNavigationLabelsVisible",
       "file": "src/VRSceneManager.ts",
-      "line": 5834,
+      "line": 5825,
       "isExported": true,
       "type": "function",
       "code": "public setNavigationLabelsVisible(visible: boolean): void {\n    this.setLabelsVisibility(visible);\n  }"
@@ -3370,7 +3370,7 @@
       "id": "areNavigationLabelsVisible@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "areNavigationLabelsVisible",
       "file": "src/VRSceneManager.ts",
-      "line": 5838,
+      "line": 5829,
       "isExported": true,
       "type": "function",
       "code": "public areNavigationLabelsVisible(): boolean {\n    return this.labelsVisible;\n  }"
@@ -3379,7 +3379,7 @@
       "id": "rebuildExportedFunctionLayout@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "rebuildExportedFunctionLayout",
       "file": "src/VRSceneManager.ts",
-      "line": 5845,
+      "line": 5836,
       "isExported": true,
       "type": "function",
       "code": "public rebuildExportedFunctionLayout(): void {\n    if (!this.currentGraphData || this.fileBoxMeshes.size === 0) {\n      return;\n    }\n\n    console.log('🔄 Rebuilding exported function layout...');\n\n    // Re-run exported function positioning\n    if (this.useLegacyExportedFaceLayout) {\n      this.placeExportedFunctionsOnOptimalFace();\n      this.spreadExportedFunctionsOnFaces(12);\n      this.pullInternalNodesToExportedFace();\n      this.rerunInternalLayoutsAfterExportPlacement(120);\n      this.resizeAndResolveAfterInternalRelayout();\n      this.resolveNodeEdgeObstructions(20);\n      this.resolveExportedFaceEdgeObstructions(15);\n      this.spreadExportedFunctionsOnFaces(8);\n      this.resolveFunctionLabelObstructions(12);\n    }\n\n    // Resolve any remaining collisions\n    this.resolveInitialFileBoxOverlaps(6);\n    this.enforceMinimumFileBoxGap(28.0, 4);\n    this.enforceTopLevelDirectoryGap(36.0, 2);\n\n    // Refresh labels after repositioning\n    this.refreshLabelTransformsIfScaleChanged(true);\n\n    // Update edges for new positions\n    this.clearEdgesAndRender();\n\n    console.log('✓ Exported function layout rebuilt');\n  }"
@@ -3388,7 +3388,7 @@
       "id": "clearEdgesAndRender@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "clearEdgesAndRender",
       "file": "src/VRSceneManager.ts",
-      "line": 5879,
+      "line": 5870,
       "isExported": false,
       "type": "function",
       "code": "private clearEdgesAndRender(): void {\n    // Clear and re-render edges\n    this.meshFactory.clearEdges();\n    if (this.currentGraphData) {\n      this.populateCurrentEdges(this.currentGraphData);\n      this.resolveEdgeObstructions(30);\n      this.resolveNodeEdgeObstructions(20);\n      this.renderEdges();\n      this.meshFactory.updateEdges();\n    }\n  }"
@@ -3397,7 +3397,7 @@
       "id": "navigateToFunctionMesh@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "navigateToFunctionMesh",
       "file": "src/VRSceneManager.ts",
-      "line": 5894,
+      "line": 5885,
       "isExported": false,
       "type": "function",
       "code": "private navigateToFunctionMesh(targetMesh: BABYLON.Mesh, faceNormal: BABYLON.Vector3): void {\n    const clickedNode = (targetMesh as any).nodeData as GraphNode | undefined;\n    if (!clickedNode) {\n      return;\n    }\n\n    if (clickedNode.type === 'variable') {\n      this.currentFunctionId = null;\n      this.currentFaceNormal = null;\n      this.flyToWorldPosition(targetMesh.getAbsolutePosition(), targetMesh);\n      return;\n    }\n\n    if (clickedNode.type === 'external') {\n      this.currentFunctionId = null;\n      this.currentFaceNormal = null;\n      this.flyToWorldPosition(targetMesh.getAbsolutePosition(), targetMesh);\n      return;\n    }\n\n    console.log('🎯 Function face selected', {\n      nodeId: clickedNode.id,\n      name: clickedNode.name,\n      faceNormal: this.formatDebugVector(faceNormal),\n      currentFunctionId: this.currentFunctionId,\n      currentFaceNormal: this.currentFaceNormal ? this.formatDebugVector(this.currentFaceNormal) : null,\n    });\n\n    const isSameFunction = clickedNode.id === this.currentFunctionId;\n    const isSameFace = isSameFunction && this.isFaceNormalEqual(faceNormal, this.currentFaceNormal);\n\n    if (isSameFace) {\n      // Keep editor stable when the same face is clicked again.\n      if (this.editorVisibleForNodeId === clickedNode.id) {\n        return;\n      }\n      // Same face clicked again - slide to show that face\n      this.slideFaceView(targetMesh.getAbsolutePosition(), faceNormal, targetMesh);\n    } else if (isSameFunction) {\n      // Different face of same function - slide to new face\n      this.currentFaceNormal = faceNormal.clone();\n      this.slideFaceView(targetMesh.getAbsolutePosition(), faceNormal, targetMesh);\n    } else {\n      // Different function - jump to it, positioning camera orthogonally to clicked face\n      this.currentFunctionId = clickedNode.id;\n      this.currentFaceNormal = faceNormal.clone();\n\n      // Refresh editor content immediately for the newly selected function box.\n      // This prevents stale code text/buttons from the previous selection.\n      if (clickedNode.type === 'function' && clickedNode.code) {\n        if (this.editorVisibleForNodeId && this.editorVisibleForNodeId !== clickedNode.id) {\n          this.hideFunctionEditor();\n        }\n        this.showFunctionEditor(clickedNode);\n      }\n\n      this.flyToWorldPosition(targetMesh.getAbsolutePosition(), targetMesh, false, faceNormal);\n    }\n  }"
@@ -3406,7 +3406,7 @@
       "id": "attemptTeleportToFunction@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "attemptTeleportToFunction",
       "file": "src/VRSceneManager.ts",
-      "line": 5958,
+      "line": 5949,
       "isExported": false,
       "type": "function",
       "code": "private attemptTeleportToFunction(hand: 'left' | 'right', gripState: GripState): void {\n    if (this.isAnimating) {\n      return;\n    }\n\n    const now = performance.now();\n    const TELEPORT_DEBOUNCE_MS = 250;\n    if (now - this.lastTeleportAtByHand[hand] < TELEPORT_DEBOUNCE_MS) {\n      return;\n    }\n    this.lastTeleportAtByHand[hand] = now;\n\n    const ray = new BABYLON.Ray(gripState.position, gripState.direction, 2000);\n    const hits = this.scene.multiPickWithRay(ray, (mesh) => {\n      if (!mesh.isPickable) return false;\n      const meshAny = mesh as any;\n      return meshAny.nodeData !== undefined\n        || meshAny.edgeData !== undefined\n        || meshAny.labelData !== undefined;\n    }) || [];\n\n    const interactiveHits = hits.filter((h) => h?.hit && h.pickedMesh);\n    if (interactiveHits.length === 0) {\n      return;\n    }\n\n    const hit = this.selectPrioritizedInteractiveHit(interactiveHits) || interactiveHits[0];\n\n    if (this.functionEditorScreen && hit.pickedMesh === this.functionEditorScreen) {\n      const uv = hit.getTextureCoordinates();\n      if (uv) {\n        this.handleEditorScreenClick(uv);\n      }\n      return;\n    }\n\n    const pickedMesh = hit.pickedMesh as BABYLON.Mesh;\n    const pickedPoint = hit.pickedPoint || pickedMesh.getAbsolutePosition();\n    const pickedEdge = (pickedMesh as any).edgeData as { from: string; to: string } | undefined;\n    const pickedLabel = (pickedMesh as any).labelData as { kind: 'file' | 'directory'; path: string } | undefined;\n\n    this.logXRNavigationDebug('teleport:pick', {\n      meshName: pickedMesh.name,\n      isNode: (pickedMesh as any).nodeData !== undefined,\n      isEdge: pickedEdge !== undefined,\n      isLabel: pickedLabel !== undefined,\n      pickedPoint: this.formatDebugVector(pickedPoint),\n      meshWorldPos: this.formatDebugVector(pickedMesh.getAbsolutePosition()),\n      rayOrigin: this.formatDebugVector(gripState.position),\n      rayDirection: this.formatDebugVector(gripState.direction),\n      hitDistance: Number(((hit as any).distance ?? 0).toFixed(3)),\n    });\n\n    if (pickedEdge) {\n      const fromMesh = this.nodeMeshMap.get(pickedEdge.from);\n      const toMesh = this.nodeMeshMap.get(pickedEdge.to);\n      if (!fromMesh || !toMesh) {\n        return;\n      }\n\n      const fromPos = fromMesh.getAbsolutePosition();\n      const toPos = toMesh.getAbsolutePosition();\n      const nearSource = BABYLON.Vector3.DistanceSquared(pickedPoint, fromPos)\n        <= BABYLON.Vector3.DistanceSquared(pickedPoint, toPos);\n\n      const destinationMesh = nearSource ? toMesh : fromMesh;\n      const destinationId = nearSource ? pickedEdge.to : pickedEdge.from;\n\n      this.currentFunctionId = destinationId;\n      this.currentFaceNormal = null;\n      this.logXRNavigationDebug('teleport:edge-destination', {\n        fromId: pickedEdge.from,\n        toId: pickedEdge.to,\n        destinationId,\n        destinationWorldPos: this.formatDebugVector(destinationMesh.getAbsolutePosition()),\n      });\n      this.flyToWorldPosition(destinationMesh.getAbsolutePosition(), destinationMesh);\n      return;\n    }\n\n    if (pickedLabel) {\n      this.currentFunctionId = null;\n      this.currentFaceNormal = null;\n      const targetLabel = this.resolveBreadcrumbNavigationTarget(pickedLabel.kind, pickedLabel.path, pickedMesh);\n      this.logXRNavigationDebug('teleport:label-destination', {\n        labelKind: pickedLabel.kind,\n        labelPath: pickedLabel.path,\n        destinationWorldPos: this.formatDebugVector(targetLabel.getAbsolutePosition()),\n      });\n      this.flyToWorldPosition(targetLabel.getAbsolutePosition(), targetLabel, 12);\n      return;\n    }\n\n    let faceNormal = hit.getNormal(true) || new BABYLON.Vector3(0, 0, 1);\n    faceNormal = this.quantizeFaceNormalFromPickedPoint(pickedMesh, pickedPoint, faceNormal);\n\n    this.logXRNavigationDebug('teleport:node-destination', {\n      nodeId: ((pickedMesh as any).nodeData as GraphNode | undefined)?.id ?? 'unknown',\n      destinationWorldPos: this.formatDebugVector(pickedMesh.getAbsolutePosition()),\n      faceNormal: this.formatDebugVector(faceNormal),\n    });\n\n    this.navigateToFunctionMesh(pickedMesh, faceNormal);\n  }"
@@ -3415,7 +3415,7 @@
       "id": "attemptGrabObject@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "attemptGrabObject",
       "file": "src/VRSceneManager.ts",
-      "line": 6066,
+      "line": 6057,
       "isExported": false,
       "type": "function",
       "code": "private attemptGrabObject(hand: 'left' | 'right', gripState: GripState): void {\n    // Cast a ray from the grip position forward\n    const origin = gripState.position;\n    const direction = gripState.direction;\n    const length = this.gripController?.getMaxGripDistance() || 5.0;\n    \n    const ray = new BABYLON.Ray(origin, direction, length);\n    \n    // Pick objects that can be grabbed\n    const hit = this.scene.pickWithRay(ray, (mesh) => {\n      const nodeData = (mesh as any).nodeData as GraphNode | undefined;\n      return mesh.isPickable && nodeData !== undefined;\n    });\n    \n    if (hit && hit.hit && hit.pickedMesh) {\n      const mesh = hit.pickedMesh as BABYLON.Mesh;\n      this.gripController?.grabObject(hand, mesh);\n      console.log(`✋ Grabbed object: ${mesh.name} (${hand})`);\n    }\n  }"
@@ -3424,7 +3424,7 @@
       "id": "releaseHeldObjects@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "releaseHeldObjects",
       "file": "src/VRSceneManager.ts",
-      "line": 6090,
+      "line": 6081,
       "isExported": false,
       "type": "function",
       "code": "private releaseHeldObjects(hand: 'left' | 'right'): void {\n    if (!this.gripController) return;\n    \n    const heldObjects = this.gripController.getHeldObjects(hand);\n    if (heldObjects.size > 0) {\n      console.log(`🔓 Released ${heldObjects.size} object(s) from ${hand} hand`);\n      this.gripController.releaseObject(hand);\n    }\n  }"
@@ -3433,7 +3433,7 @@
       "id": "updateHeldObjectPositions@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "updateHeldObjectPositions",
       "file": "src/VRSceneManager.ts",
-      "line": 6103,
+      "line": 6094,
       "isExported": false,
       "type": "function",
       "code": "private updateHeldObjectPositions(hand: 'left' | 'right', gripState: GripState): void {\n    if (!this.gripController) return;\n    \n    const heldObjects = this.gripController.getHeldObjects(hand);\n    if (heldObjects.size === 0) return;\n    \n    const gripVelocity = this.gripController.getGripVelocity(hand);\n    \n    for (const mesh of heldObjects) {\n      // Move held object with the grip position\n      mesh.position = gripState.position.clone();\n      \n      // Apply grip velocity for physics-based interaction\n      if ((mesh as any).physicsImpostor) {\n        const newVel = gripVelocity.scale(0.01); // Scale down for reasonable physics\n        (mesh as any).physicsImpostor.setLinearVelocity(newVel);\n      }\n    }\n  }"
@@ -3442,7 +3442,7 @@
       "id": "run@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "run",
       "file": "src/VRSceneManager.ts",
-      "line": 6123,
+      "line": 6114,
       "isExported": true,
       "type": "function",
       "code": "public run(): void {\n    this.engine.runRenderLoop(() => {\n      this.applySceneDeclutter();\n      // Update edge cylinders each frame\n      this.meshFactory.updateEdges();\n      this.updateFunctionEditorProximity();\n      this.scene.render();\n    });\n  }"
@@ -3451,7 +3451,7 @@
       "id": "dispose@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "name": "dispose",
       "file": "src/VRSceneManager.ts",
-      "line": 6133,
+      "line": 6124,
       "isExported": true,
       "type": "function",
       "code": "public dispose(): void {\n    if (this.xrLoadingHideTimer !== null) {\n      window.clearTimeout(this.xrLoadingHideTimer);\n      this.xrLoadingHideTimer = null;\n    }\n    this.xrLoadingPanel?.dispose(false, true);\n    this.xrLoadingTexture?.dispose();\n    this.functionEditorScreen?.dispose(false, true);\n    this.functionEditorMaterial?.dispose();\n    this.functionEditorTexture?.dispose();\n    this.functionEditorScreen = null;\n    this.functionEditorMaterial = null;\n    this.functionEditorTexture = null;\n    this.scene.dispose();\n    this.engine.dispose();\n  }"
@@ -6241,11 +6241,6 @@
       "kind": "call"
     },
     {
-      "from": "getFocusedFilePath@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "to": "getViewerWorldPosition@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
-      "kind": "call"
-    },
-    {
       "from": "buildFocusedDirectoryChain@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "to": "getDirectoryPath@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\PathUtils.ts",
       "kind": "call"
@@ -6673,5 +6668,5 @@
     "vite.config.ts",
     "vitest.config.ts"
   ],
-  "lastUpdated": "2026-03-29T00:29:23.601Z"
+  "lastUpdated": "2026-03-29T00:32:00.241Z"
 }
