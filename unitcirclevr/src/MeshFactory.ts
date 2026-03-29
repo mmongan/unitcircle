@@ -941,8 +941,13 @@ export class MeshFactory {
           : SceneConfig.INTERNAL_EDGE_RADIUS * 2;
       const edgeRadius = edgeDiameter * 0.5;
 
-      // Calculate collision-free waypoints
-      const waypoints = this.calculateCollisionAvoidanceWaypoints(edgeStartPos, edgeEndPos, edgeRadius);
+      // Determine shared file box parent - only internal edges need collision avoidance
+      const sharedFileBox = (sourceMesh.parent === targetMesh.parent) ? sourceMesh.parent : null;
+
+      // Calculate collision-free waypoints (only for edges in the same file box)
+      const waypoints = sharedFileBox
+        ? this.calculateCollisionAvoidanceWaypoints(edgeStartPos, edgeEndPos, edgeRadius, sharedFileBox)
+        : [edgeStartPos, edgeEndPos];
 
       // Convert waypoints to local space relative to parent for tube creation
       const localWaypoints = waypoints.map((wp) => this.toParentLocalPoint(cylinder.parent ?? null, wp));
@@ -1135,73 +1140,75 @@ export class MeshFactory {
   }
 
   /**
-   * Calculate waypoints for an edge to avoid collisions with function boxes.
-   * Uses a simple offset strategy: if edge passes through boxes, route around them.
+   * Calculate waypoints for edges within the same file box to avoid collisions with sibling function boxes.
+   * Only checks boxes that are children of the shared file box parent.
+   * Cross-file edges skip this (they don't share a parent).
    */
   private calculateCollisionAvoidanceWaypoints(
     startPos: BABYLON.Vector3,
     endPos: BABYLON.Vector3,
     edgeRadius: number,
+    fileBoxParent: BABYLON.Node,
   ): BABYLON.Vector3[] {
-    // Collect all function box meshes to check collisions
-    const functionBoxes: Array<{ mesh: BABYLON.Mesh; nodeId: string }> = [];
-    for (const [nodeId, mesh] of this.nodeMeshes.entries()) {
+    // Early exit: very short edges unlikely to collide
+    const edgeLength = BABYLON.Vector3.Distance(startPos, endPos);
+    if (edgeLength < 2.0) {
+      return [startPos, endPos];
+    }
+
+    // Collect only sibling boxes (children of the same file box)
+    const fileBoxChildren = fileBoxParent.getChildren() as BABYLON.Mesh[];
+    const siblingBoxes: BABYLON.Mesh[] = [];
+
+    for (const mesh of fileBoxChildren) {
       if (mesh && mesh.isVisible && mesh.name && mesh.name.startsWith('func_')) {
-        functionBoxes.push({ mesh, nodeId });
+        siblingBoxes.push(mesh);
       }
     }
 
-    if (functionBoxes.length === 0) {
-      return [startPos, endPos];  // No boxes to avoid
+    if (siblingBoxes.length === 0) {
+      return [startPos, endPos];
     }
 
     const waypoints: BABYLON.Vector3[] = [startPos];
     const edgeDirection = endPos.subtract(startPos).normalize();
-    const edgeLength = BABYLON.Vector3.Distance(startPos, endPos);
 
-    // Check for collisions with function boxes along the edge
+    // Check for collisions with sibling boxes only
     const collisionBoxes: Array<{ mesh: BABYLON.Mesh; distance: number }> = [];
 
-    for (const { mesh } of functionBoxes) {
-      // Get box bounds in world space
-      mesh.computeWorldMatrix(true);
+    for (const mesh of siblingBoxes) {
       const boundingSphere = mesh.getBoundingInfo().boundingSphere;
-
-      // Get box position and radius
       const boxCenter = mesh.getAbsolutePosition();
-      const boxRadius = boundingSphere.radiusWorld + edgeRadius + 0.3;  // Add padding
+      const boxRadius = boundingSphere.radiusWorld + edgeRadius + 0.3;
 
-      // Check if edge line passes near box center
-      // Using closest point on line to box center
+      // Project box center onto edge line
       const toBox = boxCenter.subtract(startPos);
       const projectionLength = BABYLON.Vector3.Dot(toBox, edgeDirection);
-      
+
       // Skip if box is completely before/after the edge segment
       if (projectionLength < -boxRadius || projectionLength > edgeLength + boxRadius) {
         continue;
       }
 
+      // Check distance from edge line to box center
       const closestPointOnEdge = startPos.add(edgeDirection.scale(
         BABYLON.Scalar.Clamp(projectionLength, 0, edgeLength)
       ));
       const distanceToBox = BABYLON.Vector3.Distance(closestPointOnEdge, boxCenter);
 
-      // Collision if distance is less than box radius
       if (distanceToBox < boxRadius) {
         collisionBoxes.push({ mesh, distance: projectionLength });
       }
     }
 
-    // If no collisions, use straight line
     if (collisionBoxes.length === 0) {
       waypoints.push(endPos);
       return waypoints;
     }
 
-    // Sort colliding boxes by their position along the edge
+    // Sort and add waypoints to route around boxes
     collisionBoxes.sort((a, b) => a.distance - b.distance);
 
-    // Add waypoints to route around boxes
     for (const { mesh } of collisionBoxes) {
       const boxCenter = mesh.getAbsolutePosition();
       const boundingSphere = mesh.getBoundingInfo().boundingSphere;
@@ -1218,11 +1225,7 @@ export class MeshFactory {
         sideDir = BABYLON.Vector3.Cross(edgeDirection, BABYLON.Axis.Z).normalize();
       }
 
-      // Add waypoint offset to the side of the box
-      const sideOffset = sideDir.scale(boxRadius * 1.2);
-      
-      // Position waypoint at the edge of the box along the edge line
-      waypoints.push(boxCenter.add(sideOffset));
+      waypoints.push(boxCenter.add(sideDir.scale(boxRadius * 1.2)));
     }
 
     waypoints.push(endPos);
