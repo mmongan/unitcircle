@@ -65,9 +65,63 @@ async function createVRScene(canvas: HTMLCanvasElement): Promise<void> {
 async function runVRScene(vrScene: VRSceneManager): Promise<void> {
   // Initialize the scene visualization before starting render loop
   await vrScene.initialize();
+  setupAltKeyLabelToggle(vrScene);
   setupLayoutRebuildShortcut(vrScene);
   vrScene.run();
   hideLoadingOverlay();
+}
+
+function setupAltKeyLabelToggle(vrScene: VRSceneManager): void {
+  let isAltHeld = false;
+
+  const isAltOnlyEvent = (event: KeyboardEvent): boolean => {
+    const isAltKey = event.key === 'Alt' || event.code === 'AltLeft' || event.code === 'AltRight';
+    return isAltKey && !event.ctrlKey && !event.metaKey && !event.shiftKey;
+  };
+
+  const releaseAltHold = () => {
+    if (!isAltHeld) {
+      return;
+    }
+    isAltHeld = false;
+    vrScene.setNavigationLabelsVisible(false);
+  };
+
+  window.addEventListener('keydown', (event) => {
+    const target = event.target as HTMLElement | null;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+      return;
+    }
+
+    if (isAltOnlyEvent(event)) {
+      // Prevent browser/UI Alt handling from stealing focus.
+      event.preventDefault();
+      if (!isAltHeld) {
+        isAltHeld = true;
+        vrScene.setNavigationLabelsVisible(true);
+      }
+    }
+  }, true);
+
+  window.addEventListener('keyup', (event) => {
+    if (isAltOnlyEvent(event)) {
+      event.preventDefault();
+      releaseAltHold();
+    } else if (isAltHeld && !event.altKey) {
+      // Fallback in case key identity differs across platforms/devices.
+      releaseAltHold();
+    }
+  }, true);
+
+  window.addEventListener('blur', () => {
+    releaseAltHold();
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      releaseAltHold();
+    }
+  });
 }
 
 function setupLayoutRebuildShortcut(vrScene: VRSceneManager): void {

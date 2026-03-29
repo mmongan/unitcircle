@@ -1456,13 +1456,22 @@
       "line": 65,
       "isExported": false,
       "type": "function",
-      "code": "async function runVRScene(vrScene: VRSceneManager): Promise<void> {\n  // Initialize the scene visualization before starting render loop\n  await vrScene.initialize();\n  setupLayoutRebuildShortcut(vrScene);\n  vrScene.run();\n  hideLoadingOverlay();\n}"
+      "code": "async function runVRScene(vrScene: VRSceneManager): Promise<void> {\n  // Initialize the scene visualization before starting render loop\n  await vrScene.initialize();\n  setupAltKeyLabelToggle(vrScene);\n  setupLayoutRebuildShortcut(vrScene);\n  vrScene.run();\n  hideLoadingOverlay();\n}"
+    },
+    {
+      "id": "setupAltKeyLabelToggle@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
+      "name": "setupAltKeyLabelToggle",
+      "file": "src/main.ts",
+      "line": 74,
+      "isExported": false,
+      "type": "function",
+      "code": "function setupAltKeyLabelToggle(vrScene: VRSceneManager): void {\n  let isAltHeld = false;\n\n  const isAltOnlyEvent = (event: KeyboardEvent): boolean => {\n    const isAltKey = event.key === 'Alt' || event.code === 'AltLeft' || event.code === 'AltRight';\n    return isAltKey && !event.ctrlKey && !event.metaKey && !event.shiftKey;\n  };\n\n  const releaseAltHold = () => {\n    if (!isAltHeld) {\n      return;\n    }\n    isAltHeld = false;\n    vrScene.setNavigationLabelsVisible(false);\n  };\n\n  window.addEventListener('keydown', (event) => {\n    const target = event.target as HTMLElement | null;\n    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {\n      return;\n    }\n\n    if (isAltOnlyEvent(event)) {\n      // Prevent browser/UI Alt handling from stealing focus.\n      event.preventDefault();\n      if (!isAltHeld) {\n        isAltHeld = true;\n        vrScene.setNavigationLabelsVisible(true);\n      }\n    }\n  }, true);\n\n  window.addEventListener('keyup', (event) => {\n    if (isAltOnlyEvent(event)) {\n      event.preventDefault();\n      releaseAltHold();\n    } else if (isAltHeld && !event.altKey) {\n      // Fallback in case key identity differs across platforms/devices.\n      releaseAltHold();\n    }\n  }, true);\n\n  window.addEventListener('blur', () => {\n    releaseAltHold();\n  });\n\n  document.addEventListener('visibilitychange', () => {\n    if (document.hidden) {\n      releaseAltHold();\n    }\n  });\n}"
     },
     {
       "id": "setupLayoutRebuildShortcut@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
       "name": "setupLayoutRebuildShortcut",
       "file": "src/main.ts",
-      "line": 73,
+      "line": 127,
       "isExported": false,
       "type": "function",
       "code": "function setupLayoutRebuildShortcut(vrScene: VRSceneManager): void {\n  document.addEventListener('keydown', (event) => {\n    const target = event.target as HTMLElement | null;\n    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {\n      return;\n    }\n\n    // Press 'R' to rebuild exported function layout\n    if (event.key.toLowerCase() === 'r' && event.ctrlKey) {\n      event.preventDefault();\n      console.log('🔄 Rebuilding exported function layout (Ctrl+R)...');\n      vrScene.rebuildExportedFunctionLayout();\n    }\n  });\n}"
@@ -1471,7 +1480,7 @@
       "id": "setupWindowCleanup@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
       "name": "setupWindowCleanup",
       "file": "src/main.ts",
-      "line": 91,
+      "line": 145,
       "isExported": false,
       "type": "function",
       "code": "function setupWindowCleanup(): void {\n  window.addEventListener('beforeunload', () => {\n    // Cleanup placeholder\n  });\n}"
@@ -1480,7 +1489,7 @@
       "id": "isWebGLSupported@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
       "name": "isWebGLSupported",
       "file": "src/main.ts",
-      "line": 97,
+      "line": 151,
       "isExported": false,
       "type": "function",
       "code": "function isWebGLSupported(canvas: HTMLCanvasElement): boolean {\n  if (typeof window === 'undefined' || !('WebGLRenderingContext' in window)) {\n    return false;\n  }\n\n  const contextNames = ['webgl2', 'webgl', 'experimental-webgl'] as const;\n  return contextNames.some((contextName) => {\n    const context = canvas.getContext(contextName);\n    return context !== null;\n  });\n}"
@@ -1489,7 +1498,7 @@
       "id": "showUnsupportedMessage@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
       "name": "showUnsupportedMessage",
       "file": "src/main.ts",
-      "line": 109,
+      "line": 163,
       "isExported": false,
       "type": "function",
       "code": "function showUnsupportedMessage(canvas: HTMLCanvasElement): void {\n  canvas.style.display = 'none';\n  hideLoadingOverlay(true);\n  const existing = document.getElementById('webglUnsupportedMessage');\n  if (existing) {\n    return;\n  }\n\n  const container = document.createElement('div');\n  container.id = 'webglUnsupportedMessage';\n  container.className = 'webgl-unsupported';\n  container.innerHTML = [\n    '<h1>WebGL is not available</h1>',\n    '<p>This app requires WebGL to render the VR scene.</p>',\n    '<p>Try enabling hardware acceleration or using a WebGL-capable browser.</p>',\n  ].join('');\n  document.body.appendChild(container);\n}"
@@ -1498,7 +1507,7 @@
       "id": "showLoadingOverlay@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
       "name": "showLoadingOverlay",
       "file": "src/main.ts",
-      "line": 128,
+      "line": 182,
       "isExported": false,
       "type": "function",
       "code": "function showLoadingOverlay(): void {\n  loadingOverlayShownAt = performance.now();\n  const existing = document.getElementById(LOADING_OVERLAY_ID);\n  if (existing) {\n    existing.classList.remove('is-hidden');\n    return;\n  }\n\n  const overlay = document.createElement('div');\n  overlay.id = LOADING_OVERLAY_ID;\n  overlay.className = 'startup-loading';\n  overlay.innerHTML = [\n    '<div class=\"startup-loading__content\">',\n    '<div class=\"startup-loading__title\">imagining<span class=\"startup-loading__dots\" aria-hidden=\"true\"></span></div>',\n    '</div>',\n  ].join('');\n  document.body.appendChild(overlay);\n}"
@@ -1507,7 +1516,7 @@
       "id": "hideLoadingOverlay@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
       "name": "hideLoadingOverlay",
       "file": "src/main.ts",
-      "line": 147,
+      "line": 201,
       "isExported": false,
       "type": "function",
       "code": "function hideLoadingOverlay(removeImmediately: boolean = false): void {\n  const overlay = document.getElementById(LOADING_OVERLAY_ID);\n  if (!overlay) {\n    return;\n  }\n\n  if (removeImmediately) {\n    overlay.remove();\n    return;\n  }\n\n  const elapsedMs = performance.now() - loadingOverlayShownAt;\n  const delayMs = Math.max(0, LOADING_OVERLAY_MIN_VISIBLE_MS - elapsedMs);\n\n  window.setTimeout(() => {\n    overlay.classList.add('is-hidden');\n    window.setTimeout(() => {\n      overlay.remove();\n    }, 450);\n  }, delayMs);\n}"
@@ -4634,6 +4643,11 @@
     },
     {
       "from": "runVRScene@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
+      "to": "setupAltKeyLabelToggle@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
+      "kind": "call"
+    },
+    {
+      "from": "runVRScene@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
       "to": "setupLayoutRebuildShortcut@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
       "kind": "call"
     },
@@ -4645,6 +4659,11 @@
     {
       "from": "runVRScene@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
       "to": "hideLoadingOverlay@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
+      "kind": "call"
+    },
+    {
+      "from": "setupAltKeyLabelToggle@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\main.ts",
+      "to": "setNavigationLabelsVisible@C:\\Projects\\mmongan\\unitcircle\\unitcirclevr\\src\\VRSceneManager.ts",
       "kind": "call"
     },
     {
@@ -6455,5 +6474,5 @@
     "vite.config.ts",
     "vitest.config.ts"
   ],
-  "lastUpdated": "2026-03-28T23:44:30.093Z"
+  "lastUpdated": "2026-03-29T00:11:00.609Z"
 }
