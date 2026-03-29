@@ -406,5 +406,16 @@ describe('MeshFactory', () => {
 
       expect(visible).toBe(true);
     });
+
+    it('re-enables a previously hidden non-self edge when it becomes visible again', () => {
+      const cylinder = {
+        isEnabled: vi.fn(() => false),
+        setEnabled: vi.fn(),
+      } as any;
+
+      (factory as any).ensureMeshEnabled(cylinder);
+
+      expect(cylinder.setEnabled).toHaveBeenCalledWith(true);
+    });
   });
 });

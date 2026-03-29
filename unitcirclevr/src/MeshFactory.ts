@@ -836,9 +836,7 @@ export class MeshFactory {
           activeTube = this.recreateSelfLoopTube(edgeId, cylinder, loopPath, loopTubeRadius);
         }
 
-        if (!activeTube.isEnabled()) {
-          activeTube.setEnabled(true);
-        }
+        this.ensureMeshEnabled(activeTube);
 
         if (arrow) {
           const loopRadius = Math.max(3.2, sourceRadius * 1.8);
@@ -859,9 +857,7 @@ export class MeshFactory {
           BABYLON.Quaternion.FromUnitVectorsToRef(BABYLON.Axis.Y, tangent, arrowQ);
           arrow.rotationQuaternion = arrowQ;
 
-          if (!arrow.isEnabled()) {
-            arrow.setEnabled(true);
-          }
+          this.ensureMeshEnabled(arrow);
         }
 
         continue;
@@ -952,9 +948,7 @@ export class MeshFactory {
       cylinder.rotationQuaternion = rotationQuaternion;
 
       // Ensure cylinder is visible
-      if (!cylinder.isEnabled) {
-        cylinder.setEnabled(true);
-      }
+      this.ensureMeshEnabled(cylinder);
 
       // Position and orient arrowhead at the target surface
       if (arrow) {
@@ -975,10 +969,21 @@ export class MeshFactory {
         BABYLON.Quaternion.FromUnitVectorsToRef(BABYLON.Axis.Y, edgeDirection, arrowQ);
         arrow.rotationQuaternion = arrowQ;
 
-        if (!arrow.isEnabled) {
-          arrow.setEnabled(true);
-        }
+        this.ensureMeshEnabled(arrow);
       }
+    }
+  }
+
+  private ensureMeshEnabled(mesh: BABYLON.Mesh): void {
+    const isEnabledMember = (mesh as any).isEnabled;
+    const isCurrentlyEnabled = typeof isEnabledMember === 'function'
+      ? isEnabledMember.call(mesh)
+      : typeof isEnabledMember === 'boolean'
+        ? isEnabledMember
+        : true;
+
+    if (!isCurrentlyEnabled) {
+      mesh.setEnabled(true);
     }
   }
 
