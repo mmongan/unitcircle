@@ -1055,7 +1055,7 @@ export class MeshFactory {
     targetsExternalLibrary: boolean;
   }): boolean {
     if (!this.focusedFile) {
-      return !metadata.targetsExternalLibrary;
+      return true;
     }
 
     if (metadata.fromFile === this.focusedFile || metadata.toFile === this.focusedFile) {

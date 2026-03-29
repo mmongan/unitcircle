@@ -441,5 +441,17 @@ describe('MeshFactory', () => {
 
       expect(visible).toBe(true);
     });
+
+    it('keeps cross-file edges visible when no focus file is active', () => {
+      (factory as any).setDeclutterContext(null, []);
+
+      const visible = (factory as any).shouldRenderCrossFileEdge({
+        fromFile: 'scripts/build-graph.ts',
+        toFile: 'viewer.html',
+        targetsExternalLibrary: true,
+      });
+
+      expect(visible).toBe(true);
+    });
   });
 });

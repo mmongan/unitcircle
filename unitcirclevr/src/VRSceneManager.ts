@@ -5439,10 +5439,23 @@ export class VRSceneManager {
     return chain;
   }
 
+  private isViewerInsideAnyFileBox(): boolean {
+    const viewerWorldPos = this.getViewerWorldPosition();
+    for (const fileBox of this.fileBoxMeshes.values()) {
+      fileBox.computeWorldMatrix(true);
+      const bounds = fileBox.getBoundingInfo().boundingBox;
+      if (bounds.intersectsPoint(viewerWorldPos)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private applySceneDeclutter(): void {
-    const focusedFile = this.getFocusedFilePath();
+    const viewerInsideFile = this.isViewerInsideAnyFileBox();
+    const focusedFile = viewerInsideFile ? this.getFocusedFilePath() : null;
     const focusedDirectories = this.buildFocusedDirectoryChain(focusedFile);
-    const signature = `${focusedFile ?? 'none'}|${Array.from(focusedDirectories).sort().join(',')}|${this.labelsVisible ? 'labels' : 'nolabels'}`;
+    const signature = `${viewerInsideFile ? 'inside' : 'outside'}|${focusedFile ?? 'none'}|${Array.from(focusedDirectories).sort().join(',')}|${this.labelsVisible ? 'labels' : 'nolabels'}`;
 
     if (signature === this.lastDeclutterSignature && !this.isAnimating) {
       this.meshFactory.setDeclutterContext(focusedFile, focusedDirectories);
@@ -5451,6 +5464,51 @@ export class VRSceneManager {
 
     this.lastDeclutterSignature = signature;
     this.meshFactory.setDeclutterContext(focusedFile, focusedDirectories);
+
+    if (!viewerInsideFile) {
+      for (const box of this.fileBoxMeshes.values()) {
+        box.setEnabled(true);
+        box.visibility = 1.0;
+        const material = box.material as BABYLON.StandardMaterial | null;
+        if (material) {
+          material.alpha = 0.18;
+        }
+      }
+
+      for (const box of this.directoryBoxMeshes.values()) {
+        box.setEnabled(true);
+        box.visibility = 1.0;
+        const material = box.material as BABYLON.StandardMaterial | null;
+        if (material) {
+          material.alpha = 0.08;
+        }
+      }
+
+      for (const mesh of this.nodeMeshMap.values()) {
+        mesh.setEnabled(true);
+        mesh.isVisible = true;
+        mesh.visibility = 1.0;
+        const material = mesh.material as BABYLON.StandardMaterial | null;
+        if (material) {
+          material.alpha = 1.0;
+          material.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
+        }
+      }
+
+      for (const label of this.fileBoxLabels.values()) {
+        const shouldShow = this.labelsVisible;
+        this.setBreadcrumbAnchorInteractivity(label, shouldShow);
+        label.visibility = shouldShow ? 1 : 0;
+      }
+
+      for (const label of this.directoryBoxLabels.values()) {
+        const shouldShow = this.labelsVisible;
+        this.setBreadcrumbAnchorInteractivity(label, shouldShow);
+        label.visibility = shouldShow ? 1 : 0;
+      }
+
+      return;
+    }
 
     for (const [file, box] of this.fileBoxMeshes.entries()) {
       const relativeFile = toProjectRelativePath(file);
