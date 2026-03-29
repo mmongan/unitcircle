@@ -2044,7 +2044,7 @@ export class VRSceneManager {
       const boxSize = typeof meshAny?.boxSize === 'number'
         ? meshAny.boxSize
         : Math.max(1.0, (targetMesh?.getBoundingInfo()?.boundingSphere?.radiusWorld ?? 1) * 1.15);
-      const panelOffset = (boxSize * 0.5) + Math.max(0.14, boxSize * 0.045);
+      const panelOffset = (boxSize * 0.5) + Math.max(0.5, boxSize * 0.08);
 
       const activeCamera = this.scene.activeCamera || this.camera;
       const fovY = Math.max(0.45, activeCamera.fov || this.camera.fov || 0.8);
@@ -2065,8 +2065,8 @@ export class VRSceneManager {
       const distanceByWidth = (panelWorldWidth * 0.5) / Math.tan((fovX * targetHorizontalFill) * 0.5);
       const requiredPanelDistance = Math.max(distanceByHeight, distanceByWidth);
 
-      // Keep a small but stable buffer from the panel surface.
-      const desiredPanelGap = Math.max(2.2, requiredPanelDistance);
+      // Keep a comfortable buffer from the panel surface.
+      const desiredPanelGap = Math.max(4.0, requiredPanelDistance);
 
       const standoffDistance = panelOffset + desiredPanelGap;
       newCamPos = targetWorldPos.add(faceNormal.normalize().scale(standoffDistance));
