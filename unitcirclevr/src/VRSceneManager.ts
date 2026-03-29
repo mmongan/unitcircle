@@ -3419,6 +3419,12 @@ export class VRSceneManager {
    */
   private updateLabelDistanceScaling(): void {
     this.labelManager.updateLabelDistanceScaling();
+    
+    // Update node label (class, variable) scaling based on camera distance
+    const activeCamera = this.scene.activeCamera || this.camera;
+    if (activeCamera) {
+      this.meshFactory.updateNodeLabelScaling(activeCamera);
+    }
   }
 
   /**

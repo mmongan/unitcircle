@@ -25,6 +25,7 @@ export class MeshFactory {
   private edgeBatchUpdateIndex = 0;  // Track position in edge update cycle
   
   private nodeMeshes: Map<string, BABYLON.Mesh> = new Map();  // Track meshes for raycasting
+  private nodeLabels: Map<string, BABYLON.Mesh> = new Map();  // Track node label planes for scaling
   private edgeTubes: Map<string, BABYLON.Mesh> = new Map();   // Simple tube storage
   private edgeArrows: Map<string, BABYLON.Mesh> = new Map();  // Arrowhead cones at target end
   private crossFileConduits: Map<string, BABYLON.Mesh> = new Map();
@@ -597,6 +598,32 @@ export class MeshFactory {
     labelMaterial.emissiveTexture = dynamicTexture;
     labelMaterial.backFaceCulling = false;
     labelPlane.material = labelMaterial;
+
+    // Track label for distance-based scaling
+    this.nodeLabels.set(parentMesh.id, labelPlane);
+  }
+
+  public updateNodeLabelScaling(camera: BABYLON.Camera): void {
+    if (!camera) return;
+
+    const cameraPos = camera.position;
+    
+    for (const [parentId, labelPlane] of this.nodeLabels.entries()) {
+      const parentMesh = this.nodeMeshes.get(parentId);
+      if (!parentMesh || !labelPlane.parent) continue;
+
+      // Calculate distance from camera to parent mesh (world position)
+      const meshWorldPos = parentMesh.getAbsolutePosition();
+      const distance = BABYLON.Vector3.Distance(cameraPos, meshWorldPos);
+
+      // Scale labels based on distance: closer = smaller, farther = larger
+      // Base scale at distance 10 is 1.0, scales up with distance
+      const baseDistance = 10;
+      const scaleFactor = Math.max(0.5, Math.min(3.0, distance / baseDistance));
+      
+      labelPlane.scaling.x = scaleFactor;
+      labelPlane.scaling.y = scaleFactor;
+    }
   }
 
   private truncateText(text: string, maxChars: number): string {
