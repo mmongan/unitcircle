@@ -2987,6 +2987,13 @@ export class VRSceneManager {
       // Skip files with no parsed nodes — they would create empty boxes with no content.
       if (this.fileNodeIds.get(file)!.size === 0) continue;
       
+      // Check if this file contains any class nodes
+      const fileNodeIdSet = this.fileNodeIds.get(file)!;
+      const containsClasses = Array.from(fileNodeIdSet).some(nodeId => {
+        const node = this.graphNodeMap.get(nodeId);
+        return node && node.type === 'class';
+      });
+      
       // Seed size before per-axis autosizing runs.
       const boxSize = 20.0;
       
@@ -3020,7 +3027,8 @@ export class VRSceneManager {
       material.specularPower = 128;
       // Cull inner faces to reduce overlapping transparent surfaces and flicker.
       material.backFaceCulling = true;
-      material.alpha = 0.18;
+      // Files with classes are much more transparent to reveal class containers inside
+      material.alpha = containsClasses ? 0.06 : 0.18;
       material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
       material.needDepthPrePass = true;
       // Disable depth write so edges render on top of transparent faces
