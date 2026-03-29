@@ -66,6 +66,17 @@ export class SceneConfig {
   static readonly EDGE_RADIUS = 0.2;          // Cross-file / exported edge radius
   static readonly INTERNAL_EDGE_RADIUS = 0.14; // Same-file internal edge radius (boosted for distance readability)
 
+  // Scene decluttering
+  static readonly DECLUTTER_FOCUS_VISIBILITY = 1.0;
+  static readonly DECLUTTER_CONTEXT_VISIBILITY = 0.34;
+  static readonly DECLUTTER_BACKGROUND_VISIBILITY = 0.08;
+  static readonly DECLUTTER_HIDDEN_VISIBILITY = 0.0;
+  static readonly DECLUTTER_ACTIVE_FILE_BOX_ALPHA = 0.16;
+  static readonly DECLUTTER_CONTEXT_FILE_BOX_ALPHA = 0.06;
+  static readonly DECLUTTER_BACKGROUND_FILE_BOX_ALPHA = 0.02;
+  static readonly DECLUTTER_ACTIVE_DIRECTORY_BOX_ALPHA = 0.10;
+  static readonly DECLUTTER_CONTEXT_DIRECTORY_BOX_ALPHA = 0.04;
+
   // Physics Layout
   static readonly LAYOUT_ITERATIONS = 1; // Simple random placement requires minimal iterations
 

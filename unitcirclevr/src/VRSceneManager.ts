@@ -109,6 +109,7 @@ export class VRSceneManager {
   private graphUpdateInProgress = false;
   private lastGraphReloadAtMs = 0;
   private desktopStartupRecenterDone = false;
+  private lastDeclutterSignature: string | null = null;
   private readonly xrNavigationDebug = ((import.meta.env.VITE_XR_NAV_DEBUG ?? 'false').toLowerCase() === 'true');
   private readonly exportedFaceCircleLayout = ((import.meta.env.VITE_EXPORTED_FACE_CIRCLE ?? 'false').toLowerCase() === 'true');
   private readonly useLegacyExportedFaceLayout = ((import.meta.env.VITE_LEGACY_EXPORTED_FACE_LAYOUT ?? 'false').toLowerCase() === 'true');
@@ -4637,14 +4638,18 @@ export class VRSceneManager {
     
     // Build a map of node IDs to their exported status for edge material selection
     const nodeExportedMap = new Map<string, boolean>();
+    const nodeFileMap = new Map<string, string>();
     if (this.currentGraphData && this.currentGraphData.nodes) {
       for (const node of this.currentGraphData.nodes) {
         nodeExportedMap.set(node.id, node.isExported || false);
+        if (node.file) {
+          nodeFileMap.set(node.id, node.file);
+        }
       }
     }
     
     // Create edges - they'll be positioned by updateEdges() in the physics loop
-    this.meshFactory.createEdges(graphEdges, new Map(), this.sceneRoot, nodeExportedMap, this.fileColorMap);
+    this.meshFactory.createEdges(graphEdges, new Map(), this.sceneRoot, nodeExportedMap, this.fileColorMap, nodeFileMap);
   }
 
   /**
@@ -5406,6 +5411,149 @@ export class VRSceneManager {
     return activeCamera.position.clone();
   }
 
+  private getFocusedFilePath(): string | null {
+    const selectedNodeId = this.editorVisibleForNodeId || this.currentFunctionId;
+    if (selectedNodeId) {
+      const selectedNode = this.graphNodeMap.get(selectedNodeId);
+      if (selectedNode?.file) {
+        return toProjectRelativePath(selectedNode.file);
+      }
+    }
+
+    const viewerWorldPos = this.getViewerWorldPosition();
+    for (const [file, fileBox] of this.fileBoxMeshes.entries()) {
+      fileBox.computeWorldMatrix(true);
+      const bounds = fileBox.getBoundingInfo().boundingBox;
+      if (bounds.intersectsPoint(viewerWorldPos)) {
+        return toProjectRelativePath(file);
+      }
+    }
+
+    return null;
+  }
+
+  private buildFocusedDirectoryChain(filePath: string | null): Set<string> {
+    const chain = new Set<string>();
+    if (!filePath) {
+      return chain;
+    }
+
+    let current = getDirectoryPath(filePath);
+    chain.add(current);
+    while (current) {
+      current = getParentDirectoryPath(current);
+      chain.add(current);
+    }
+
+    return chain;
+  }
+
+  private applySceneDeclutter(): void {
+    const focusedFile = this.getFocusedFilePath();
+    const focusedDirectories = this.buildFocusedDirectoryChain(focusedFile);
+    const signature = `${focusedFile ?? 'none'}|${Array.from(focusedDirectories).sort().join(',')}|${this.labelsVisible ? 'labels' : 'nolabels'}`;
+
+    if (signature === this.lastDeclutterSignature && !this.isAnimating) {
+      this.meshFactory.setDeclutterContext(focusedFile, focusedDirectories);
+      return;
+    }
+
+    this.lastDeclutterSignature = signature;
+    this.meshFactory.setDeclutterContext(focusedFile, focusedDirectories);
+
+    for (const [file, box] of this.fileBoxMeshes.entries()) {
+      const relativeFile = toProjectRelativePath(file);
+      const fileDir = getDirectoryPath(relativeFile);
+      const material = box.material as BABYLON.StandardMaterial | null;
+      const isFocused = focusedFile !== null && relativeFile === focusedFile;
+      const isContext = focusedFile !== null && focusedDirectories.has(fileDir);
+
+      box.visibility = isFocused
+        ? SceneConfig.DECLUTTER_FOCUS_VISIBILITY
+        : isContext
+          ? SceneConfig.DECLUTTER_CONTEXT_VISIBILITY
+          : SceneConfig.DECLUTTER_BACKGROUND_VISIBILITY;
+
+      if (material) {
+        material.alpha = isFocused
+          ? SceneConfig.DECLUTTER_ACTIVE_FILE_BOX_ALPHA
+          : isContext
+            ? SceneConfig.DECLUTTER_CONTEXT_FILE_BOX_ALPHA
+            : SceneConfig.DECLUTTER_BACKGROUND_FILE_BOX_ALPHA;
+      }
+    }
+
+    for (const [dir, box] of this.directoryBoxMeshes.entries()) {
+      const relativeDir = toProjectRelativePath(dir);
+      const showBox = focusedFile === null || focusedDirectories.has(relativeDir);
+      box.setEnabled(showBox);
+      box.visibility = showBox
+        ? (focusedFile !== null && relativeDir === getDirectoryPath(focusedFile)
+          ? SceneConfig.DECLUTTER_CONTEXT_VISIBILITY
+          : SceneConfig.DECLUTTER_BACKGROUND_VISIBILITY)
+        : SceneConfig.DECLUTTER_HIDDEN_VISIBILITY;
+
+      const material = box.material as BABYLON.StandardMaterial | null;
+      if (material) {
+        material.alpha = focusedFile !== null && relativeDir === getDirectoryPath(focusedFile)
+          ? SceneConfig.DECLUTTER_ACTIVE_DIRECTORY_BOX_ALPHA
+          : SceneConfig.DECLUTTER_CONTEXT_DIRECTORY_BOX_ALPHA;
+      }
+    }
+
+    for (const [nodeId, mesh] of this.nodeMeshMap.entries()) {
+      const node = this.graphNodeMap.get(nodeId);
+      if (!node) {
+        continue;
+      }
+
+      const relativeFile = node.file ? toProjectRelativePath(node.file) : null;
+      const fileDir = relativeFile ? getDirectoryPath(relativeFile) : '';
+      const isFocusedNode = focusedFile !== null && relativeFile === focusedFile;
+      const isContextNode = focusedFile !== null && focusedDirectories.has(fileDir);
+      const isExternalOrVariable = node.type === 'external' || node.type === 'variable';
+      const shouldHide = focusedFile !== null && isExternalOrVariable && !isFocusedNode;
+
+      mesh.setEnabled(!shouldHide);
+      mesh.isVisible = !shouldHide;
+      mesh.visibility = shouldHide
+        ? SceneConfig.DECLUTTER_HIDDEN_VISIBILITY
+        : isFocusedNode
+          ? SceneConfig.DECLUTTER_FOCUS_VISIBILITY
+          : isContextNode
+            ? SceneConfig.DECLUTTER_CONTEXT_VISIBILITY
+            : SceneConfig.DECLUTTER_BACKGROUND_VISIBILITY;
+
+      const material = mesh.material as BABYLON.StandardMaterial | null;
+      if (material) {
+        material.alpha = shouldHide
+          ? 0.0
+          : isFocusedNode
+            ? 1.0
+            : isContextNode
+              ? 0.78
+              : 0.18;
+        material.transparencyMode = material.alpha >= 0.999
+          ? BABYLON.Material.MATERIAL_OPAQUE
+          : BABYLON.Material.MATERIAL_ALPHABLEND;
+      }
+    }
+
+    for (const [file, label] of this.fileBoxLabels.entries()) {
+      const relativeFile = toProjectRelativePath(file);
+      const shouldShow = this.labelsVisible && (focusedFile === null || relativeFile === focusedFile || focusedDirectories.has(getDirectoryPath(relativeFile)));
+      this.setBreadcrumbAnchorInteractivity(label, shouldShow);
+      label.visibility = shouldShow ? 1 : 0;
+    }
+
+    for (const [dir, label] of this.directoryBoxLabels.entries()) {
+      const relativeDir = toProjectRelativePath(dir);
+      const shouldShow = this.labelsVisible && (focusedFile === null || focusedDirectories.has(relativeDir));
+      this.setBreadcrumbAnchorInteractivity(label, shouldShow);
+      label.visibility = shouldShow ? 1 : 0;
+    }
+  }
+
   private findNearbyFunctionForEditor(): GraphNode | null {
     const viewerWorldPos = this.getViewerWorldPosition();
 
@@ -5974,6 +6122,7 @@ export class VRSceneManager {
 
   public run(): void {
     this.engine.runRenderLoop(() => {
+      this.applySceneDeclutter();
       // Update edge cylinders each frame
       this.meshFactory.updateEdges();
       this.updateFunctionEditorProximity();

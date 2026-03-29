@@ -11,11 +11,27 @@ export class MeshFactory {
   private nodeMeshes: Map<string, BABYLON.Mesh> = new Map();  // Track meshes for raycasting
   private edgeTubes: Map<string, BABYLON.Mesh> = new Map();   // Simple tube storage
   private edgeArrows: Map<string, BABYLON.Mesh> = new Map();  // Arrowhead cones at target end
-  private edgeMetadata: Map<string, { from: string; to: string; isCrossFile: boolean; isSelfLoop: boolean; bidirectionalOffsetSign: number }> = new Map();
+  private edgeMetadata: Map<string, {
+    from: string;
+    to: string;
+    fromFile: string | null;
+    toFile: string | null;
+    isCrossFile: boolean;
+    isSelfLoop: boolean;
+    bidirectionalOffsetSign: number;
+    targetsExternalLibrary: boolean;
+  }> = new Map();
   private edgeMaterials: Set<BABYLON.StandardMaterial> = new Set();
+  private focusedFile: string | null = null;
+  private focusedDirectories: Set<string> = new Set();
 
   constructor(scene: BABYLON.Scene) {
     this.scene = scene;
+  }
+
+  public setDeclutterContext(focusedFile: string | null, focusedDirectories: Iterable<string>): void {
+    this.focusedFile = focusedFile ? toProjectRelativePath(focusedFile) : null;
+    this.focusedDirectories = new Set(Array.from(focusedDirectories, (dir) => toProjectRelativePath(dir)));
   }
 
   /**
@@ -453,7 +469,8 @@ export class MeshFactory {
     _layoutNodes: Map<string, any>,  // Kept for API compatibility, actual positions from mesh.getAbsolutePosition()
     sceneRoot?: BABYLON.TransformNode,
     nodeExportedMap?: Map<string, boolean>,  // Map of node IDs to isExported status
-    fileColorMap?: Map<string, BABYLON.Color3> // Map of file paths to file box colors
+    fileColorMap?: Map<string, BABYLON.Color3>, // Map of file paths to file box colors
+    nodeFileMap?: Map<string, string>,
   ): void {
     // Clear old edge meshes/materials first so repeated graph refreshes do not leak GPU resources.
     this.clearEdges();
@@ -565,8 +582,8 @@ export class MeshFactory {
       // This allows edges to be created before node meshes are fully positioned
 
       // Extract file paths to determine if cross-file
-      const fromFile = edge.from.split('@')[1];
-      const toFile = edge.to.split('@')[1];
+      const fromFile = nodeFileMap?.get(edge.from) ?? this.extractFilePathFromNodeId(edge.from);
+      const toFile = nodeFileMap?.get(edge.to) ?? this.extractFilePathFromNodeId(edge.to);
       const edgeKind = edge.kind ?? 'call';
       const isCrossFile = fromFile !== toFile;
       const isSelfLoop = edge.from === edge.to;
@@ -656,9 +673,12 @@ export class MeshFactory {
       this.edgeMetadata.set(`${edgeIndex}`, {
         from: edge.from,
         to: edge.to,
+        fromFile: fromFile ? toProjectRelativePath(fromFile) : null,
+        toFile: toFile ? toProjectRelativePath(toFile) : null,
         isCrossFile,
         isSelfLoop,
         bidirectionalOffsetSign,
+        targetsExternalLibrary,
       });
 
       edgeIndex++;
@@ -988,12 +1008,21 @@ export class MeshFactory {
   }
 
   private shouldRenderEdge(
-    metadata: { from: string; to: string; isCrossFile: boolean; isSelfLoop: boolean; bidirectionalOffsetSign: number },
+    metadata: {
+      from: string;
+      to: string;
+      fromFile: string | null;
+      toFile: string | null;
+      isCrossFile: boolean;
+      isSelfLoop: boolean;
+      bidirectionalOffsetSign: number;
+      targetsExternalLibrary: boolean;
+    },
     sourceMesh: BABYLON.Mesh,
     targetMesh: BABYLON.Mesh,
   ): boolean {
     if (metadata.isCrossFile) {
-      return true;
+      return this.shouldRenderCrossFileEdge(metadata);
     }
 
     const sharedParent = sourceMesh.parent && sourceMesh.parent === targetMesh.parent
@@ -1018,6 +1047,28 @@ export class MeshFactory {
     }
 
     return this.isPointInsideBoundingBox(boundingBox, viewerWorldPosition);
+  }
+
+  private shouldRenderCrossFileEdge(metadata: {
+    fromFile: string | null;
+    toFile: string | null;
+    targetsExternalLibrary: boolean;
+  }): boolean {
+    if (!this.focusedFile) {
+      return !metadata.targetsExternalLibrary;
+    }
+
+    if (metadata.fromFile === this.focusedFile || metadata.toFile === this.focusedFile) {
+      return true;
+    }
+
+    if (metadata.targetsExternalLibrary) {
+      return metadata.fromFile === this.focusedFile;
+    }
+
+    const fromDir = metadata.fromFile ? this.getDirectoryPathSafe(metadata.fromFile) : '';
+    const toDir = metadata.toFile ? this.getDirectoryPathSafe(metadata.toFile) : '';
+    return this.focusedDirectories.has(fromDir) || this.focusedDirectories.has(toDir);
   }
 
   private isPointInsideBoundingBox(
@@ -1063,6 +1114,25 @@ export class MeshFactory {
     }
 
     return null;
+  }
+
+  private extractFilePathFromNodeId(nodeId: string): string | null {
+    const atIndex = nodeId.lastIndexOf('@');
+    if (atIndex >= 0 && atIndex < nodeId.length - 1) {
+      return nodeId.slice(atIndex + 1);
+    }
+
+    if (nodeId.startsWith('html:')) {
+      return nodeId.slice('html:'.length);
+    }
+
+    return null;
+  }
+
+  private getDirectoryPathSafe(filePath: string): string {
+    const normalized = toProjectRelativePath(filePath);
+    const slashIndex = normalized.lastIndexOf('/');
+    return slashIndex >= 0 ? normalized.slice(0, slashIndex) : '';
   }
 
 }

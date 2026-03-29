@@ -417,5 +417,29 @@ describe('MeshFactory', () => {
 
       expect(cylinder.setEnabled).toHaveBeenCalledWith(true);
     });
+
+    it('hides unrelated cross-file edges when a focus file is active', () => {
+      (factory as any).setDeclutterContext('src/main.ts', ['src']);
+
+      const visible = (factory as any).shouldRenderCrossFileEdge({
+        fromFile: 'scripts/build-graph.ts',
+        toFile: 'viewer.html',
+        targetsExternalLibrary: false,
+      });
+
+      expect(visible).toBe(false);
+    });
+
+    it('keeps cross-file edges visible when they connect to the focus file', () => {
+      (factory as any).setDeclutterContext('src/main.ts', ['src']);
+
+      const visible = (factory as any).shouldRenderCrossFileEdge({
+        fromFile: 'src/main.ts',
+        toFile: 'src/VRSceneManager.ts',
+        targetsExternalLibrary: false,
+      });
+
+      expect(visible).toBe(true);
+    });
   });
 });
