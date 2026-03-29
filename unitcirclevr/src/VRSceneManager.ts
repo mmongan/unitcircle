@@ -10,6 +10,7 @@ import { SceneConfig } from './SceneConfig';
 import { Quest3GripController, type GripState, type GripGesture } from './Quest3GripController';
 import { FileColorService } from './FileColorService';
 import { collectCodeViewerConnections, drawCodeViewerConnectionButtons } from './CodeViewerPanel';
+import { computeDesktopCameraDestination } from './CameraFlightPlanner';
 import { getDirectoryPath, getParentDirectoryPath, normalizePath, toProjectRelativePath } from './PathUtils';
 
 // VS Code Dark+ inspired token colours for Canvas 2D syntax rendering
@@ -2020,61 +2021,21 @@ export class VRSceneManager {
     }
     this.isAnimating = false;
 
-    const currentDir = this.camera.target.subtract(this.camera.position).normalize();
-    let newCamPos: BABYLON.Vector3;
-    if (labelStandoff !== false) {
-      // For labels: position camera a fixed distance in front of the label,
-      // offset toward the camera so the text is readable.
-      let toCamera = this.camera.position.subtract(targetWorldPos);
-      if (!Number.isFinite(toCamera.length()) || toCamera.lengthSquared() < 0.000001) {
-        toCamera = currentDir.scale(-1);
-      }
-      toCamera = toCamera.normalize();
-      const labelRadius = targetMesh?.getBoundingInfo()?.boundingSphere?.radiusWorld ?? 0;
-      const effectiveLabelStandoff = Math.max(
-        labelStandoff as number,
-        8,
-        (labelRadius * 1.35) + 5,
-      );
-      newCamPos = targetWorldPos.add(toCamera.scale(effectiveLabelStandoff));
-    } else if (faceNormal && faceNormal.lengthSquared() > 0.000001) {
-      // Position camera orthogonally in front of the clicked face, close enough
-      // that the code panel nearly fills the viewport.
-      const meshAny = targetMesh as any;
-      const boxSize = typeof meshAny?.boxSize === 'number'
-        ? meshAny.boxSize
-        : Math.max(1.0, (targetMesh?.getBoundingInfo()?.boundingSphere?.radiusWorld ?? 1) * 1.15);
-      const panelOffset = (boxSize * 0.5) + Math.max(0.5, boxSize * 0.08);
-
-      const activeCamera = this.scene.activeCamera || this.camera;
-      const fovY = Math.max(0.45, activeCamera.fov || this.camera.fov || 0.8);
-      const renderWidth = Math.max(1, this.engine.getRenderWidth());
-      const renderHeight = Math.max(1, this.engine.getRenderHeight());
-      const aspect = renderWidth / renderHeight;
-      const fovX = 2 * Math.atan(Math.tan(fovY * 0.5) * aspect);
-
-      // Editor plane is square in world units (scaled by box size).
-      const panelWorldHeight = boxSize * EDITOR_WORLD_HEIGHT_SCALE;
-      const panelWorldWidth = boxSize * EDITOR_WORLD_WIDTH_SCALE;
-
-      // Target fraction of viewport occupied by panel dimensions.
-      const targetVerticalFill = 0.86;
-      const targetHorizontalFill = 0.80;
-
-      const distanceByHeight = (panelWorldHeight * 0.5) / Math.tan((fovY * targetVerticalFill) * 0.5);
-      const distanceByWidth = (panelWorldWidth * 0.5) / Math.tan((fovX * targetHorizontalFill) * 0.5);
-      const requiredPanelDistance = Math.max(distanceByHeight, distanceByWidth);
-
-      // Keep a comfortable buffer from the panel surface.
-      const desiredPanelGap = Math.max(4.0, requiredPanelDistance);
-
-      const standoffDistance = panelOffset + desiredPanelGap;
-      newCamPos = targetWorldPos.add(faceNormal.normalize().scale(standoffDistance));
-    } else {
-      const radius = targetMesh?.getBoundingInfo()?.boundingSphere?.radiusWorld ?? 0;
-      const standoffDistance = Math.max(2, radius + 1.5);
-      newCamPos = targetWorldPos.subtract(currentDir.scale(standoffDistance));
-    }
+    const activeCamera = this.scene.activeCamera || this.camera;
+    const newCamPos = computeDesktopCameraDestination({
+      targetWorldPos,
+      cameraPosition: this.camera.position,
+      cameraTarget: this.camera.target,
+      targetMesh,
+      labelStandoff,
+      faceNormal,
+      activeFov: activeCamera.fov,
+      fallbackFov: this.camera.fov || 0.8,
+      renderWidth: this.engine.getRenderWidth(),
+      renderHeight: this.engine.getRenderHeight(),
+      editorWorldWidthScale: EDITOR_WORLD_WIDTH_SCALE,
+      editorWorldHeightScale: EDITOR_WORLD_HEIGHT_SCALE,
+    });
 
     const fps = SceneConfig.FLY_TO_ANIMATION_FPS;
     const totalFrames = (SceneConfig.FLY_TO_ANIMATION_TIME_MS / 1000) * fps;
