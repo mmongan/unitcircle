@@ -39,6 +39,46 @@ const EDITOR_TEXTURE_HEIGHT = 768;
 const EDITOR_WORLD_WIDTH_SCALE = 1.75;
 const EDITOR_WORLD_HEIGHT_SCALE = 1.08;
 
+interface DeclutterFileBoxWorkItem {
+  relativeFile: string;
+  fileDirectory: string;
+  box: BABYLON.Mesh;
+}
+
+interface DeclutterDirectoryBoxWorkItem {
+  relativeDirectory: string;
+  box: BABYLON.Mesh;
+}
+
+interface DeclutterNodeWorkItem {
+  node: GraphNode;
+  mesh: BABYLON.Mesh;
+  relativeFile: string | null;
+  fileDirectory: string;
+}
+
+interface DeclutterLabelWorkItem {
+  relativePath: string;
+  label: BABYLON.Mesh;
+}
+
+interface PendingDeclutterState {
+  viewerInsideFile: boolean;
+  focusedFile: string | null;
+  focusedFileDirectory: string;
+  focusedDirectories: Set<string>;
+  fileBoxes: DeclutterFileBoxWorkItem[];
+  directoryBoxes: DeclutterDirectoryBoxWorkItem[];
+  nodes: DeclutterNodeWorkItem[];
+  fileLabels: DeclutterLabelWorkItem[];
+  directoryLabels: DeclutterLabelWorkItem[];
+  fileBoxIndex: number;
+  directoryBoxIndex: number;
+  nodeIndex: number;
+  fileLabelIndex: number;
+  directoryLabelIndex: number;
+}
+
 export class VRSceneManager {
   private engine: BABYLON.Engine;
   private scene: BABYLON.Scene;
@@ -98,9 +138,11 @@ export class VRSceneManager {
   private functionEditorScreen: BABYLON.Mesh | null = null;
   private functionEditorTexture: BABYLON.DynamicTexture | null = null;
   private functionEditorMaterial: BABYLON.StandardMaterial | null = null;
+  private editorDismissedNodeId: string | null = null;
   private editorCurrentNodeId: string | null = null;
   private editorCallButtons: Array<{ x: number; y: number; width: number; height: number; targetNodeId: string }> = [];
   private editorScrollButtons: Array<{ x: number; y: number; width: number; height: number; action: 'up' | 'down' }> = [];
+  private editorCloseButton: { x: number; y: number; width: number; height: number } | null = null;
   private editorCodeScrollByNodeId: Map<string, number> = new Map();
   private editorCurrentCodeLineCount = 0;
   private editorCurrentCodeMaxLines = 0;
@@ -110,6 +152,7 @@ export class VRSceneManager {
   private lastGraphReloadAtMs = 0;
   private desktopStartupRecenterDone = false;
   private lastDeclutterSignature: string | null = null;
+  private pendingDeclutterState: PendingDeclutterState | null = null;
   private readonly xrNavigationDebug = ((import.meta.env.VITE_XR_NAV_DEBUG ?? 'false').toLowerCase() === 'true');
   private readonly exportedFaceCircleLayout = ((import.meta.env.VITE_EXPORTED_FACE_CIRCLE ?? 'false').toLowerCase() === 'true');
   private readonly useLegacyExportedFaceLayout = ((import.meta.env.VITE_LEGACY_EXPORTED_FACE_LAYOUT ?? 'false').toLowerCase() === 'true');
@@ -2765,6 +2808,16 @@ export class VRSceneManager {
     }
     this.directoryBoxMeshes.clear();
 
+    for (const label of this.directoryBoxLabels.values()) {
+      label.dispose();
+    }
+    this.directoryBoxLabels.clear();
+    this.directoryLabelLookup.clear();
+
+    if (!SceneConfig.SHOW_DIRECTORY_CAGE) {
+      return;
+    }
+
     const filePaths = Array.from(this.fileBoxMeshes.keys())
       .filter((f) => f !== 'external')
       .map((f) => toProjectRelativePath(f));
@@ -4059,7 +4112,7 @@ export class VRSceneManager {
    */
   private resolveInternalNodeCollisions(maxPasses: number = 10, includeExported: boolean = false): void {
     // Additional world-space padding beyond the sum of node radii.
-    const collisionPaddingWorld = 1.8;
+    const collisionPaddingWorld = 1.0;
 
     for (const [, fileBox] of this.fileBoxMeshes.entries()) {
       // Gather function children of this file box.
@@ -4985,6 +5038,7 @@ export class VRSceneManager {
     this.editorCurrentNodeId = null;
     this.editorCallButtons = [];
     this.editorScrollButtons = [];
+    this.editorCloseButton = null;
     this.editorCurrentCodeLineCount = 0;
     this.editorCurrentCodeMaxLines = 0;
     this.lastEditorAttachmentSignature = null;
@@ -5016,6 +5070,26 @@ export class VRSceneManager {
 
     ctx.fillStyle = 'rgba(26, 38, 57, 0.95)';
     ctx.fillRect(16, 16, width - 32, 88);
+
+    const closeSize = 52;
+    const closeX = width - 24 - closeSize;
+    const closeY = 34;
+    this.editorCloseButton = { x: closeX, y: closeY, width: closeSize, height: closeSize };
+
+    ctx.fillStyle = 'rgba(210, 44, 44, 0.96)';
+    ctx.fillRect(closeX, closeY, closeSize, closeSize);
+    ctx.strokeStyle = 'rgba(255, 224, 224, 0.95)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(closeX, closeY, closeSize, closeSize);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 5;
+    const iconInset = 14;
+    ctx.beginPath();
+    ctx.moveTo(closeX + iconInset, closeY + iconInset);
+    ctx.lineTo(closeX + closeSize - iconInset, closeY + closeSize - iconInset);
+    ctx.moveTo(closeX + closeSize - iconInset, closeY + iconInset);
+    ctx.lineTo(closeX + iconInset, closeY + closeSize - iconInset);
+    ctx.stroke();
 
     ctx.fillStyle = '#f6f9ff';
     ctx.font = '700 36px Consolas';
@@ -5081,13 +5155,25 @@ export class VRSceneManager {
   }
 
   private handleEditorScreenClick(uv: BABYLON.Vector2): boolean {
-    if (!this.editorCurrentNodeId) {
-      return false;
-    }
-
     // DynamicTexture is mirrored on U, so convert accordingly.
     const texX = (1 - uv.x) * EDITOR_TEXTURE_WIDTH;
     const texY = (1 - uv.y) * EDITOR_TEXTURE_HEIGHT;
+
+    if (this.editorCloseButton) {
+      const insideClose = texX >= this.editorCloseButton.x
+        && texX <= (this.editorCloseButton.x + this.editorCloseButton.width)
+        && texY >= this.editorCloseButton.y
+        && texY <= (this.editorCloseButton.y + this.editorCloseButton.height);
+      if (insideClose) {
+        this.editorDismissedNodeId = this.editorCurrentNodeId;
+        this.hideFunctionEditor();
+        return true;
+      }
+    }
+
+    if (!this.editorCurrentNodeId) {
+      return false;
+    }
 
     for (const btn of this.editorScrollButtons) {
       const inside = texX >= btn.x && texX <= (btn.x + btn.width)
@@ -5451,105 +5537,30 @@ export class VRSceneManager {
     return false;
   }
 
-  private applySceneDeclutter(): void {
-    const viewerInsideFile = this.isViewerInsideAnyFileBox();
-    const focusedFile = viewerInsideFile ? this.getFocusedFilePath() : null;
-    const focusedDirectories = this.buildFocusedDirectoryChain(focusedFile);
-    const signature = `${viewerInsideFile ? 'inside' : 'outside'}|${focusedFile ?? 'none'}|${Array.from(focusedDirectories).sort().join(',')}|${this.labelsVisible ? 'labels' : 'nolabels'}`;
-
-    if (signature === this.lastDeclutterSignature && !this.isAnimating) {
-      this.meshFactory.setDeclutterContext(focusedFile, focusedDirectories);
-      return;
-    }
-
-    this.lastDeclutterSignature = signature;
-    this.meshFactory.setDeclutterContext(focusedFile, focusedDirectories);
-
-    if (!viewerInsideFile) {
-      for (const box of this.fileBoxMeshes.values()) {
-        box.setEnabled(true);
-        box.visibility = 1.0;
-        const material = box.material as BABYLON.StandardMaterial | null;
-        if (material) {
-          material.alpha = 0.18;
-        }
-      }
-
-      for (const box of this.directoryBoxMeshes.values()) {
-        box.setEnabled(true);
-        box.visibility = 1.0;
-        const material = box.material as BABYLON.StandardMaterial | null;
-        if (material) {
-          material.alpha = 0.08;
-        }
-      }
-
-      for (const mesh of this.nodeMeshMap.values()) {
-        mesh.setEnabled(true);
-        mesh.isVisible = true;
-        mesh.visibility = 1.0;
-        const material = mesh.material as BABYLON.StandardMaterial | null;
-        if (material) {
-          material.alpha = 1.0;
-          material.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
-        }
-      }
-
-      for (const label of this.fileBoxLabels.values()) {
-        const shouldShow = this.labelsVisible;
-        this.setBreadcrumbAnchorInteractivity(label, shouldShow);
-        label.visibility = shouldShow ? 1 : 0;
-      }
-
-      for (const label of this.directoryBoxLabels.values()) {
-        const shouldShow = this.labelsVisible;
-        this.setBreadcrumbAnchorInteractivity(label, shouldShow);
-        label.visibility = shouldShow ? 1 : 0;
-      }
-
-      return;
-    }
-
+  private createPendingDeclutterState(
+    viewerInsideFile: boolean,
+    focusedFile: string | null,
+    focusedDirectories: Set<string>,
+  ): PendingDeclutterState {
+    const fileBoxes: DeclutterFileBoxWorkItem[] = [];
     for (const [file, box] of this.fileBoxMeshes.entries()) {
       const relativeFile = toProjectRelativePath(file);
-      const fileDir = getDirectoryPath(relativeFile);
-      const material = box.material as BABYLON.StandardMaterial | null;
-      const isFocused = focusedFile !== null && relativeFile === focusedFile;
-      const isContext = focusedFile !== null && focusedDirectories.has(fileDir);
-
-      box.visibility = isFocused
-        ? SceneConfig.DECLUTTER_FOCUS_VISIBILITY
-        : isContext
-          ? SceneConfig.DECLUTTER_CONTEXT_VISIBILITY
-          : SceneConfig.DECLUTTER_BACKGROUND_VISIBILITY;
-
-      if (material) {
-        material.alpha = isFocused
-          ? SceneConfig.DECLUTTER_ACTIVE_FILE_BOX_ALPHA
-          : isContext
-            ? SceneConfig.DECLUTTER_CONTEXT_FILE_BOX_ALPHA
-            : SceneConfig.DECLUTTER_BACKGROUND_FILE_BOX_ALPHA;
-      }
+      fileBoxes.push({
+        relativeFile,
+        fileDirectory: getDirectoryPath(relativeFile),
+        box,
+      });
     }
 
-    for (const [dir, box] of this.directoryBoxMeshes.entries()) {
-      const relativeDir = toProjectRelativePath(dir);
-      const showBox = focusedFile === null || focusedDirectories.has(relativeDir);
-      box.setEnabled(showBox);
-      box.visibility = showBox
-        ? (focusedFile !== null && relativeDir === getDirectoryPath(focusedFile)
-          ? SceneConfig.DECLUTTER_CONTEXT_VISIBILITY
-          : SceneConfig.DECLUTTER_BACKGROUND_VISIBILITY)
-        : SceneConfig.DECLUTTER_HIDDEN_VISIBILITY;
-
-      const material = box.material as BABYLON.StandardMaterial | null;
-      if (material) {
-        material.alpha = focusedFile !== null && relativeDir === getDirectoryPath(focusedFile)
-          ? SceneConfig.DECLUTTER_ACTIVE_DIRECTORY_BOX_ALPHA
-          : SceneConfig.DECLUTTER_CONTEXT_DIRECTORY_BOX_ALPHA;
-      }
+    const directoryBoxes: DeclutterDirectoryBoxWorkItem[] = [];
+    for (const [directory, box] of this.directoryBoxMeshes.entries()) {
+      directoryBoxes.push({
+        relativeDirectory: toProjectRelativePath(directory),
+        box,
+      });
     }
 
+    const nodes: DeclutterNodeWorkItem[] = [];
     for (const [nodeId, mesh] of this.nodeMeshMap.entries()) {
       const node = this.graphNodeMap.get(nodeId);
       if (!node) {
@@ -5557,50 +5568,229 @@ export class VRSceneManager {
       }
 
       const relativeFile = node.file ? toProjectRelativePath(node.file) : null;
-      const fileDir = relativeFile ? getDirectoryPath(relativeFile) : '';
-      const isFocusedNode = focusedFile !== null && relativeFile === focusedFile;
-      const isContextNode = focusedFile !== null && focusedDirectories.has(fileDir);
-      const isExternalOrVariable = node.type === 'external' || node.type === 'variable';
-      const shouldHide = focusedFile !== null && isExternalOrVariable && !isFocusedNode;
-
-      mesh.setEnabled(!shouldHide);
-      mesh.isVisible = !shouldHide;
-      mesh.visibility = shouldHide
-        ? SceneConfig.DECLUTTER_HIDDEN_VISIBILITY
-        : isFocusedNode
-          ? SceneConfig.DECLUTTER_FOCUS_VISIBILITY
-          : isContextNode
-            ? SceneConfig.DECLUTTER_CONTEXT_VISIBILITY
-            : SceneConfig.DECLUTTER_BACKGROUND_VISIBILITY;
-
-      const material = mesh.material as BABYLON.StandardMaterial | null;
-      if (material) {
-        material.alpha = shouldHide
-          ? 0.0
-          : isFocusedNode
-            ? 1.0
-            : isContextNode
-              ? 0.78
-              : 0.18;
-        material.transparencyMode = material.alpha >= 0.999
-          ? BABYLON.Material.MATERIAL_OPAQUE
-          : BABYLON.Material.MATERIAL_ALPHABLEND;
-      }
+      nodes.push({
+        node,
+        mesh,
+        relativeFile,
+        fileDirectory: relativeFile ? getDirectoryPath(relativeFile) : '',
+      });
     }
 
+    const fileLabels: DeclutterLabelWorkItem[] = [];
     for (const [file, label] of this.fileBoxLabels.entries()) {
-      const relativeFile = toProjectRelativePath(file);
-      const shouldShow = this.labelsVisible && (focusedFile === null || relativeFile === focusedFile || focusedDirectories.has(getDirectoryPath(relativeFile)));
-      this.setBreadcrumbAnchorInteractivity(label, shouldShow);
-      label.visibility = shouldShow ? 1 : 0;
+      fileLabels.push({
+        relativePath: toProjectRelativePath(file),
+        label,
+      });
     }
 
-    for (const [dir, label] of this.directoryBoxLabels.entries()) {
-      const relativeDir = toProjectRelativePath(dir);
-      const shouldShow = this.labelsVisible && (focusedFile === null || focusedDirectories.has(relativeDir));
-      this.setBreadcrumbAnchorInteractivity(label, shouldShow);
-      label.visibility = shouldShow ? 1 : 0;
+    const directoryLabels: DeclutterLabelWorkItem[] = [];
+    for (const [directory, label] of this.directoryBoxLabels.entries()) {
+      directoryLabels.push({
+        relativePath: toProjectRelativePath(directory),
+        label,
+      });
     }
+
+    return {
+      viewerInsideFile,
+      focusedFile,
+      focusedFileDirectory: focusedFile ? getDirectoryPath(focusedFile) : '',
+      focusedDirectories,
+      fileBoxes,
+      directoryBoxes,
+      nodes,
+      fileLabels,
+      directoryLabels,
+      fileBoxIndex: 0,
+      directoryBoxIndex: 0,
+      nodeIndex: 0,
+      fileLabelIndex: 0,
+      directoryLabelIndex: 0,
+    };
+  }
+
+  private processDeclutterBatch(): void {
+    const state = this.pendingDeclutterState;
+    if (!state) {
+      return;
+    }
+
+    let remainingMutations = SceneConfig.DECLUTTER_MUTATIONS_PER_FRAME;
+
+    while (remainingMutations > 0) {
+      if (state.fileBoxIndex < state.fileBoxes.length) {
+        const item = state.fileBoxes[state.fileBoxIndex++];
+        const material = item.box.material as BABYLON.StandardMaterial | null;
+
+        if (!state.viewerInsideFile) {
+          item.box.setEnabled(true);
+          item.box.visibility = 1.0;
+          if (material) {
+            material.alpha = 0.18;
+          }
+        } else {
+          const isFocused = state.focusedFile !== null && item.relativeFile === state.focusedFile;
+          const isContext = state.focusedFile !== null && state.focusedDirectories.has(item.fileDirectory);
+
+          item.box.visibility = isFocused
+            ? SceneConfig.DECLUTTER_FOCUS_VISIBILITY
+            : isContext
+              ? SceneConfig.DECLUTTER_CONTEXT_VISIBILITY
+              : SceneConfig.DECLUTTER_BACKGROUND_VISIBILITY;
+
+          if (material) {
+            material.alpha = isFocused
+              ? SceneConfig.DECLUTTER_ACTIVE_FILE_BOX_ALPHA
+              : isContext
+                ? SceneConfig.DECLUTTER_CONTEXT_FILE_BOX_ALPHA
+                : SceneConfig.DECLUTTER_BACKGROUND_FILE_BOX_ALPHA;
+          }
+        }
+
+        remainingMutations -= 1;
+        continue;
+      }
+
+      if (state.directoryBoxIndex < state.directoryBoxes.length) {
+        const item = state.directoryBoxes[state.directoryBoxIndex++];
+        const material = item.box.material as BABYLON.StandardMaterial | null;
+
+        if (!state.viewerInsideFile) {
+          item.box.setEnabled(true);
+          item.box.visibility = 1.0;
+          if (material) {
+            material.alpha = 0.08;
+          }
+        } else {
+          const showBox = state.focusedFile === null || state.focusedDirectories.has(item.relativeDirectory);
+          item.box.setEnabled(showBox);
+          item.box.visibility = showBox
+            ? (state.focusedFile !== null && item.relativeDirectory === state.focusedFileDirectory
+              ? SceneConfig.DECLUTTER_CONTEXT_VISIBILITY
+              : SceneConfig.DECLUTTER_BACKGROUND_VISIBILITY)
+            : SceneConfig.DECLUTTER_HIDDEN_VISIBILITY;
+
+          if (material) {
+            material.alpha = state.focusedFile !== null && item.relativeDirectory === state.focusedFileDirectory
+              ? SceneConfig.DECLUTTER_ACTIVE_DIRECTORY_BOX_ALPHA
+              : SceneConfig.DECLUTTER_CONTEXT_DIRECTORY_BOX_ALPHA;
+          }
+        }
+
+        remainingMutations -= 1;
+        continue;
+      }
+
+      if (state.nodeIndex < state.nodes.length) {
+        const item = state.nodes[state.nodeIndex++];
+        const material = item.mesh.material as BABYLON.StandardMaterial | null;
+
+        if (!state.viewerInsideFile) {
+          item.mesh.setEnabled(true);
+          item.mesh.isVisible = true;
+          item.mesh.visibility = 1.0;
+          if (material) {
+            material.alpha = 1.0;
+            material.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
+          }
+        } else {
+          const isFocusedNode = state.focusedFile !== null && item.relativeFile === state.focusedFile;
+          const isContextNode = state.focusedFile !== null && state.focusedDirectories.has(item.fileDirectory);
+          const isFunctionNode = item.node.type === 'function';
+          const isExternalOrVariable = item.node.type === 'external' || item.node.type === 'variable';
+          const shouldHide = state.focusedFile !== null && isExternalOrVariable && !isFocusedNode;
+
+          item.mesh.setEnabled(!shouldHide);
+          item.mesh.isVisible = !shouldHide;
+          item.mesh.visibility = shouldHide
+            ? SceneConfig.DECLUTTER_HIDDEN_VISIBILITY
+            : isFunctionNode
+              ? 1.0
+              : isFocusedNode
+                ? SceneConfig.DECLUTTER_FOCUS_VISIBILITY
+                : isContextNode
+                  ? SceneConfig.DECLUTTER_CONTEXT_VISIBILITY
+                  : SceneConfig.DECLUTTER_BACKGROUND_VISIBILITY;
+
+          if (material) {
+            material.alpha = shouldHide
+              ? 0.0
+              : isFunctionNode
+                ? 1.0
+                : isFocusedNode
+                  ? 1.0
+                  : isContextNode
+                    ? 0.88
+                    : 0.42;
+            material.transparencyMode = material.alpha >= 0.999
+              ? BABYLON.Material.MATERIAL_OPAQUE
+              : BABYLON.Material.MATERIAL_ALPHABLEND;
+          }
+        }
+
+        remainingMutations -= 1;
+        continue;
+      }
+
+      if (state.fileLabelIndex < state.fileLabels.length) {
+        const item = state.fileLabels[state.fileLabelIndex++];
+        const shouldShow = !state.viewerInsideFile
+          ? this.labelsVisible
+          : this.labelsVisible
+            && (state.focusedFile === null
+              || item.relativePath === state.focusedFile
+              || state.focusedDirectories.has(getDirectoryPath(item.relativePath)));
+        this.setBreadcrumbAnchorInteractivity(item.label, shouldShow);
+        item.label.visibility = shouldShow ? 1 : 0;
+
+        remainingMutations -= 1;
+        continue;
+      }
+
+      if (state.directoryLabelIndex < state.directoryLabels.length) {
+        const item = state.directoryLabels[state.directoryLabelIndex++];
+        const shouldShow = !state.viewerInsideFile
+          ? this.labelsVisible
+          : this.labelsVisible && (state.focusedFile === null || state.focusedDirectories.has(item.relativePath));
+        this.setBreadcrumbAnchorInteractivity(item.label, shouldShow);
+        item.label.visibility = shouldShow ? 1 : 0;
+
+        remainingMutations -= 1;
+        continue;
+      }
+
+      break;
+    }
+
+    const isDone = state.fileBoxIndex >= state.fileBoxes.length
+      && state.directoryBoxIndex >= state.directoryBoxes.length
+      && state.nodeIndex >= state.nodes.length
+      && state.fileLabelIndex >= state.fileLabels.length
+      && state.directoryLabelIndex >= state.directoryLabels.length;
+
+    if (isDone) {
+      this.pendingDeclutterState = null;
+    }
+  }
+
+  private applySceneDeclutter(): void {
+    const viewerInsideFile = this.isViewerInsideAnyFileBox();
+    const focusedFile = viewerInsideFile ? this.getFocusedFilePath() : null;
+    const focusedDirectories = this.buildFocusedDirectoryChain(focusedFile);
+    const signature = `${viewerInsideFile ? 'inside' : 'outside'}|${focusedFile ?? 'none'}|${Array.from(focusedDirectories).sort().join(',')}|${this.labelsVisible ? 'labels' : 'nolabels'}`;
+    this.meshFactory.setDeclutterContext(focusedFile, focusedDirectories);
+
+    if (signature !== this.lastDeclutterSignature) {
+      this.lastDeclutterSignature = signature;
+      this.pendingDeclutterState = this.createPendingDeclutterState(
+        viewerInsideFile,
+        focusedFile,
+        focusedDirectories,
+      );
+    }
+
+    this.processDeclutterBatch();
   }
 
   private findNearbyFunctionForEditor(): GraphNode | null {
@@ -5643,9 +5833,14 @@ export class VRSceneManager {
   private updateFunctionEditorProximity(): void {
     const nearbyNode = this.findNearbyFunctionForEditor();
     if (!nearbyNode) {
+      this.editorDismissedNodeId = null;
       if (this.editorVisibleForNodeId !== null) {
         this.hideFunctionEditor();
       }
+      return;
+    }
+
+    if (this.editorDismissedNodeId === nearbyNode.id) {
       return;
     }
 
@@ -5972,6 +6167,11 @@ export class VRSceneManager {
     const isSameFace = isSameFunction && this.isFaceNormalEqual(faceNormal, this.currentFaceNormal);
 
     if (isSameFace) {
+      if (clickedNode.type === 'function' && clickedNode.code && this.editorVisibleForNodeId !== clickedNode.id) {
+        this.editorDismissedNodeId = null;
+        this.showFunctionEditor(clickedNode);
+      }
+
       // Keep editor stable when the same face is clicked again.
       if (this.editorVisibleForNodeId === clickedNode.id) {
         return;
@@ -5981,6 +6181,10 @@ export class VRSceneManager {
     } else if (isSameFunction) {
       // Different face of same function - slide to new face
       this.currentFaceNormal = faceNormal.clone();
+      if (clickedNode.type === 'function' && clickedNode.code && this.editorVisibleForNodeId !== clickedNode.id) {
+        this.editorDismissedNodeId = null;
+        this.showFunctionEditor(clickedNode);
+      }
       this.slideFaceView(targetMesh.getAbsolutePosition(), faceNormal, targetMesh);
     } else {
       // Different function - jump to it, positioning camera orthogonally to clicked face
@@ -5990,6 +6194,7 @@ export class VRSceneManager {
       // Refresh editor content immediately for the newly selected function box.
       // This prevents stale code text/buttons from the previous selection.
       if (clickedNode.type === 'function' && clickedNode.code) {
+        this.editorDismissedNodeId = null;
         if (this.editorVisibleForNodeId && this.editorVisibleForNodeId !== clickedNode.id) {
           this.hideFunctionEditor();
         }

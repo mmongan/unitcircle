@@ -22,16 +22,14 @@ export class MeshFactory {
     targetsExternalLibrary: boolean;
   }> = new Map();
   private edgeMaterials: Set<BABYLON.StandardMaterial> = new Set();
-  private focusedFile: string | null = null;
-  private focusedDirectories: Set<string> = new Set();
 
   constructor(scene: BABYLON.Scene) {
     this.scene = scene;
   }
 
   public setDeclutterContext(focusedFile: string | null, focusedDirectories: Iterable<string>): void {
-    this.focusedFile = focusedFile ? toProjectRelativePath(focusedFile) : null;
-    this.focusedDirectories = new Set(Array.from(focusedDirectories, (dir) => toProjectRelativePath(dir)));
+    void focusedFile;
+    void focusedDirectories;
   }
 
   /**
@@ -619,16 +617,21 @@ export class MeshFactory {
           : isExportedConnection
             ? SceneConfig.INTERNAL_EDGE_RADIUS * 4
             : SceneConfig.INTERNAL_EDGE_RADIUS * 2;
-      const cylinder = isSelfLoop
-        ? BABYLON.MeshBuilder.CreateTube(`edge_${edgeIndex}`, {
-            path: this.buildSelfLoopPath(sceneRoot ?? null, BABYLON.Vector3.Zero(), 2.0),
-            radius: Math.max(0.06, edgeDiameter * 0.45),
-            updatable: true,
-          }, this.scene)
-        : BABYLON.MeshBuilder.CreateCylinder(`edge_${edgeIndex}`, {
-            diameter: edgeDiameter,
-            height: 1,  // Will be scaled based on distance
-          }, this.scene);
+      // All edges are now created as tubes with updatable paths to support collision avoidance
+      // Initial path is a straight line (will be updated in updateEdges())
+      const initialPath = [
+        BABYLON.Vector3.Zero(),
+        new BABYLON.Vector3(0, 1, 0),
+      ];
+      const tubeRadius = isSelfLoop
+        ? Math.max(0.06, edgeDiameter * 0.45)
+        : Math.max(0.06, edgeDiameter * 0.5);
+      
+      const cylinder = BABYLON.MeshBuilder.CreateTube(`edge_${edgeIndex}`, {
+        path: initialPath,
+        radius: tubeRadius,
+        updatable: true,
+      }, this.scene);
       
       cylinder.material = material;
       cylinder.isPickable = true;
@@ -927,43 +930,50 @@ export class MeshFactory {
       const edgeStartPos = offsetSourcePos.add(sourceVerticalOffset);
       const edgeEndPos = offsetTargetPos.add(targetVerticalOffset);
 
-      // Edge direction unit vector (source → target)
-      const edgeDirection = edgeEndPos.subtract(edgeStartPos).normalize();
+      // Get edge diameter from metadata/config
+      const edgeKind = (cylinder as any).edgeKind ?? 'call';
+      const edgeDiameter = edgeKind === 'var-write'
+        ? SceneConfig.INTERNAL_EDGE_RADIUS * 3.0
+        : edgeKind === 'var-read'
+          ? SceneConfig.INTERNAL_EDGE_RADIUS * 2.2
+          : metadata.isCrossFile
+          ? SceneConfig.EDGE_RADIUS * 2
+          : SceneConfig.INTERNAL_EDGE_RADIUS * 2;
+      const edgeRadius = edgeDiameter * 0.5;
 
-      // Compute arrow cone height so we can shorten the cylinder to avoid overlap.
-      // The cone is unscaled so its bounding-box half-height equals arrowHeight/2.
-      const arrowFullHeight = arrow
-        ? arrow.getBoundingInfo().boundingBox.maximum.y * 2
-        : 0;
+      // Calculate collision-free waypoints
+      const waypoints = this.calculateCollisionAvoidanceWaypoints(edgeStartPos, edgeEndPos, edgeRadius);
 
-      // Cylinder ends at the cone's base (not the target surface) so the tip is visible.
-      const cylinderEndPos = edgeEndPos.subtract(edgeDirection.scale(arrowFullHeight));
+      // Convert waypoints to local space relative to parent for tube creation
+      const localWaypoints = waypoints.map((wp) => this.toParentLocalPoint(cylinder.parent ?? null, wp));
 
-      // Use midpoint of start and cylinder-end for the cylinder position
-      const midpointWorld = edgeStartPos.add(cylinderEndPos).scale(0.5);
-      
-      // Recalculate distance based on surface points (cylinder portion only)
-      const surfaceDistance = cylinderEndPos.subtract(edgeStartPos).length();
-      
-      // Convert world position to local position relative to parent
-      // If cylinder has a parent, position is automatically local
-      if (cylinder.parent) {
-        const parentMatrix = (cylinder.parent as BABYLON.TransformNode).getWorldMatrix().clone();
-        const inverseParentMatrix = BABYLON.Matrix.Invert(parentMatrix);
-        const localPosition = BABYLON.Vector3.TransformCoordinates(midpointWorld, inverseParentMatrix);
-        cylinder.position = localPosition;
-      } else {
-        cylinder.position = midpointWorld;
+      // Update tube with new path
+      const tubeRadius = Math.max(0.06, edgeDiameter * 0.5);
+      try {
+        BABYLON.MeshBuilder.CreateTube(cylinder.name, {
+          path: localWaypoints,
+          radius: tubeRadius,
+          updatable: true,
+          instance: cylinder,
+        }, this.scene);
+      } catch {
+        // If tube update fails, recreate the tube
+        cylinder.dispose();
+        const newTube = BABYLON.MeshBuilder.CreateTube(cylinder.name, {
+          path: localWaypoints,
+          radius: tubeRadius,
+          updatable: true,
+        }, this.scene);
+        newTube.material = cylinder.material;
+        newTube.isPickable = true;
+        newTube.alwaysSelectAsActiveMesh = true;
+        newTube.renderingGroupId = 1;
+        (newTube as any).edgeData = (cylinder as any).edgeData;
+        if (cylinder.parent) {
+          newTube.parent = cylinder.parent;
+        }
+        this.edgeTubes.set(edgeId, newTube);
       }
-
-      // Scale cylinder to surface-to-surface distance
-      cylinder.scaling.y = Math.max(surfaceDistance, 0.1);  // Minimum 0.1 to avoid invisible edges
-
-      // Rotate cylinder to point along the connection
-      const yAxis = BABYLON.Axis.Y;
-      const rotationQuaternion = BABYLON.Quaternion.Identity();
-      BABYLON.Quaternion.FromUnitVectorsToRef(yAxis, edgeDirection, rotationQuaternion);
-      cylinder.rotationQuaternion = rotationQuaternion;
 
       // Ensure cylinder is visible
       this.ensureMeshEnabled(cylinder);
@@ -971,6 +981,14 @@ export class MeshFactory {
 
       // Position and orient arrowhead at the target surface
       if (arrow) {
+        // Edge direction unit vector (source → target)
+        const edgeDirection = edgeEndPos.subtract(edgeStartPos).normalize();
+        
+        // Compute arrow cone height so we can shorten the cylinder to avoid overlap.
+        const arrowFullHeight = arrow
+          ? arrow.getBoundingInfo().boundingBox.maximum.y * 2
+          : 0;
+
         const arrowHalfHeight = arrowFullHeight / 2;
         // Place cone center so its tip (+Y) sits exactly at edgeEndPos
         const arrowCenterWorld = edgeEndPos.subtract(edgeDirection.scale(arrowHalfHeight));
@@ -1046,7 +1064,7 @@ export class MeshFactory {
       return 1.0;
     }
 
-    return this.isPointInsideBoundingBox(boundingBox, viewerWorldPosition) ? 1.0 : 0.22;
+    return this.isPointInsideBoundingBox(boundingBox, viewerWorldPosition) ? 1.0 : 0.45;
   }
 
   private getCrossFileEdgeVisibilityFactor(metadata: {
@@ -1054,23 +1072,8 @@ export class MeshFactory {
     toFile: string | null;
     targetsExternalLibrary: boolean;
   }): number {
-    if (!this.focusedFile) {
-      return 1.0;
-    }
-
-    if (metadata.fromFile === this.focusedFile || metadata.toFile === this.focusedFile) {
-      return 1.0;
-    }
-
-    if (metadata.targetsExternalLibrary) {
-      return metadata.fromFile === this.focusedFile ? 1.0 : 0.18;
-    }
-
-    const fromDir = metadata.fromFile ? this.getDirectoryPathSafe(metadata.fromFile) : '';
-    const toDir = metadata.toFile ? this.getDirectoryPathSafe(metadata.toFile) : '';
-    return this.focusedDirectories.has(fromDir) || this.focusedDirectories.has(toDir)
-      ? 0.56
-      : 0.24;
+    void metadata;
+    return 1.0;
   }
 
   private isPointInsideBoundingBox(
@@ -1131,10 +1134,99 @@ export class MeshFactory {
     return null;
   }
 
-  private getDirectoryPathSafe(filePath: string): string {
-    const normalized = toProjectRelativePath(filePath);
-    const slashIndex = normalized.lastIndexOf('/');
-    return slashIndex >= 0 ? normalized.slice(0, slashIndex) : '';
+  /**
+   * Calculate waypoints for an edge to avoid collisions with function boxes.
+   * Uses a simple offset strategy: if edge passes through boxes, route around them.
+   */
+  private calculateCollisionAvoidanceWaypoints(
+    startPos: BABYLON.Vector3,
+    endPos: BABYLON.Vector3,
+    edgeRadius: number,
+  ): BABYLON.Vector3[] {
+    // Collect all function box meshes to check collisions
+    const functionBoxes: Array<{ mesh: BABYLON.Mesh; nodeId: string }> = [];
+    for (const [nodeId, mesh] of this.nodeMeshes.entries()) {
+      if (mesh && mesh.isVisible && mesh.name && mesh.name.startsWith('func_')) {
+        functionBoxes.push({ mesh, nodeId });
+      }
+    }
+
+    if (functionBoxes.length === 0) {
+      return [startPos, endPos];  // No boxes to avoid
+    }
+
+    const waypoints: BABYLON.Vector3[] = [startPos];
+    const edgeDirection = endPos.subtract(startPos).normalize();
+    const edgeLength = BABYLON.Vector3.Distance(startPos, endPos);
+
+    // Check for collisions with function boxes along the edge
+    const collisionBoxes: Array<{ mesh: BABYLON.Mesh; distance: number }> = [];
+
+    for (const { mesh } of functionBoxes) {
+      // Get box bounds in world space
+      mesh.computeWorldMatrix(true);
+      const boundingSphere = mesh.getBoundingInfo().boundingSphere;
+
+      // Get box position and radius
+      const boxCenter = mesh.getAbsolutePosition();
+      const boxRadius = boundingSphere.radiusWorld + edgeRadius + 0.3;  // Add padding
+
+      // Check if edge line passes near box center
+      // Using closest point on line to box center
+      const toBox = boxCenter.subtract(startPos);
+      const projectionLength = BABYLON.Vector3.Dot(toBox, edgeDirection);
+      
+      // Skip if box is completely before/after the edge segment
+      if (projectionLength < -boxRadius || projectionLength > edgeLength + boxRadius) {
+        continue;
+      }
+
+      const closestPointOnEdge = startPos.add(edgeDirection.scale(
+        BABYLON.Scalar.Clamp(projectionLength, 0, edgeLength)
+      ));
+      const distanceToBox = BABYLON.Vector3.Distance(closestPointOnEdge, boxCenter);
+
+      // Collision if distance is less than box radius
+      if (distanceToBox < boxRadius) {
+        collisionBoxes.push({ mesh, distance: projectionLength });
+      }
+    }
+
+    // If no collisions, use straight line
+    if (collisionBoxes.length === 0) {
+      waypoints.push(endPos);
+      return waypoints;
+    }
+
+    // Sort colliding boxes by their position along the edge
+    collisionBoxes.sort((a, b) => a.distance - b.distance);
+
+    // Add waypoints to route around boxes
+    for (const { mesh } of collisionBoxes) {
+      const boxCenter = mesh.getAbsolutePosition();
+      const boundingSphere = mesh.getBoundingInfo().boundingSphere;
+      const boxRadius = boundingSphere.radiusWorld + edgeRadius + 0.5;
+
+      // Build perpendicular offset direction
+      let offsetDir = BABYLON.Axis.X;
+      if (Math.abs(BABYLON.Vector3.Dot(edgeDirection, offsetDir)) > 0.9) {
+        offsetDir = BABYLON.Axis.Y;
+      }
+
+      let sideDir = BABYLON.Vector3.Cross(edgeDirection, offsetDir).normalize();
+      if (!Number.isFinite(sideDir.length()) || sideDir.lengthSquared() < 0.001) {
+        sideDir = BABYLON.Vector3.Cross(edgeDirection, BABYLON.Axis.Z).normalize();
+      }
+
+      // Add waypoint offset to the side of the box
+      const sideOffset = sideDir.scale(boxRadius * 1.2);
+      
+      // Position waypoint at the edge of the box along the edge line
+      waypoints.push(boxCenter.add(sideOffset));
+    }
+
+    waypoints.push(endPos);
+    return waypoints;
   }
 
 }

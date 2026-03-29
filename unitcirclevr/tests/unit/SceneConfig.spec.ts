@@ -11,8 +11,8 @@ describe('SceneConfig', () => {
       expect(SceneConfig.INTERNAL_EDGE_RADIUS).toBeLessThan(SceneConfig.EDGE_RADIUS);
     });
 
-    it('INTERNAL_EDGE_RADIUS is 0.05', () => {
-      expect(SceneConfig.INTERNAL_EDGE_RADIUS).toBe(0.05);
+    it('INTERNAL_EDGE_RADIUS is 0.14', () => {
+      expect(SceneConfig.INTERNAL_EDGE_RADIUS).toBe(0.14);
     });
 
     it('EDGE_RADIUS is 0.2', () => {

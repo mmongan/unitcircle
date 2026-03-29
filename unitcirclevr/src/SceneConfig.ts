@@ -28,7 +28,7 @@ export class SceneConfig {
 
   // Node Dimensions
   static readonly FUNCTION_BOX_SIZE = 0.1;
-  static readonly INTERNAL_FUNCTION_BOX_SIZE = 1.6;
+  static readonly INTERNAL_FUNCTION_BOX_SIZE = 2.2;
   static readonly EXPORTED_FUNCTION_BOX_SIZE = 6.0;
   static readonly VARIABLE_SPHERE_DIAMETER = 1.5;
   static readonly EXTERNAL_PYRAMID_BASE = 1.2;
@@ -68,14 +68,16 @@ export class SceneConfig {
 
   // Scene decluttering
   static readonly DECLUTTER_FOCUS_VISIBILITY = 1.0;
-  static readonly DECLUTTER_CONTEXT_VISIBILITY = 0.5;
-  static readonly DECLUTTER_BACKGROUND_VISIBILITY = 0.28;
+  static readonly DECLUTTER_CONTEXT_VISIBILITY = 0.7;
+  static readonly DECLUTTER_BACKGROUND_VISIBILITY = 0.5;
   static readonly DECLUTTER_HIDDEN_VISIBILITY = 0.0;
   static readonly DECLUTTER_ACTIVE_FILE_BOX_ALPHA = 0.18;
-  static readonly DECLUTTER_CONTEXT_FILE_BOX_ALPHA = 0.10;
-  static readonly DECLUTTER_BACKGROUND_FILE_BOX_ALPHA = 0.06;
+  static readonly DECLUTTER_CONTEXT_FILE_BOX_ALPHA = 0.14;
+  static readonly DECLUTTER_BACKGROUND_FILE_BOX_ALPHA = 0.10;
   static readonly DECLUTTER_ACTIVE_DIRECTORY_BOX_ALPHA = 0.12;
   static readonly DECLUTTER_CONTEXT_DIRECTORY_BOX_ALPHA = 0.06;
+  static readonly DECLUTTER_MUTATIONS_PER_FRAME = 140;
+  static readonly SHOW_DIRECTORY_CAGE = false;
 
   // Physics Layout
   static readonly LAYOUT_ITERATIONS = 1; // Simple random placement requires minimal iterations

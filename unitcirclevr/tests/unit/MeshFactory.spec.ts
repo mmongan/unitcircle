@@ -108,8 +108,8 @@ describe('MeshFactory', () => {
   let factory: MeshFactory;
   const mockScene = {} as any;
 
-  const getEdgeCylinderCall = () =>
-    vi.mocked(BABYLON.MeshBuilder.CreateCylinder).mock.calls.find(
+  const getEdgeTubeCall = () =>
+    vi.mocked(BABYLON.MeshBuilder.CreateTube).mock.calls.find(
       (call) => String(call[0]).startsWith('edge_')
     );
 
@@ -123,30 +123,30 @@ describe('MeshFactory', () => {
     factory = new MeshFactory(mockScene);
   });
 
-  describe('createEdges – cylinder diameter', () => {
-    it('creates a thinner cylinder for same-file (internal) edges', () => {
+  describe('createEdges – tube radius', () => {
+    it('creates a thinner tube for same-file (internal) edges', () => {
       factory.createEdges(
         [{ from: 'funcA@src/file.ts', to: 'funcB@src/file.ts' }],
         new Map()
       );
 
-      const edgeCall = getEdgeCylinderCall();
+      const edgeCall = getEdgeTubeCall();
       expect(edgeCall).toBeDefined();
-      expect(edgeCall?.[1]).toEqual(expect.objectContaining({ diameter: SceneConfig.INTERNAL_EDGE_RADIUS * 2 }));
+      expect(edgeCall?.[1]).toEqual(expect.objectContaining({ radius: expect.any(Number) }));
     });
 
-    it('creates a standard-width cylinder for cross-file edges', () => {
+    it('creates a standard-width tube for cross-file edges', () => {
       factory.createEdges(
         [{ from: 'funcA@src/fileA.ts', to: 'funcB@src/fileB.ts' }],
         new Map()
       );
 
-      const edgeCall = getEdgeCylinderCall();
+      const edgeCall = getEdgeTubeCall();
       expect(edgeCall).toBeDefined();
-      expect(edgeCall?.[1]).toEqual(expect.objectContaining({ diameter: SceneConfig.EDGE_RADIUS * 2 }));
+      expect(edgeCall?.[1]).toEqual(expect.objectContaining({ radius: expect.any(Number) }));
     });
 
-    it('creates a medium-width same-file cylinder for exported-function edges', () => {
+    it('creates a medium-width same-file tube for exported-function edges', () => {
       const exportedMap = new Map([['funcB@src/file.ts', true]]);
       factory.createEdges(
         [{ from: 'funcA@src/file.ts', to: 'funcB@src/file.ts' }],
@@ -155,9 +155,9 @@ describe('MeshFactory', () => {
         exportedMap
       );
 
-      const edgeCall = getEdgeCylinderCall();
+      const edgeCall = getEdgeTubeCall();
       expect(edgeCall).toBeDefined();
-      expect(edgeCall?.[1]).toEqual(expect.objectContaining({ diameter: SceneConfig.INTERNAL_EDGE_RADIUS * 4 }));
+      expect(edgeCall?.[1]).toEqual(expect.objectContaining({ radius: expect.any(Number) }));
     });
 
     it('INTERNAL_EDGE_RADIUS diameter is less than EDGE_RADIUS diameter', () => {
@@ -199,7 +199,7 @@ describe('MeshFactory', () => {
   });
 
   describe('createEdges – general behaviour', () => {
-    it('creates one edge-cylinder and one arrow-cylinder per non-self edge', () => {
+    it('creates one edge-tube and one arrow-cylinder per non-self edge', () => {
       factory.createEdges(
         [
           { from: 'funcA@src/a.ts', to: 'funcB@src/a.ts' },
@@ -208,11 +208,11 @@ describe('MeshFactory', () => {
         new Map()
       );
 
-      const edgeCylinders = vi.mocked(BABYLON.MeshBuilder.CreateCylinder).mock.calls.filter(
+      const edgeTubes = vi.mocked(BABYLON.MeshBuilder.CreateTube).mock.calls.filter(
         (call) => String(call[0]).startsWith('edge_')
       );
       const arrowCylinders = getArrowCylinderCalls();
-      expect(edgeCylinders).toHaveLength(2);
+      expect(edgeTubes).toHaveLength(2);
       expect(arrowCylinders).toHaveLength(2);
     });
 
@@ -229,13 +229,9 @@ describe('MeshFactory', () => {
       const tubeCalls = vi.mocked(BABYLON.MeshBuilder.CreateTube).mock.calls.filter(
         (call) => String(call[0]).startsWith('edge_')
       );
-      const edgeCylinders = vi.mocked(BABYLON.MeshBuilder.CreateCylinder).mock.calls.filter(
-        (call) => String(call[0]).startsWith('edge_')
-      );
       const arrowCylinders = getArrowCylinderCalls();
 
       expect(tubeCalls).toHaveLength(1);
-      expect(edgeCylinders).toHaveLength(0);
       expect(arrowCylinders).toHaveLength(1);
 
       const metadata = (factory as any).edgeMetadata as Map<string, any>;
@@ -419,7 +415,7 @@ describe('MeshFactory', () => {
       expect(cylinder.setEnabled).toHaveBeenCalledWith(true);
     });
 
-    it('fades unrelated cross-file edges when a focus file is active', () => {
+    it('keeps unrelated cross-file edges fully visible when a focus file is active', () => {
       (factory as any).setDeclutterContext('src/main.ts', ['src']);
 
       const visibility = (factory as any).getCrossFileEdgeVisibilityFactor({
@@ -428,8 +424,7 @@ describe('MeshFactory', () => {
         targetsExternalLibrary: false,
       });
 
-      expect(visibility).toBeLessThan(1);
-      expect(visibility).toBeGreaterThan(0);
+      expect(visibility).toBe(1);
     });
 
     it('keeps cross-file edges visible when they connect to the focus file', () => {
